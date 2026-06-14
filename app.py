@@ -18,52 +18,56 @@ DATA_MAP = {
     49: (13, 5, "In"), 50: (14, 5, "Sn"), 51: (15, 5, "Sb"), 52: (16, 5, "Te"), 53: (17, 5, "I"), 54: (18, 5, "Xe")
 }
 
-SUB = {"0": "₀", "1": "₁", "2": "₂", "3": "₃", "4": "₄", "5": "₅", "6": "₆", "7": "₇", "8": "₈", "9": "₉"}
-SUP = {"1": "⁽¹⁾", "2": "⁽²⁾"}
-
 def clean_txt(t):
     z = {'Ą': 'A', 'Ć': 'C', 'Ę': 'E', 'Ł': 'L', 'Ń': 'N', 'Ó': 'O', 'Ś': 'S', 'Ź': 'Z', 'Ż': 'Z'}
     t = t.upper()
     for k, v in z.items(): t = t.replace(k, v)
     return re.sub(r'[^A-Z ]', '', t)
 
+# --- KOD 1 (Liniowy) ---
 def enc_v1(l):
     for i, (g, o, s) in DATA_MAP.items():
         if s == l: return f"{i}"
-        if s[0] == l and len(s) > 1: return f"{i}₁"
-        if len(s) > 1 and s[1] == l.lower(): return f"{i}₂"
+        if s[0] == l and len(s) > 1: return f"{i}.1"
+        if len(s) > 1 and s[1] == l.lower(): return f"{i}.2"
     return "?"
 
 def dec_v1(s):
-    s = s.strip().replace("₁", "1").replace("₂", "2")
+    s = s.strip()
     if not s: return ""
-    idx = s[-1] if len(s) > 1 and s[-1] in ["1", "2"] else ""
     try:
-        val = int(s[:-1]) if idx else int(s)
+        if "." in s:
+            parts = s.split(".")
+            val = int(parts[0])
+            idx = parts[1]
+        else:
+            val = int(s)
+            idx = ""
+            
         if val in DATA_MAP:
             res = DATA_MAP[val][2]
             return res[0].upper() if idx in ["", "1"] else res[1].upper()
     except ValueError: pass
     return "?"
 
+# --- KOD 2 (Macierzowy z kropkami) ---
 def enc_v2(l):
     for i, (g, o, s) in DATA_MAP.items():
-        sub_o = "".join(SUB[c] for c in str(o))
-        if s == l: return f"{g}{sub_o}"
-        if s[0] == l and len(s) > 1: return f"{g}{sub_o}{SUP['1']}"
-        if len(s) > 1 and s[1] == l.lower(): return f"{g}{sub_o}{SUP['2']}"
+        if s == l: return f"{g}.{o}"
+        if s[0] == l and len(s) > 1: return f"{g}.{o}.1"
+        if len(s) > 1 and s[1] == l.lower(): return f"{g}.{o}.2"
     return "?"
 
 def dec_v2(s):
     s = s.strip()
     if not s: return ""
-    for k, v in SUB.items(): s = s.replace(v, k)
-    s = s.replace("⁽¹⁾", "¹").replace("⁽²⁾", "²")
-    pos = "1" if s.endswith("¹") else ("2" if s.endswith("²") else "")
-    if pos: s = s[:-1]
-    if len(s) < 2: return "?"
+    if "." not in s: return "?"
     try:
-        o, g = int(s[-1]), int(s[:-1])
+        parts = s.split(".")
+        g = int(parts[0])
+        o = int(parts[1])
+        pos = parts[2] if len(parts) > 2 else ""
+        
         for i, (vg, vo, vs) in DATA_MAP.items():
             if vg == g and vo == o:
                 return vs[1].upper() if pos == "2" and len(vs) > 1 else vs[0].upper()
@@ -80,7 +84,9 @@ with c1:
     st.subheader("Panel Sterowania")
     proto = st.radio("Wybierz system kodu:", ["Kod 1", "Kod 2"], horizontal=True)
     mode = st.radio("Wybierz operację:", ["Koduj", "Odkoduj"], horizontal=True)
-    txt = st.text_input("Wprowadź tekst lub kod i zatwierdź Enterem:")
+    
+    placeholder = "Wpisz tekst do zakodowania..." if mode == "Koduj" else ("Wpisz kody (np. 16.1 20)" if "Kod 1" in proto else "Wpisz kody (np. 1.1 16.3.2)")
+    txt = st.text_input("Wprowadź tekst lub kod i zatwierdź Enterem:", placeholder=placeholder)
     
     if txt:
         res = ""
@@ -99,3 +105,4 @@ with c2:
     for item in st.session_state.history: 
         st.text(item)
         st.write("---")
+        
