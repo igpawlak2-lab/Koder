@@ -50,12 +50,12 @@ def dec_v1(s):
     except ValueError: pass
     return "?"
 
-# --- KOD 2 (Macierzowy z kropkami) ---
+# --- KOD 2 (Macierzowy: Grupa.OkresPozycja) ---
 def enc_v2(l):
     for i, (g, o, s) in DATA_MAP.items():
         if s == l: return f"{g}.{o}"
-        if s[0] == l and len(s) > 1: return f"{g}.{o}.1"
-        if len(s) > 1 and s[1] == l.lower(): return f"{g}.{o}.2"
+        if s[0] == l and len(s) > 1: return f"{g}.{o}1"
+        if len(s) > 1 and s[1] == l.lower(): return f"{g}.{o}2"
     return "?"
 
 def dec_v2(s):
@@ -65,8 +65,15 @@ def dec_v2(s):
     try:
         parts = s.split(".")
         g = int(parts[0])
-        o = int(parts[1])
-        pos = parts[2] if len(parts) > 2 else ""
+        rest = parts[1]
+        
+        # Jeśli po kropce są dwie cyfry, np. "32", to o=3, pos="2"
+        if len(rest) > 1:
+            o = int(rest[0])
+            pos = rest[1]
+        else:
+            o = int(rest)
+            pos = ""
         
         for i, (vg, vo, vs) in DATA_MAP.items():
             if vg == g and vo == o:
@@ -85,7 +92,7 @@ with c1:
     proto = st.radio("Wybierz system kodu:", ["Kod 1", "Kod 2"], horizontal=True)
     mode = st.radio("Wybierz operację:", ["Koduj", "Odkoduj"], horizontal=True)
     
-    placeholder = "Wpisz tekst do zakodowania..." if mode == "Koduj" else ("Wpisz kody (np. 16.1 20)" if "Kod 1" in proto else "Wpisz kody (np. 1.1 16.3.2)")
+    placeholder = "Wpisz tekst do zakodowania..." if mode == "Koduj" else ("Wpisz kody (np. 16.1 20)" if "Kod 1" in proto else "Wpisz kody (np. 1.1 13.32)")
     txt = st.text_input("Wprowadź tekst lub kod i zatwierdź Enterem:", placeholder=placeholder)
     
     if txt:
@@ -105,4 +112,3 @@ with c2:
     for item in st.session_state.history: 
         st.text(item)
         st.write("---")
-        
