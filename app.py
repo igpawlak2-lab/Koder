@@ -5,20 +5,58 @@ import streamlit as st
 # Czysty interfejs bez elementów chemicznych
 st.set_page_config(page_title="Koder", page_icon="📟", layout="wide")
 
-# --- KOD POWIĘKSZAJĄCY PRZYCISKI RADIO (Kod 1, Kod 2, Koduj, Odkoduj) ---
+# --- MODYFIKACJA INTERFEJSU (CSS) ---
 st.markdown("""
     <style>
-        /* Powiększenie tekstu obok opcji */
-        div[data-testid="stMarkdownContainer"] p {
-            font-size: 18px !important;
-        }
-        /* Powiększenie samych kółek do klikania (radio) */
-        div[data-testid="stRadio"] label div[data-testid="stWidgetLabel"] p {
-            font-size: 20px !important; /* Nagłówek nad opcjami, np. "Wybierz system kodu:" */
-            font-weight: bold;
+        /* Zamiana st.radio w duże, prostokątne przyciski */
+        div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div {
+            display: flex;
+            gap: 15px;
+            margin-top: 5px;
         }
         div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label {
-            padding: 10px 15px !important; /* Większe odstępy między opcjami */
+            background-color: #F0F2F6;
+            border: 2px solid #E0E2E6;
+            padding: 15px 30px !important;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+            font-size: 18px !important;
+            font-weight: bold !important;
+        }
+        /* Ukrycie domyślnych małych kółek radio */
+        div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label div[data-testid="stMarkdownContainer"]::before {
+            display: none !important;
+        }
+        div[data-testid="stRadio"] input[type="radio"] {
+            display: none;
+        }
+        /* Efekt podświetlenia wybranego kafelka (akcent niebieski) */
+        div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label:has(input:checked) {
+            background-color: #1E90FF !important;
+            color: white !important;
+            border-color: #1E90FF !important;
+            box-shadow: 0px 4px 10px rgba(30, 144, 255, 0.3);
+        }
+        /* Nagłówki nad kafelkami */
+        div[data-testid="stRadio"] label div[data-testid="stWidgetLabel"] p {
+            font-size: 18px !important;
+            font-weight: bold;
+            color: #31333E;
+        }
+        
+        /* Stylizowana ramka wokół historii operacji */
+        .history-box {
+            border: 2px solid #1E90FF;
+            border-radius: 12px;
+            padding: 20px;
+            background-color: #F9FAFB;
+            box-shadow: 0px 2px 8px rgba(0,0,0,0.05);
+            min-height: 300px;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -42,7 +80,6 @@ DATA_MAP = {
     113: (13, 7, "Nh"), 114: (14, 7, "Fl"), 115: (15, 7, "Mc"), 116: (16, 7, "Lv"), 117: (17, 7, "Ts"), 118: (18, 7, "Og")
 }
 
-# ... reszta kodu (funkcje enc, dec, i interfejs) pozostaje bez zmian ...
 def clean_txt(t):
     z = {'Ą': 'A', 'Ć': 'C', 'Ę': 'E', 'Ł': 'L', 'Ń': 'N', 'Ó': 'O', 'Ś': 'S', 'Ź': 'Z', 'Ż': 'Z'}
     t = t.upper()
@@ -118,12 +155,13 @@ if "has_liked" not in st.session_state:
 st.title("📟 KODER")
 st.write("Uniwersalny system kodowania i dekodowania tekstu.")
 
-c1, c2 = st.columns([2, 1])
+c1, c2 = st.columns([1.8, 1.2])
 with c1:
     st.subheader("Panel Sterowania")
     proto = st.radio("Wybierz system kodu:", ["Kod 1", "Kod 2"], horizontal=True)
     mode = st.radio("Wybierz operację:", ["Koduj", "Odkoduj"], horizontal=True)
     
+    st.write(" ")
     txt = st.text_input("Wprowadź dane i zatwierdź Enterem:", placeholder="Wpisz dane tutaj...")
     
     if txt:
@@ -139,12 +177,23 @@ with c1:
 
 with c2:
     st.subheader("Historia operacji")
+    
+    # Otwarcie ramki HTML
+    st.markdown('<div class="history-box">', unsafe_allow_html=True)
+    
     if st.button("Wyczyść historię", type="primary", key="btn_clear_history"): 
         st.session_state.history = []
         st.rerun()
-    for item in st.session_state.history: 
-        st.text(item)
-        st.write("---")
+        
+    if not st.session_state.history:
+        st.caption("Brak zarejestrowanych operacji w tej sesji.")
+    else:
+        for item in st.session_state.history: 
+            st.text(item)
+            st.write("---")
+            
+    # Zamknięcie ramki HTML
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # --- SEKCJA GLOBALNYCH POLUBIEŃ I KOMENTARZY ---
 st.write("---")
