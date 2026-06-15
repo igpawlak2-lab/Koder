@@ -30,7 +30,7 @@ def clean_txt(t):
     for k, v in z.items(): t = t.replace(k, v)
     return re.sub(r'[^A-Z ]', '', t)
 
-# --- KOD 1 (Liniowy) ---
+# --- KOD 1 ---
 def enc_v1(l):
     for i, (g, o, s) in DATA_MAP.items():
         if s == l: return f"{i}"
@@ -49,14 +49,13 @@ def dec_v1(s):
         else:
             val = int(s)
             idx = ""
-            
         if val in DATA_MAP:
             res = DATA_MAP[val][2]
             return res[0].upper() if idx in ["", "1"] else res[1].upper()
     except ValueError: pass
     return "?"
 
-# --- KOD 2 (Macierzowy) ---
+# --- KOD 2 ---
 def enc_v2(l):
     for i, (g, o, s) in DATA_MAP.items():
         if s == l: return f"{g}.{o}"
@@ -72,24 +71,31 @@ def dec_v2(s):
         parts = s.split(".")
         g = int(parts[0])
         rest = parts[1]
-        
         if len(rest) > 1:
             o = int(rest[0])
             pos = rest[1]
         else:
             o = int(rest)
             pos = ""
-        
         for i, (vg, vo, vs) in DATA_MAP.items():
             if vg == g and vo == o:
                 return vs[1].upper() if pos == "2" and len(vs) > 1 else vs[0].upper()
     except ValueError: pass
     return "?"
 
-# Inicjalizacja list i liczników w pamięci sesji
-if "history" not in st.session_state: st.session_state.history = []
-if "likes" not in st.session_state: st.session_state.likes = 0
-if "comments" not in st.session_state: st.session_state.comments = []
+# --- TRWAŁA PAMIĘĆ SERWERA DLA WSZYSTKICH (GLOBALNA) ---
+@st.cache_resource
+def get_global_data():
+    return {"likes": 0, "comments": []}
+
+global_store = get_global_data()
+
+# Lokalna historia (tylko dla bieżącej sesji użytkownika)
+if "history" not in st.session_state: 
+    st.session_state.history = []
+# Stan polubienia dla konkretnej przeglądarki
+if "has_liked" not in st.session_state:
+    st.session_state.has_liked = False
 
 st.title("📟 KODER")
 st.write("Uniwersalny system kodowania i dekodowania tekstu.")
@@ -100,19 +106,16 @@ with c1:
     proto = st.radio("Wybierz system kodu:", ["Kod 1", "Kod 2"], horizontal=True)
     mode = st.radio("Wybierz operację:", ["Koduj", "Odkoduj"], horizontal=True)
     
-    # --- WYRAŹNA INSTRUKCJA (FORMUŁA) NAD POLEM ---
     if mode == "Koduj":
         instrukcja = "**Wymagany format:** Dowolny tekst słowny (np. `KODER` lub `TEST`)"
     else:
         if "Kod 1" in proto:
             instrukcja = "**Wymagana formuła:** `Liczba` lub `Liczba.Pozycja` (np. `19 8.2 6`)"
         else:
-            instrukcja = "**Wymagana formuła:** `Grupa.Okres` lub `Grupa.OkresPozycja` (np. `1.1 13.32 1.2`)"
+            instrukcja = "**Wymagana formuła:** `Grupa.Okres` lub `Grupa.OkresPozycja` (np. `1.1 14.32 1.2`)"
             
     st.markdown(instrukcja)
-    
-    placeholder_input = "Wpisz dane tutaj..."
-    txt = st.text_input("Wprowadź dane i zatwierdź Enterem:", placeholder=placeholder_input)
+    txt = st.text_input("Wprowadź dane i zatwierdź Enterem:", placeholder="Wpisz dane tutaj...")
     
     if txt:
         res = ""
@@ -134,17 +137,26 @@ with c2:
         st.text(item)
         st.write("---")
 
-# --- SEKCJA POLUBIEŃ I KOMENTARZY (NA SAMYM DOLE) ---
+# --- SEKCJA GLOBALNYCH POLUBIEŃ I KOMENTARZY ---
 st.write("---")
 st.subheader("💬 Opinie użytkowników")
 
-col_like1, col_like2 = st.columns([1, 5])
+col_like1, col_like2 = st.columns([1.5, 5])
 with col_like1:
-    if st.button("👍 Polub stronę", key="btn_like_page"):
-        st.session_state.likes += 1
-        st.rerun()
+    # Inteligentny przycisk: lajkowanie / cofanie lajka
+    if not st.session_state.has_liked:
+        if st.button("👍 Polub stronę", key="btn_like_page"):
+            global_store["likes"] += 1
+            st.session_state.has_liked = True
+            st.rerun()
+    else:
+        if st.button("❌ Cofnij polubienie", type="primary", key="btn_unlike_page"):
+            global_store["likes"] = max(0, global_store["likes"] - 1)
+            st.session_state.has_liked = False
+            st.rerun()
+
 with col_like2:
-    st.write(f"Ta strona została polubiona już **{st.session_state.likes}** razy!")
+    st.write(f"Ta strona została polubiona już **{global_store['likes']}** razy!")
 
 st.write(" ")
 
@@ -156,12 +168,12 @@ with st.form("comment_form", clear_on_submit=True):
     if wyslij and komentarz_tekst.strip():
         podpis = nick.strip() if nick.strip() else "Anonim"
         nowy_komentarz = f"**{podpis}** ({datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}):\n{komentarz_tekst.strip()}"
-        st.session_state.comments.insert(0, nowy_komentarz)
+        global_store["comments"].insert(0, nowy_komentarz)
         st.rerun()
 
-if st.session_state.comments:
-    st.write("**Ostatnie komentarze:**")
-    for com in st.session_state.comments:
+if global_store["comments"]:
+    st.write("**Ostatnie komentarze (widoczne dla wszystkich):**")
+    for com in global_store["comments"]:
         st.info(com)
 else:
     st.caption("Brak komentarzy. Bądź pierwszy!")
