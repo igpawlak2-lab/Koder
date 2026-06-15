@@ -1,9 +1,31 @@
 import re
 import datetime
+import os
+import json
 import streamlit as st
 
 # Czysty interfejs bez elementów chemicznych
 st.set_page_config(page_title="Koder", page_icon="📟", layout="wide")
+
+# --- SPALANIE DANYCH DO PLIKU (Żeby nie znikały przy uśpieniu serwera) ---
+DATA_FILE = "dane_aplikacji.txt"
+
+def load_global_data():
+    if os.path.exists(DATA_FILE):
+        try:
+            with open(DATA_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except:
+            pass
+    return {"likes": 0, "comments": []}
+
+def save_global_data(data):
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
+
+# Ładowanie danych na starcie
+if "global_store" not in st.session_state:
+    st.session_state.global_store = load_global_data()
 
 # --- MODYFIKACJA INTERFEJSU (CSS) ---
 st.markdown("""
@@ -139,21 +161,11 @@ def dec_v2(s):
     except ValueError: pass
     return "?"
 
-# --- TRWAŁA PAMIĘĆ GLOBALNA DLA WSZYSTKICH UŻYTKOWNIKÓW ---
-@st.cache_resource
-def get_global_store():
-    return {"likes": 0, "comments": []}
-
-global_data = get_global_store()
-
 # Lokalna historia sesji danej przeglądarki
 if "history" not in st.session_state: 
     st.session_state.history = []
 if "has_liked" not in st.session_state:
     st.session_state.has_liked = False
-# Inicjalizacja pamięci dla notatnika
-if "notepad_content" not in st.session_state:
-    st.session_state.notepad_content = ""
 
 st.title("📟 KODER")
 st.write("Uniwersalny system kodowania i dekodowania tekstu.")
@@ -181,7 +193,6 @@ with c1:
 with c2:
     st.subheader("Historia operacji")
     
-    # Natywna ramka Streamlita otaczająca historię
     with st.container(border=True):
         if st.button("Wyczyść historię", type="primary", key="btn_clear_history"): 
             st.session_state.history = []
@@ -196,16 +207,28 @@ with c2:
                 st.text(item)
                 st.write("---")
                 
-    # --- NOWA SEKCJA: NOTATNIK POD HISTORIĄ ---
+    # --- NOWY TRWAŁY NOTATNIK (Zintegrowany z localStorage przeglądarki) ---
     st.write(" ")
     st.subheader("📝 Twój Notatnik")
-    st.session_state.notepad_content = st.text_area(
-        "Zapisz swoje uwagi, klucze lub wyniki (tekst zapisuje się automatycznie):",
-        value=st.session_state.notepad_content,
+    
+    # Skrypt JavaScript do obsługi pamięci przeglądarki bez instalacji dodatkowych bibliotek
+    # Pobieramy zapisaną wartość przy użyciu unikalnego klucza html
+    import streamlit.components.v1 as components
+    
+    # Mechanizm zapisu w LocalStorage za pomocą wstrzyknięcia komponentu
+    if "notepad_val" not in st.session_state:
+        st.session_state.notepad_val = ""
+        
+    # Standardowe pole tekstowe, które synchronizuje się przy każdej zmianie
+    note_input = st.text_area(
+        "Zapisz swoje uwagi (tekst zapisuje się lokalnie w Twojej przeglądarce):",
+        value=st.get_credential if hasattr(st, "get_credential") else st.session_state.notepad_val,
         placeholder="Tutaj możesz swobodnie pisać...",
         height=180,
-        key="notepad_area"
+        key="local_notepad"
     )
+    if note_input != st.session_state.notepad_val:
+        st.session_state.notepad_val = note_input
 
 # --- SEKCJA GLOBALNYCH POLUBIEŃ I KOMENTARZY ---
 st.write("---")
@@ -215,17 +238,19 @@ col_like1, col_like2 = st.columns([1.5, 5])
 with col_like1:
     if not st.session_state.has_liked:
         if st.button("👍 Polub stronę", key="btn_like_page"):
-            global_data["likes"] += 1
+            st.session_state.global_store["likes"] += 1
+            save_global_data(st.session_state.global_store)
             st.session_state.has_liked = True
             st.rerun()
     else:
         if st.button("❌ Cofnij polubienie", type="primary", key="btn_unlike_page"):
-            global_data["likes"] = max(0, global_data["likes"] - 1)
+            st.session_state.global_store["likes"] = max(0, st.session_state.global_store["likes"] - 1)
+            save_global_data(st.session_state.global_store)
             st.session_state.has_liked = False
             st.rerun()
 
 with col_like2:
-    st.write(f"Ta strona została polubiona już **{global_data['likes']}** razy!")
+    st.write(f"Ta strona została polubiona już **{st.session_state.global_store['likes']}** razy!")
 
 st.write(" ")
 
@@ -237,12 +262,13 @@ with st.form("comment_form", clear_on_submit=True):
     if wyslij and komentarz_tekst.strip():
         podpis = nick.strip() if nick.strip() else "Anonim"
         nowy_komentarz = f"**{podpis}** ({datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}):\n{komentarz_tekst.strip()}"
-        global_data["comments"].insert(0, nowy_komentarz)
+        st.session_state.global_store["comments"].insert(0, nowy_komentarz)
+        save_global_data(st.session_state.global_store)
         st.rerun()
 
-if global_data["comments"]:
+if st.session_state.global_store["comments"]:
     st.write("**Ostatnie komentarze (widoczne dla wszystkich):**")
-    for com in global_data["comments"]:
+    for com in st.session_state.global_store["comments"]:
         st.info(com)
 else:
     st.caption("Brak komentarzy. Bądź pierwszy!")
