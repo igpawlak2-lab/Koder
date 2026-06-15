@@ -114,7 +114,52 @@ with c1:
 
 with c2:
     st.subheader("Historia operacji")
-    if st.button("Wyczyść historię", type="primary"): st.session_state.history = []; st.rerun()
+    if st.button("Wyczyść historię", type="primary"): 
+        st.session_state.history = []
+        st.rerun()
+        
     for item in st.session_state.history: 
         st.text(item)
         st.write("---")
+
+
+st.write("---")
+st.subheader("💬 Opinie użytkowników")
+
+# Inicjalizacja bazy w pamięci sesji
+if "likes" not in st.session_state:
+    st.session_state.likes = 0
+if "comments" not in st.session_state:
+    st.session_state.comments = []
+
+# Układ dla polubień
+col_like1, col_like2 = st.columns([1, 5])
+with col_like1:
+    if st.button("👍 Polub stronę"):
+        st.session_state.likes += 1
+        st.rerun()
+with col_like2:
+    st.write(f"Ta strona została polubiona już **{st.session_state.likes}** razy!")
+
+st.write(" ")
+
+# Formularz dodawania komentarza
+with st.form("comment_form", clear_on_submit=True):
+    nick = st.text_input("Twój podpis/nick:", placeholder="Anonim")
+    komentarz_tekst = st.text_area("Napisz komentarz o stronie:", placeholder="Wpisz swoją opinię tutaj...")
+    wyslij = st.form_submit_button("Dodaj komentarz")
+    
+    if wyslij and komentarz_tekst.strip():
+        podpis = nick.strip() if nick.strip() else "Anonim"
+        czas_kom = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+        nowy_komentarz = f"**{podpis}** ({czas_kom}):\n{komentarz_tekst.strip()}"
+        st.session_state.comments.insert(0, nowy_komentarz)
+        st.rerun()
+
+# Wyświetlanie komentarzy
+if st.session_state.comments:
+    st.write("**Ostatnie komentarze:**")
+    for com in st.session_state.comments:
+        st.info(com)
+else:
+    st.caption("Brak komentarzy. Bądź pierwszy!")
