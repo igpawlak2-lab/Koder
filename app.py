@@ -83,14 +83,14 @@ def dec_v2(s):
     except ValueError: pass
     return "?"
 
-# --- TRWAŁA PAMIĘĆ SERWERA DLA WSZYSTKICH (GLOBALNA) ---
+# --- GLOBALNA PAMIĘĆ SERWERA ---
 @st.cache_resource
 def get_global_data():
     return {"likes": 0, "comments": []}
 
 global_store = get_global_data()
 
-# Lokalna historia (tylko dla bieżącej sesji użytkownika)
+# Lokalna historia
 if "history" not in st.session_state: 
     st.session_state.history = []
 # Stan polubienia dla konkretnej przeglądarki
@@ -106,15 +106,7 @@ with c1:
     proto = st.radio("Wybierz system kodu:", ["Kod 1", "Kod 2"], horizontal=True)
     mode = st.radio("Wybierz operację:", ["Koduj", "Odkoduj"], horizontal=True)
     
-    if mode == "Koduj":
-        instrukcja = "**Wymagany format:** Dowolny tekst słowny (np. `KODER` lub `TEST`)"
-    else:
-        if "Kod 1" in proto:
-            instrukcja = "**Wymagana formuła:** `Liczba` lub `Liczba.Pozycja` (np. `19 8.2 6`)"
-        else:
-            instrukcja = "**Wymagana formuła:** `Grupa.Okres` lub `Grupa.OkresPozycja` (np. `1.1 14.32 1.2`)"
-            
-    st.markdown(instrukcja)
+    # Usunięto st.markdown(instrukcja) – tekst już się nie wyświetla
     txt = st.text_input("Wprowadź dane i zatwierdź Enterem:", placeholder="Wpisz dane tutaj...")
     
     if txt:
@@ -143,7 +135,6 @@ st.subheader("💬 Opinie użytkowników")
 
 col_like1, col_like2 = st.columns([1.5, 5])
 with col_like1:
-    # Inteligentny przycisk: lajkowanie / cofanie lajka
     if not st.session_state.has_liked:
         if st.button("👍 Polub stronę", key="btn_like_page"):
             global_store["likes"] += 1
@@ -163,17 +154,4 @@ st.write(" ")
 with st.form("comment_form", clear_on_submit=True):
     nick = st.text_input("Twój podpis/nick:", placeholder="Anonim")
     komentarz_tekst = st.text_area("Napisz komentarz o stronie:", placeholder="Wpisz swoją opinię tutaj...")
-    wyslij = st.form_submit_button("Dodaj komentarz")
-    
-    if wyslij and komentarz_tekst.strip():
-        podpis = nick.strip() if nick.strip() else "Anonim"
-        nowy_komentarz = f"**{podpis}** ({datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}):\n{komentarz_tekst.strip()}"
-        global_store["comments"].insert(0, nowy_komentarz)
-        st.rerun()
-
-if global_store["comments"]:
-    st.write("**Ostatnie komentarze (widoczne dla wszystkich):**")
-    for com in global_store["comments"]:
-        st.info(com)
-else:
-    st.caption("Brak komentarzy. Bądź pierwszy!")
+    wyslij =
