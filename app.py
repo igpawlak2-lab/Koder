@@ -89,8 +89,8 @@ def dec_v2(s):
 
 if "history" not in st.session_state: st.session_state.history = []
 
-st.title("📟 KODER")
-st.write("Uniwersalny system kodowania i dekodowania tekstu.")
+st.title("📟🧪 KODER ")
+st.write("Uniwersalny system kodowania i dekodowania tekstu z tablicy mendelejewa.")
 
 c1, c2 = st.columns([2, 1])
 with c1:
