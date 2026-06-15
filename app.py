@@ -18,7 +18,7 @@ st.markdown("""
         div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label {
             background-color: #F0F2F6;
             border: 2px solid #E0E2E6;
-            padding: 12px 10px !important; /* Zmniejszony padding wewnętrzny, by tekst się mieścił */
+            padding: 12px 10px !important;
             border-radius: 10px;
             cursor: pointer;
             transition: all 0.2s ease-in-out;
@@ -26,10 +26,10 @@ st.markdown("""
             align-items: center;
             justify-content: center;
             flex: 1;
-            min-width: 140px; /* Minimalna szerokość, aby "Odkoduj" się nie łamało */
+            min-width: 140px;
             font-size: 16px !important;
             font-weight: bold !important;
-            white-space: nowrap !important; /* Blokada łamania tekstu do nowej linii */
+            white-space: nowrap !important;
         }
         /* Ukrycie domyślnych małych kółek radio */
         div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label div[data-testid="stMarkdownContainer"]::before {
@@ -151,6 +151,9 @@ if "history" not in st.session_state:
     st.session_state.history = []
 if "has_liked" not in st.session_state:
     st.session_state.has_liked = False
+# Inicjalizacja pamięci dla notatnika
+if "notepad_content" not in st.session_state:
+    st.session_state.notepad_content = ""
 
 st.title("📟 KODER")
 st.write("Uniwersalny system kodowania i dekodowania tekstu.")
@@ -178,7 +181,7 @@ with c1:
 with c2:
     st.subheader("Historia operacji")
     
-    # Bezpieczna, natywna ramka Streamlita otaczająca przycisk ORAZ całą zawartość historii
+    # Natywna ramka Streamlita otaczająca historię
     with st.container(border=True):
         if st.button("Wyczyść historię", type="primary", key="btn_clear_history"): 
             st.session_state.history = []
@@ -192,6 +195,17 @@ with c2:
             for item in st.session_state.history: 
                 st.text(item)
                 st.write("---")
+                
+    # --- NOWA SEKCJA: NOTATNIK POD HISTORIĄ ---
+    st.write(" ")
+    st.subheader("📝 Twój Notatnik")
+    st.session_state.notepad_content = st.text_area(
+        "Zapisz swoje uwagi, klucze lub wyniki (tekst zapisuje się automatycznie):",
+        value=st.session_state.notepad_content,
+        placeholder="Tutaj możesz swobodnie pisać...",
+        height=180,
+        key="notepad_area"
+    )
 
 # --- SEKCJA GLOBALNYCH POLUBIEŃ I KOMENTARZY ---
 st.write("---")
