@@ -7,8 +7,8 @@ import streamlit as st
 # Czysty interfejs bez elementów chemicznych
 st.set_page_config(page_title="Koder", page_icon="📟", layout="wide")
 
-# --- SPALANIE DANYCH DO PLIKU (Żeby nie znikały przy uśpieniu serwera) ---
-DATA_FILE = "dane_aplikacji.txt"
+# --- TRWAŁE ZAPISYWANIE DANYCH DO PLIKU (Żeby opinie i lajki nie znikały) ---
+DATA_FILE = "dane_aplikacji.json"
 
 def load_global_data():
     if os.path.exists(DATA_FILE):
@@ -20,10 +20,13 @@ def load_global_data():
     return {"likes": 0, "comments": []}
 
 def save_global_data(data):
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
+    try:
+        with open(DATA_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
+    except:
+        pass
 
-# Ładowanie danych na starcie
+# Ładowanie danych na starcie do pamięci podręcznej sesji
 if "global_store" not in st.session_state:
     st.session_state.global_store = load_global_data()
 
@@ -108,10 +111,11 @@ def clean_txt(t):
     for k, v in z.items(): t = t.replace(k, v)
     return re.sub(r'[^A-Z ]', '', t)
 
-# --- KOD 1 ---
+# --- POPRAWIONY KOD 1 ---
 def enc_v1(l):
     for i, (g, o, s) in DATA_MAP.items():
         if s == l: return f"{i}"
+    for i, (g, o, s) in DATA_MAP.items():
         if s[0] == l and len(s) > 1: return f"{i}.1"
         if len(s) > 1 and s[1] == l.lower(): return f"{i}.2"
     return "?"
@@ -133,10 +137,11 @@ def dec_v1(s):
     except ValueError: pass
     return "?"
 
-# --- KOD 2 ---
+# --- POPRAWIONY KOD 2 ---
 def enc_v2(l):
     for i, (g, o, s) in DATA_MAP.items():
         if s == l: return f"{g}.{o}"
+    for i, (g, o, s) in DATA_MAP.items():
         if s[0] == l and len(s) > 1: return f"{g}.{o}1"
         if len(s) > 1 and s[1] == l.lower(): return f"{g}.{o}2"
     return "?"
@@ -166,6 +171,8 @@ if "history" not in st.session_state:
     st.session_state.history = []
 if "has_liked" not in st.session_state:
     st.session_state.has_liked = False
+if "notepad_content" not in st.session_state:
+    st.session_state.notepad_content = ""
 
 st.title("📟 KODER")
 st.write("Uniwersalny system kodowania i dekodowania tekstu.")
@@ -207,28 +214,18 @@ with c2:
                 st.text(item)
                 st.write("---")
                 
-    # --- NOWY TRWAŁY NOTATNIK (Zintegrowany z localStorage przeglądarki) ---
+    # --- BEZPIECZNY NOTATNIK ---
     st.write(" ")
     st.subheader("📝 Twój Notatnik")
     
-    # Skrypt JavaScript do obsługi pamięci przeglądarki bez instalacji dodatkowych bibliotek
-    # Pobieramy zapisaną wartość przy użyciu unikalnego klucza html
-    import streamlit.components.v1 as components
-    
-    # Mechanizm zapisu w LocalStorage za pomocą wstrzyknięcia komponentu
-    if "notepad_val" not in st.session_state:
-        st.session_state.notepad_val = ""
-        
-    # Standardowe pole tekstowe, które synchronizuje się przy każdej zmianie
     note_input = st.text_area(
-        "Zapisz swoje uwagi (tekst zapisuje się lokalnie w Twojej przeglądarce):",
-        value=st.get_credential if hasattr(st, "get_credential") else st.session_state.notepad_val,
+        "Zapisz swoje uwagi (tekst zapamiętuje się podczas pracy z kodami):",
+        value=st.session_state.notepad_content,
         placeholder="Tutaj możesz swobodnie pisać...",
         height=180,
         key="local_notepad"
     )
-    if note_input != st.session_state.notepad_val:
-        st.session_state.notepad_val = note_input
+    st.session_state.notepad_content = note_input
 
 # --- SEKCJA GLOBALNYCH POLUBIEŃ I KOMENTARZY ---
 st.write("---")
