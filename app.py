@@ -5,6 +5,24 @@ import streamlit as st
 # Czysty interfejs bez elementów chemicznych
 st.set_page_config(page_title="Koder", page_icon="📟", layout="wide")
 
+# --- KOD POWIĘKSZAJĄCY PRZYCISKI RADIO (Kod 1, Kod 2, Koduj, Odkoduj) ---
+st.markdown("""
+    <style>
+        /* Powiększenie tekstu obok opcji */
+        div[data-testid="stMarkdownContainer"] p {
+            font-size: 18px !important;
+        }
+        /* Powiększenie samych kółek do klikania (radio) */
+        div[data-testid="stRadio"] label div[data-testid="stWidgetLabel"] p {
+            font-size: 20px !important; /* Nagłówek nad opcjami, np. "Wybierz system kodu:" */
+            font-weight: bold;
+        }
+        div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label {
+            padding: 10px 15px !important; /* Większe odstępy między opcjami */
+        }
+    </style>
+""", unsafe_allow_html=True)
+
 # Ukryta mapa danych
 DATA_MAP = {
     1: (1, 1, "H"), 2: (18, 1, "He"), 3: (1, 2, "Li"), 4: (2, 2, "Be"), 5: (13, 2, "B"), 6: (14, 2, "C"), 
@@ -24,6 +42,7 @@ DATA_MAP = {
     113: (13, 7, "Nh"), 114: (14, 7, "Fl"), 115: (15, 7, "Mc"), 116: (16, 7, "Lv"), 117: (17, 7, "Ts"), 118: (18, 7, "Og")
 }
 
+# ... reszta kodu (funkcje enc, dec, i interfejs) pozostaje bez zmian ...
 def clean_txt(t):
     z = {'Ą': 'A', 'Ć': 'C', 'Ę': 'E', 'Ł': 'L', 'Ń': 'N', 'Ó': 'O', 'Ś': 'S', 'Ź': 'Z', 'Ż': 'Z'}
     t = t.upper()
