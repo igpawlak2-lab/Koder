@@ -83,17 +83,16 @@ def dec_v2(s):
     except ValueError: pass
     return "?"
 
-# --- GLOBALNA PAMIĘĆ SERWERA DLA WSZYSTKICH ---
+# --- TRWAŁA PAMIĘĆ GLOBALNA DLA WSZYSTKICH UŻYTKOWNIKÓW ---
 @st.cache_resource
-def get_global_data():
+def get_global_store():
     return {"likes": 0, "comments": []}
 
-global_store = get_global_data()
+global_data = get_global_store()
 
-# Lokalna historia sesji
+# Lokalna historia sesji danej przeglądarki
 if "history" not in st.session_state: 
     st.session_state.history = []
-# Stan polubienia dla tej konkretnej przeglądarki
 if "has_liked" not in st.session_state:
     st.session_state.has_liked = False
 
@@ -136,17 +135,17 @@ col_like1, col_like2 = st.columns([1.5, 5])
 with col_like1:
     if not st.session_state.has_liked:
         if st.button("👍 Polub stronę", key="btn_like_page"):
-            global_store["likes"] += 1
+            global_data["likes"] += 1
             st.session_state.has_liked = True
             st.rerun()
     else:
         if st.button("❌ Cofnij polubienie", type="primary", key="btn_unlike_page"):
-            global_store["likes"] = max(0, global_store["likes"] - 1)
+            global_data["likes"] = max(0, global_data["likes"] - 1)
             st.session_state.has_liked = False
             st.rerun()
 
 with col_like2:
-    st.write(f"Ta strona została polubiona już **{global_store['likes']}** razy!")
+    st.write(f"Ta strona została polubiona już **{global_data['likes']}** razy!")
 
 st.write(" ")
 
@@ -158,12 +157,12 @@ with st.form("comment_form", clear_on_submit=True):
     if wyslij and komentarz_tekst.strip():
         podpis = nick.strip() if nick.strip() else "Anonim"
         nowy_komentarz = f"**{podpis}** ({datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}):\n{komentarz_tekst.strip()}"
-        global_store["comments"].insert(0, nowy_komentarz)
+        global_data["comments"].insert(0, nowy_komentarz)
         st.rerun()
 
-if global_store["comments"]:
+if global_data["comments"]:
     st.write("**Ostatnie komentarze (widoczne dla wszystkich):**")
-    for com in global_store["comments"]:
+    for com in global_data["comments"]:
         st.info(com)
 else:
     st.caption("Brak komentarzy. Bądź pierwszy!")
