@@ -11,13 +11,14 @@ st.markdown("""
         /* Zamiana st.radio w duże, prostokątne przyciski */
         div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div {
             display: flex;
-            gap: 15px;
+            gap: 10px;
             margin-top: 5px;
+            width: 100%;
         }
         div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label {
             background-color: #F0F2F6;
             border: 2px solid #E0E2E6;
-            padding: 15px 30px !important;
+            padding: 12px 10px !important; /* Zmniejszony padding wewnętrzny, by tekst się mieścił */
             border-radius: 10px;
             cursor: pointer;
             transition: all 0.2s ease-in-out;
@@ -25,8 +26,10 @@ st.markdown("""
             align-items: center;
             justify-content: center;
             flex: 1;
-            font-size: 18px !important;
+            min-width: 140px; /* Minimalna szerokość, aby "Odkoduj" się nie łamało */
+            font-size: 16px !important;
             font-weight: bold !important;
+            white-space: nowrap !important; /* Blokada łamania tekstu do nowej linii */
         }
         /* Ukrycie domyślnych małych kółek radio */
         div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label div[data-testid="stMarkdownContainer"]::before {
@@ -44,19 +47,16 @@ st.markdown("""
         }
         /* Nagłówki nad kafelkami */
         div[data-testid="stRadio"] label div[data-testid="stWidgetLabel"] p {
-            font-size: 18px !important;
+            font-size: 16px !important;
             font-weight: bold;
             color: #31333E;
         }
         
-        /* Stylizowana ramka wokół historii operacji */
-        .history-box {
-            border: 2px solid #1E90FF;
+        /* Wymuszenie koloru niebieskiego dla natywnej ramki Streamlit */
+        div[data-testid="stVerticalBlockBorderWrapper"] {
+            border-color: #1E90FF !important;
             border-radius: 12px;
-            padding: 20px;
             background-color: #F9FAFB;
-            box-shadow: 0px 2px 8px rgba(0,0,0,0.05);
-            min-height: 300px;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -155,7 +155,7 @@ if "has_liked" not in st.session_state:
 st.title("📟 KODER")
 st.write("Uniwersalny system kodowania i dekodowania tekstu.")
 
-c1, c2 = st.columns([1.8, 1.2])
+c1, c2 = st.columns([1.6, 1.4])
 with c1:
     st.subheader("Panel Sterowania")
     proto = st.radio("Wybierz system kodu:", ["Kod 1", "Kod 2"], horizontal=True)
@@ -178,22 +178,20 @@ with c1:
 with c2:
     st.subheader("Historia operacji")
     
-    # Otwarcie ramki HTML
-    st.markdown('<div class="history-box">', unsafe_allow_html=True)
-    
-    if st.button("Wyczyść historię", type="primary", key="btn_clear_history"): 
-        st.session_state.history = []
-        st.rerun()
-        
-    if not st.session_state.history:
-        st.caption("Brak zarejestrowanych operacji w tej sesji.")
-    else:
-        for item in st.session_state.history: 
-            st.text(item)
-            st.write("---")
+    # Bezpieczna, natywna ramka Streamlita otaczająca przycisk ORAZ całą zawartość historii
+    with st.container(border=True):
+        if st.button("Wyczyść historię", type="primary", key="btn_clear_history"): 
+            st.session_state.history = []
+            st.rerun()
             
-    # Zamknięcie ramki HTML
-    st.markdown('</div>', unsafe_allow_html=True)
+        st.write(" ")
+        
+        if not st.session_state.history:
+            st.caption("Brak zarejestrowanych operacji w tej sesji.")
+        else:
+            for item in st.session_state.history: 
+                st.text(item)
+                st.write("---")
 
 # --- SEKCJA GLOBALNYCH POLUBIEŃ I KOMENTARZY ---
 st.write("---")
