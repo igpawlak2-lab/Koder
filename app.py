@@ -98,7 +98,7 @@ with c1:
     proto = st.radio("Wybierz system kodu:", ["Kod 1", "Kod 2"], horizontal=True)
     mode = st.radio("Wybierz operację:", ["Koduj", "Odkoduj"], horizontal=True)
     
-    placeholder = "Wpisz tekst do zakodowania..." if mode == "Koduj" else ("Wpisz kody (np. 16.1 20)" if "Kod 1" in proto else "Wpisz kody (np. 1.1 13.32)")
+    placeholder = "Wpisz tekst do zakodowania..." if mode == "Koduj" else ("Wpisz kody (np. 16 20.1)" if "Kod 1" in proto else "Wpisz kody (np. 1.1 13.32)")
     txt = st.text_input("Wprowadź tekst lub kod i zatwierdź Enterem:", placeholder=placeholder)
     
     if txt:
