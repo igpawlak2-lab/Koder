@@ -123,6 +123,19 @@ with c2:
         st.write("---")
 
 
+with c2:
+    st.subheader("Historia operacji")
+    if st.button("Wyczyść historię", type="primary"): 
+        st.session_state.history = []
+        st.rerun()
+        
+    for item in st.session_state.history: 
+        st.text(item)
+        st.write("---")
+
+# ==========================================
+# NOWA SEKCJA: POLUBIENIA I KOMENTARZE
+# ==========================================
 st.write("---")
 st.subheader("💬 Opinie użytkowników")
 
