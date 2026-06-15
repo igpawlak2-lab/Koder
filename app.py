@@ -15,13 +15,13 @@ DATA_MAP = {
     31: (13, 4, "Ga"), 32: (14, 4, "Ge"), 33: (15, 4, "As"), 34: (16, 4, "Se"), 35: (17, 4, "Br"), 36: (18, 4, "Kr"),
     37: (1, 5, "Rb"), 38: (2, 5, "Sr"), 39: (3, 5, "Y"), 40: (4, 5, "Zr"), 41: (5, 5, "Nb"), 42: (6, 5, "Mo"),
     43: (7, 5, "Tc"), 44: (8, 5, "Ru"), 45: (9, 5, "Rh"), 46: (10, 5, "Pd"), 47: (11, 5, "Ag"), 48: (12, 5, "Cd"),
-    49: (13, 5, "In"), 50: (14, 5, "Sn"), 51: (15, 5, "Sb"), 52: (16, 5, "Te"), 53: (17, 5, "I"), 54: (18, 5, "Xe"), 55: (1, 6, "Cs"),
-    56: (2, 6, "Ba"), 57: (3, 6, "La"), 72: (4, 6, "Hf"), 73: (5, 6, "Ta"), 74: (6, 6, "W"), 75: (7, 6, "Re"), 76: (8, 6, "Os"),
-    77: (9, 6, "Ir"), 78: (10, 6, "Pt"), 79: (11, 6, "Au"), 80: (12, 6, "Hg"), 81: (13, 6, "Tl"), 82: (14, 6, "Pb"), 
-    83: (15, 6, "Bi"), 84: (16, 6, "Po"), 85: (17, 6, "At"), 86: (18, 6, "Rn"), 87: (1, 7, "Fr"), 88: (2, 7, "Ra"),
-    89: (3, 7, "Ac"), 104: (4, 7, "Rf"), 105: (5, 7, "Db"), 106: (6, 7, "Sg"), 107: (7, 7, "Bh"), 108: (8, 7, "Hs"),
-    109: (9, 7, "Mt"), 110: (10, 7, "Ds"), 111: (11, 7, "Rg"), 112: (12, 7, "Cn"), 113: (13, 7, "Nh"), 114: (14, 7, "Fl"),
-    115: (15, 7, "Mc"), 116: (16, 7, "Lv"), 117: (17, 7, "Ts"), 118: (18, 7, "Og"),
+    49: (13, 5, "In"), 50: (14, 5, "Sn"), 51: (15, 5, "Sb"), 52: (16, 5, "Te"), 53: (17, 5, "I"), 54: (18, 5, "Xe"),
+    55: (1, 6, "Cs"), 56: (2, 6, "Ba"), 57: (3, 6, "La"), 72: (4, 6, "Hf"), 73: (5, 6, "Ta"), 74: (6, 6, "W"), 
+    75: (7, 6, "Re"), 76: (8, 6, "Os"), 77: (9, 6, "Ir"), 78: (10, 6, "Pt"), 79: (11, 6, "Au"), 80: (12, 6, "Hg"), 
+    81: (13, 6, "Tl"), 82: (14, 6, "Pb"), 83: (15, 6, "Bi"), 84: (16, 6, "Po"), 85: (17, 6, "At"), 86: (18, 6, "Rn"), 
+    87: (1, 7, "Fr"), 88: (2, 7, "Ra"), 89: (3, 7, "Ac"), 104: (4, 7, "Rf"), 105: (5, 7, "Db"), 106: (6, 7, "Sg"), 
+    107: (7, 7, "Bh"), 108: (8, 7, "Hs"), 109: (9, 7, "Mt"), 110: (10, 7, "Ds"), 111: (11, 7, "Rg"), 112: (12, 7, "Cn"), 
+    113: (13, 7, "Nh"), 114: (14, 7, "Fl"), 115: (15, 7, "Mc"), 116: (16, 7, "Lv"), 117: (17, 7, "Ts"), 118: (18, 7, "Og")
 }
 
 def clean_txt(t):
@@ -56,7 +56,7 @@ def dec_v1(s):
     except ValueError: pass
     return "?"
 
-# --- KOD 2 (Macierzowy: Grupa.OkresPozycja) ---
+# --- KOD 2 (Macierzowy) ---
 def enc_v2(l):
     for i, (g, o, s) in DATA_MAP.items():
         if s == l: return f"{g}.{o}"
@@ -73,7 +73,6 @@ def dec_v2(s):
         g = int(parts[0])
         rest = parts[1]
         
-        # Jeśli po kropce są dwie cyfry, np. "32", to o=3, pos="2"
         if len(rest) > 1:
             o = int(rest[0])
             pos = rest[1]
@@ -87,10 +86,13 @@ def dec_v2(s):
     except ValueError: pass
     return "?"
 
+# Inicjalizacja list w pamięci sesji
 if "history" not in st.session_state: st.session_state.history = []
+if "likes" not in st.session_state: st.session_state.likes = 0
+if "comments" not in st.session_state: st.session_state.comments = []
 
-st.title("📟🧪 KODER ")
-st.write("Uniwersalny system kodowania i dekodowania tekstu z tablicy mendelejewa.")
+st.title("📟 KODER")
+st.write("Uniwersalny system kodowania i dekodowania tekstu.")
 
 c1, c2 = st.columns([2, 1])
 with c1:
@@ -98,8 +100,19 @@ with c1:
     proto = st.radio("Wybierz system kodu:", ["Kod 1", "Kod 2"], horizontal=True)
     mode = st.radio("Wybierz operację:", ["Koduj", "Odkoduj"], horizontal=True)
     
-    placeholder = "Wpisz tekst do zakodowania..." if mode == "Koduj" else ("Wpisz kody (np. 16 20.1)" if "Kod 1" in proto else "Wpisz kody (np. 1.1 13.32)")
-    txt = st.text_input("Wprowadź tekst lub kod i zatwierdź Enterem:", placeholder=placeholder)
+    # --- ZAWSZE WIDOCZNA INSTRUKCJA (FORMUŁA) NAD POLEM ---
+    if mode == "Koduj":
+        instrukcja = "**Wymagany format:** Dowolny tekst słowny (np. `KODER` lub `TEST`)"
+    else:
+        if "Kod 1" in proto:
+            instrukcja = "**Wymagana formuła:** `Liczba` lub `Liczba.Pozycja` (np. `19 8.2 6`)"
+        else:
+            instrukcja = "**Wymagana formuła:** `Grupa.Okres` lub `Grupa.OkresPozycja` (np. `1.1 14.32 1.2`)"
+            
+    st.markdown(instrukcja)
+    
+    placeholder_input = "Wpisz tekst..." if mode == "Koduj" else "Wpisz kody zgodnie z formułą powyżej..."
+    txt = st.text_input("Wprowadź dane i zatwierdź Enterem:", placeholder=placeholder_input)
     
     if txt:
         res = ""
@@ -117,35 +130,14 @@ with c2:
     if st.button("Wyczyść historię", type="primary"): 
         st.session_state.history = []
         st.rerun()
-        
     for item in st.session_state.history: 
         st.text(item)
         st.write("---")
 
-
-with c2:
-    st.subheader("Historia operacji")
-    if st.button("Wyczyść historię", type="primary"): 
-        st.session_state.history = []
-        st.rerun()
-        
-    for item in st.session_state.history: 
-        st.text(item)
-        st.write("---")
-
-# ==========================================
-# NOWA SEKCJA: POLUBIENIA I KOMENTARZE
-# ==========================================
+# --- SEKCJA POLUBIEŃ I KOMENTARZY (NA SAMYM DOLE) ---
 st.write("---")
 st.subheader("💬 Opinie użytkowników")
 
-# Inicjalizacja bazy w pamięci sesji
-if "likes" not in st.session_state:
-    st.session_state.likes = 0
-if "comments" not in st.session_state:
-    st.session_state.comments = []
-
-# Układ dla polubień
 col_like1, col_like2 = st.columns([1, 5])
 with col_like1:
     if st.button("👍 Polub stronę"):
@@ -156,7 +148,6 @@ with col_like2:
 
 st.write(" ")
 
-# Formularz dodawania komentarza
 with st.form("comment_form", clear_on_submit=True):
     nick = st.text_input("Twój podpis/nick:", placeholder="Anonim")
     komentarz_tekst = st.text_area("Napisz komentarz o stronie:", placeholder="Wpisz swoją opinię tutaj...")
@@ -164,12 +155,10 @@ with st.form("comment_form", clear_on_submit=True):
     
     if wyslij and komentarz_tekst.strip():
         podpis = nick.strip() if nick.strip() else "Anonim"
-        czas_kom = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-        nowy_komentarz = f"**{podpis}** ({czas_kom}):\n{komentarz_tekst.strip()}"
+        nowy_komentarz = f"**{podpis}** ({datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}):\n{komentarz_tekst.strip()}"
         st.session_state.comments.insert(0, nowy_komentarz)
         st.rerun()
 
-# Wyświetlanie komentarzy
 if st.session_state.comments:
     st.write("**Ostatnie komentarze:**")
     for com in st.session_state.comments:
