@@ -83,15 +83,6 @@ st.markdown("""
             border-radius: 12px;
             background-color: #F9FAFB;
         }
-
-        /* STYL DLA PRZEWIJANEJ HISTORII */
-        .scrollable-history {
-            max-height: 250px; /* Maksymalna wysokość ramki z historią */
-            overflow-y: auto;  /* Pojawienie się suwaka w pionie, gdy tekst przekroczy max-height */
-            padding-right: 10px;
-            font-family: monospace;
-            background-color: #F9FAFB;
-        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -100,7 +91,7 @@ DATA_MAP = {
     1: (1, 1, "H"), 2: (18, 1, "He"), 3: (1, 2, "Li"), 4: (2, 2, "Be"), 5: (13, 2, "B"), 6: (14, 2, "C"), 
     7: (15, 2, "N"), 8: (16, 2, "O"), 9: (17, 2, "F"), 10: (18, 2, "Ne"), 11: (1, 3, "Na"), 12: (2, 3, "Mg"),
     13: (13, 3, "Al"), 14: (14, 3, "Si"), 15: (15, 3, "P"), 16: (16, 3, "S"), 17: (17, 3, "Cl"), 18: (18, 3, "Ar"),
-    19: (1, 4, "K"), 20: (2, 4, "Ca"), 21: (3, 4, "Sc"), 22: (4, 5, "Ti"), 23: (5, 4, "V"), 24: (6, 4, "Cr"),
+    19: (1, 4, "K"), 20: (2, 4, "Ca"), 21: (3, 4, "Sc"), 22: (4, 7, "Ti"), 23: (5, 4, "V"), 24: (6, 4, "Cr"),
     25: (7, 4, "Mn"), 26: (8, 4, "Fe"), 27: (9, 4, "Co"), 28: (10, 4, "Ni"), 29: (11, 4, "Cu"), 30: (12, 4, "Zn"),
     31: (13, 4, "Ga"), 32: (14, 4, "Ge"), 33: (15, 4, "As"), 34: (16, 4, "Se"), 35: (17, 4, "Br"), 36: (18, 4, "Kr"),
     37: (1, 5, "Rb"), 38: (2, 5, "Sr"), 39: (3, 5, "Y"), 40: (4, 5, "Zr"), 41: (5, 5, "Nb"), 42: (6, 5, "Mo"),
@@ -209,25 +200,22 @@ with c1:
 with c2:
     st.subheader("Historia operacji")
     
-    with st.container(border=True):
-        if st.button("Wyczyść historię", type="primary", key="btn_clear_history"): 
-            st.session_state.history = []
-            st.rerun()
-            
-        st.write(" ")
+    # Przycisk czyszczenia zostawiamy na górze, żeby był zawsze łatwo dostępny
+    if st.button("Wyczyść historię", type="primary", key="btn_clear_history"): 
+        st.session_state.history = []
+        st.rerun()
         
+    st.write(" ")
+    
+    # --- NATYWNA RAMKA ZBLOKOWANA SZEWEM WYSOKOŚCI (Wysokość: 260px) ---
+    with st.container(height=260):
         if not st.session_state.history:
             st.caption("Brak zarejestrowanych operacji w tej sesji.")
         else:
-            # Tworzymy przewijany blok HTML za pomocą klasy .scrollable-history
-            history_html = "<div class='scrollable-history'>"
-            for item in st.session_state.history:
-                history_html += f"<div>{item}</div><hr style='margin: 8px 0; border: 0; border-top: 1px solid #E0E2E6;'>"
-            history_html += "</div>"
-            
-            # Wstrzyknięcie przygotowanej przewijanej listy
-            st.markdown(history_html, unsafe_allow_html=True)
-                
+            # Wypisujemy historię za pomocą czystych, natywnych komponentów Streamlit
+            for item in st.session_state.history: 
+                st.code(item, language="text")
+
     # --- BEZPIECZNY NOTATNIK ---
     st.write(" ")
     st.subheader("📝 Twój Notatnik")
