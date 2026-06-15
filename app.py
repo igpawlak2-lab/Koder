@@ -86,7 +86,7 @@ def dec_v2(s):
     except ValueError: pass
     return "?"
 
-# Inicjalizacja list w pamięci sesji
+# Inicjalizacja list i liczników w pamięci sesji
 if "history" not in st.session_state: st.session_state.history = []
 if "likes" not in st.session_state: st.session_state.likes = 0
 if "comments" not in st.session_state: st.session_state.comments = []
@@ -100,18 +100,18 @@ with c1:
     proto = st.radio("Wybierz system kodu:", ["Kod 1", "Kod 2"], horizontal=True)
     mode = st.radio("Wybierz operację:", ["Koduj", "Odkoduj"], horizontal=True)
     
-    # --- ZAWSZE WIDOCZNA INSTRUKCJA (FORMUŁA) NAD POLEM ---
+    # --- WYRAŹNA INSTRUKCJA (FORMUŁA) NAD POLEM ---
     if mode == "Koduj":
         instrukcja = "**Wymagany format:** Dowolny tekst słowny (np. `KODER` lub `TEST`)"
     else:
         if "Kod 1" in proto:
             instrukcja = "**Wymagana formuła:** `Liczba` lub `Liczba.Pozycja` (np. `19 8.2 6`)"
         else:
-            instrukcja = "**Wymagana formuła:** `Grupa.Okres` lub `Grupa.OkresPozycja` (np. `1.1 14.32 1.2`)"
+            instrukcja = "**Wymagana formuła:** `Grupa.Okres` lub `Grupa.OkresPozycja` (np. `1.1 13.32 1.2`)"
             
     st.markdown(instrukcja)
     
-    placeholder_input = "Wpisz tekst..." if mode == "Koduj" else "Wpisz kody zgodnie z formułą powyżej..."
+    placeholder_input = "Wpisz dane tutaj..."
     txt = st.text_input("Wprowadź dane i zatwierdź Enterem:", placeholder=placeholder_input)
     
     if txt:
@@ -127,7 +127,7 @@ with c1:
 
 with c2:
     st.subheader("Historia operacji")
-    if st.button("Wyczyść historię", type="primary"): 
+    if st.button("Wyczyść historię", type="primary", key="btn_clear_history"): 
         st.session_state.history = []
         st.rerun()
     for item in st.session_state.history: 
@@ -140,7 +140,7 @@ st.subheader("💬 Opinie użytkowników")
 
 col_like1, col_like2 = st.columns([1, 5])
 with col_like1:
-    if st.button("👍 Polub stronę"):
+    if st.button("👍 Polub stronę", key="btn_like_page"):
         st.session_state.likes += 1
         st.rerun()
 with col_like2:
