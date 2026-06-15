@@ -83,17 +83,17 @@ def dec_v2(s):
     except ValueError: pass
     return "?"
 
-# --- GLOBALNA PAMIĘĆ SERWERA ---
+# --- GLOBALNA PAMIĘĆ SERWERA DLA WSZYSTKICH ---
 @st.cache_resource
 def get_global_data():
     return {"likes": 0, "comments": []}
 
 global_store = get_global_data()
 
-# Lokalna historia
+# Lokalna historia sesji
 if "history" not in st.session_state: 
     st.session_state.history = []
-# Stan polubienia dla konkretnej przeglądarki
+# Stan polubienia dla tej konkretnej przeglądarki
 if "has_liked" not in st.session_state:
     st.session_state.has_liked = False
 
@@ -106,7 +106,6 @@ with c1:
     proto = st.radio("Wybierz system kodu:", ["Kod 1", "Kod 2"], horizontal=True)
     mode = st.radio("Wybierz operację:", ["Koduj", "Odkoduj"], horizontal=True)
     
-    # Usunięto st.markdown(instrukcja) – tekst już się nie wyświetla
     txt = st.text_input("Wprowadź dane i zatwierdź Enterem:", placeholder="Wpisz dane tutaj...")
     
     if txt:
@@ -154,4 +153,17 @@ st.write(" ")
 with st.form("comment_form", clear_on_submit=True):
     nick = st.text_input("Twój podpis/nick:", placeholder="Anonim")
     komentarz_tekst = st.text_area("Napisz komentarz o stronie:", placeholder="Wpisz swoją opinię tutaj...")
-    wyslij =
+    wyslij = st.form_submit_button("Dodaj komentarz")
+    
+    if wyslij and komentarz_tekst.strip():
+        podpis = nick.strip() if nick.strip() else "Anonim"
+        nowy_komentarz = f"**{podpis}** ({datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}):\n{komentarz_tekst.strip()}"
+        global_store["comments"].insert(0, nowy_komentarz)
+        st.rerun()
+
+if global_store["comments"]:
+    st.write("**Ostatnie komentarze (widoczne dla wszystkich):**")
+    for com in global_store["comments"]:
+        st.info(com)
+else:
+    st.caption("Brak komentarzy. Bądź pierwszy!")
