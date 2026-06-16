@@ -14,10 +14,14 @@ def load_global_data():
     if os.path.exists(DATA_FILE):
         try:
             with open(DATA_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
+                data = json.load(f)
+                # Upewniamy się, że klucz history istnieje w pliku
+                if "history" not in data:
+                    data["history"] = []
+                return data
         except:
             pass
-    return {"likes": 0, "comments": []}
+    return {"likes": 0, "comments": [], "history": []}
 
 def save_global_data(data):
     try:
@@ -135,7 +139,6 @@ def dec_v1(s):
     s = s.strip()
     if not s: return ""
     
-    # Zamiana indeksów dolnych Unicode na format kropkowy (.1 lub .2)
     converted = ""
     for char in s:
         if char in REV_SUB:
@@ -183,7 +186,6 @@ def dec_v2(s):
     s = s.strip()
     if not s: return ""
     
-    # Jeśli użytkownik wpisał tradycyjny kod z kropką (np. 14.21 lub 22.1)
     if "." in s:
         try:
             parts = s.split(".")
@@ -201,7 +203,6 @@ def dec_v2(s):
         except ValueError: pass
         return "?"
 
-    # Obsługa zapisu z indeksami Unicode (np. 14²₁ lub 22¹)
     g_part = ""
     o_part = ""
     sub_part = ""
@@ -229,13 +230,11 @@ def dec_v2(s):
     except ValueError: pass
     return "?"
 
-# Historia sesji
-if "history" not in st.session_state: 
-    st.session_state.history = []
-if "has_liked" not in st.session_state:
-    st.session_state.has_liked = False
+# Trwałe zapamiętywanie notatnika lokalnie
 if "notepad_content" not in st.session_state:
     st.session_state.notepad_content = ""
+if "has_liked" not in st.session_state:
+    st.session_state.has_liked = False
 
 st.title("📟 KODER")
 st.write("Uniwersalny system kodowania i dekodowania tekstu.")
@@ -261,7 +260,6 @@ with c1:
             else:
                 res_display = "   ".join([" ".join([format_v2_unicode(l) for l in w]) for w in raw_words])
         else:
-            # Poprawny podział na wyrazy i litery w trybie dekodowania
             decoded_words = []
             for w in txt.split("   "):
                 word_chars = []
@@ -279,21 +277,33 @@ with c1:
             st.caption("📋 Kliknij ikonę po prawej stronie bloku, aby skopiować kod wraz z indeksami:")
             st.code(res_display, language="text")
         
+        # TRWAŁY ZAPIS DO HISTORII W PLIKU JSON
         entry = f"[{datetime.datetime.now().strftime('%H:%M:%S')}] {proto} ({mode}): {txt} -> {res_display}"
-        if not st.session_state.history or st.session_state.history[0] != entry: st.session_state.history.insert(0, entry)
+        
+        # Pobieramy aktualną listę z pliku, żeby nie nadpisać operacji z innych kart
+        current_data = load_global_data()
+        if not current_data["history"] or current_data["history"][0] != entry:
+            current_data["history"].insert(0, entry)
+            save_global_data(current_data)
+            st.session_state.global_store = current_data
 
 with c2:
     st.subheader("Historia operacji")
     if st.button("Wyczyść historię", type="primary", key="btn_clear_history"): 
-        st.session_state.history = []
+        # Czyszczenie historii w pliku JSON
+        current_data = load_global_data()
+        current_data["history"] = []
+        save_global_data(current_data)
+        st.session_state.global_store = current_data
         st.rerun()
         
     st.write(" ")
+    # Wyświetlanie trwałej historii bezpośrednio z global_store
     with st.container(height=260):
-        if not st.session_state.history:
-            st.caption("Brak zarejestrowanych operacji w tej sesji.")
+        if not st.session_state.global_store["history"]:
+            st.caption("Brak zarejestrowanych operacji.")
         else:
-            for item in st.session_state.history: 
+            for item in st.session_state.global_store["history"]: 
                 st.code(item, language="text")
 
     st.write(" ")
@@ -315,14 +325,18 @@ col_like1, col_like2 = st.columns([1.5, 5])
 with col_like1:
     if not st.session_state.has_liked:
         if st.button("👍 Polub stronę", key="btn_like_page"):
-            st.session_state.global_store["likes"] += 1
-            save_global_data(st.session_state.global_store)
+            current_data = load_global_data()
+            current_data["likes"] += 1
+            save_global_data(current_data)
+            st.session_state.global_store = current_data
             st.session_state.has_liked = True
             st.rerun()
     else:
         if st.button("❌ Cofnij polubienie", type="primary", key="btn_unlike_page"):
-            st.session_state.global_store["likes"] = max(0, st.session_state.global_store["likes"] - 1)
-            save_global_data(st.session_state.global_store)
+            current_data = load_global_data()
+            current_data["likes"] = max(0, current_data["likes"] - 1)
+            save_global_data(current_data)
+            st.session_state.global_store = current_data
             st.session_state.has_liked = False
             st.rerun()
 
@@ -339,8 +353,11 @@ with st.form("comment_form", clear_on_submit=True):
     if wyslij and komentarz_tekst.strip():
         podpis = nick.strip() if nick.strip() else "Anonim"
         nowy_komentarz = f"**{podpis}** ({datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}):\n{komentarz_tekst.strip()}"
-        st.session_state.global_store["comments"].insert(0, nowy_komentarz)
-        save_global_data(st.session_state.global_store)
+        
+        current_data = load_global_data()
+        current_data["comments"].insert(0, nowy_komentarz)
+        save_global_data(current_data)
+        st.session_state.global_store = current_data
         st.rerun()
 
 if st.session_state.global_store["comments"]:
