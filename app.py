@@ -230,7 +230,7 @@ with c1:
             st.query_params["h"] = json.dumps(st.session_state.personal_history)
 
 with c2:
-    st.subheader("Historia operacji (Tylko Twoja)")
+    st.subheader("Historia operacji")
     
     with st.container(height=280):
         if not st.session_state.personal_history:
