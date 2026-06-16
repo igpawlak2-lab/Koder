@@ -11,17 +11,21 @@ st.set_page_config(page_title="Koder", page_icon="📟", layout="wide")
 DATA_FILE = "dane_aplikacji.json"
 
 def load_global_data():
+    default_data = {"likes": 0, "comments": [], "history": []}
     if os.path.exists(DATA_FILE):
         try:
             with open(DATA_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                # Upewniamy się, że klucz history istnieje w pliku
-                if "history" not in data:
-                    data["history"] = []
+                # Bezpieczne sprawdzanie i uzupełnianie brakujących kluczy
+                if not isinstance(data, dict):
+                    return default_data
+                if "likes" not in data: data["likes"] = 0
+                if "comments" not in data: data["comments"] = []
+                if "history" not in data: data["history"] = []
                 return data
         except:
-            pass
-    return {"likes": 0, "comments": [], "history": []}
+            return default_data
+    return default_data
 
 def save_global_data(data):
     try:
@@ -30,6 +34,7 @@ def save_global_data(data):
     except:
         pass
 
+# Wymuszenie bezpiecznego załadowania danych struktury na starcie
 if "global_store" not in st.session_state:
     st.session_state.global_store = load_global_data()
 
@@ -230,7 +235,7 @@ def dec_v2(s):
     except ValueError: pass
     return "?"
 
-# Trwałe zapamiętywanie notatnika lokalnie
+# Inicjalizacja stanów lokalnych sesji
 if "notepad_content" not in st.session_state:
     st.session_state.notepad_content = ""
 if "has_liked" not in st.session_state:
@@ -280,7 +285,6 @@ with c1:
         # TRWAŁY ZAPIS DO HISTORII W PLIKU JSON
         entry = f"[{datetime.datetime.now().strftime('%H:%M:%S')}] {proto} ({mode}): {txt} -> {res_display}"
         
-        # Pobieramy aktualną listę z pliku, żeby nie nadpisać operacji z innych kart
         current_data = load_global_data()
         if not current_data["history"] or current_data["history"][0] != entry:
             current_data["history"].insert(0, entry)
@@ -289,22 +293,25 @@ with c1:
 
 with c2:
     st.subheader("Historia operacji")
+    
+    # Wyświetlanie trwałej historii wewnątrz kontenera ze stałą wysokością
+    with st.container(height=280):
+        # Pobieramy najświeższe dane z pliku
+        history_list = st.session_state.global_store.get("history", [])
+        
+        if not history_list:
+            st.caption("Brak zarejestrowanych operacji.")
+        else:
+            for item in history_list: 
+                st.code(item, language="text")
+                
+    # Przycisk czyszczenia przeniesiony bezpośrednio POD ramkę historii
     if st.button("Wyczyść historię", type="primary", key="btn_clear_history"): 
-        # Czyszczenie historii w pliku JSON
         current_data = load_global_data()
         current_data["history"] = []
         save_global_data(current_data)
         st.session_state.global_store = current_data
         st.rerun()
-        
-    st.write(" ")
-    # Wyświetlanie trwałej historii bezpośrednio z global_store
-    with st.container(height=260):
-        if not st.session_state.global_store["history"]:
-            st.caption("Brak zarejestrowanych operacji.")
-        else:
-            for item in st.session_state.global_store["history"]: 
-                st.code(item, language="text")
 
     st.write(" ")
     st.subheader("📝 Twój Notatnik")
@@ -341,7 +348,7 @@ with col_like1:
             st.rerun()
 
 with col_like2:
-    st.write(f"Ta strona została polubiona już **{st.session_state.global_store['likes']}** razy!")
+    st.write(f"Ta strona została polubiona już **{st.session_state.global_store.get('likes', 0)}** razy!")
 
 st.write(" ")
 
@@ -360,9 +367,10 @@ with st.form("comment_form", clear_on_submit=True):
         st.session_state.global_store = current_data
         st.rerun()
 
-if st.session_state.global_store["comments"]:
+comments_list = st.session_state.global_store.get("comments", [])
+if comments_list:
     st.write("**Ostatnie komentarze (widoczne dla wszystkich):**")
-    for com in st.session_state.global_store["comments"]:
+    for com in comments_list:
         st.info(com)
 else:
     st.caption("Brak komentarzy. Bądź pierwszy!")
