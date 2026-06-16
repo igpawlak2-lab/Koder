@@ -258,7 +258,7 @@ with c1:
             components.html(js_save_hist, height=0, width=0)
 
 with c2:
-    st.subheader("Historia operacji (Tylko Twoja)")
+    st.subheader("Historia operacji ")
     
     with st.container(height=280):
         if not st.session_state.personal_history:
