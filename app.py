@@ -3,7 +3,6 @@ import datetime
 import os
 import json
 import streamlit as st
-import streamlit.components.v1 as components
 
 # Czysty interfejs bez elementów chemicznych
 st.set_page_config(page_title="Koder", page_icon="📟", layout="wide")
@@ -98,7 +97,7 @@ DATA_MAP = {
     113: (13, 7, "Nh"), 114: (14, 7, "Fl"), 115: (15, 7, "Mc"), 116: (16, 7, "Lv"), 117: (17, 7, "Ts"), 118: (18, 7, "Og")
 }
 
-# Słowniki do konwersji na prawdziwe znaki indeksów Unicode (Kopiowalne)
+# Słowniki indeksów Unicode
 SUPERSCRIPTS = {'0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹'}
 SUBSCRIPTS = {'0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄', '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉'}
 
@@ -108,7 +107,6 @@ def to_superscript(num_str):
 def to_subscript(num_str):
     return "".join(SUBSCRIPTS.get(c, c) for c in num_str)
 
-# Mapowanie odwrócone dla dekodera (zamiana indeksów Unicode na zwykłe liczby i kropki)
 REV_SUP = {v: k for k, v in SUPERSCRIPTS.items()}
 REV_SUB = {v: k for k, v in SUBSCRIPTS.items()}
 
@@ -136,16 +134,18 @@ def format_v1_unicode(code_str):
 def dec_v1(s):
     s = s.strip()
     if not s: return ""
-    # Konwersja indeksów Unicode z powrotem na format z kropką
+    
+    # Zamiana indeksów dolnych Unicode na format kropkowy (.1 lub .2)
     converted = ""
     for char in s:
         if char in REV_SUB:
-            if not converted.contains("."):  # dodaj kropkę raz przed indeksem dolnym
+            if "." not in converted:
                 converted += "."
             converted += REV_SUB[char]
         else:
             converted += char
     s = converted
+    
     try:
         if "." in s:
             parts = s.split(".")
@@ -182,12 +182,31 @@ def format_v2_unicode(code_str):
 def dec_v2(s):
     s = s.strip()
     if not s: return ""
-    # Odbudowa struktury g.oX z indeksów Unicode
+    
+    # Jeśli użytkownik wpisał tradycyjny kod z kropką (np. 14.21 lub 22.1)
+    if "." in s:
+        try:
+            parts = s.split(".")
+            g = int(parts[0])
+            rest = parts[1]
+            if len(rest) > 1:
+                o = int(rest[0])
+                pos = rest[1]
+            else:
+                o = int(rest)
+                pos = ""
+            for i, (vg, vo, vs) in DATA_MAP.items():
+                if vg == g and vo == o:
+                    return vs[1].upper() if pos == "2" and len(vs) > 1 else vs[0].upper()
+        except ValueError: pass
+        return "?"
+
+    # Obsługa zapisu z indeksami Unicode (np. 14²₁ lub 22¹)
     g_part = ""
     o_part = ""
     sub_part = ""
-    
     in_o = False
+    
     for char in s:
         if char in REV_SUP:
             o_part += REV_SUP[char]
@@ -197,19 +216,13 @@ def dec_v2(s):
         else:
             if not in_o:
                 g_part += char
-    
+                
     if not g_part or not o_part: return "?"
-    full_s = f"{g_part}.{o_part}{sub_part}"
+    
     try:
-        parts = full_s.split(".")
-        g = int(parts[0])
-        rest = parts[1]
-        if len(rest) > 1:
-            o = int(rest[0])
-            pos = rest[1]
-        else:
-            o = int(rest)
-            pos = ""
+        g = int(g_part)
+        o = int(o_part)
+        pos = sub_part
         for i, (vg, vo, vs) in DATA_MAP.items():
             if vg == g and vo == o:
                 return vs[1].upper() if pos == "2" and len(vs) > 1 else vs[0].upper()
@@ -238,24 +251,27 @@ with c1:
     
     if txt:
         res_display = ""
-        res_raw_backup = ""
         
         if mode == "Koduj":
             words = clean_txt(txt).split(' ')
             raw_words = [[enc_v1(l) if "Kod 1" in proto else enc_v2(l) for l in w] for w in words]
             
-            # Budowanie pełnego wyniku opartego o znaki Unicode (Kopiowalne!)
             if "Kod 1" in proto:
                 res_display = "   ".join([" ".join([format_v1_unicode(l) for l in w]) for w in raw_words])
             else:
                 res_display = "   ".join([" ".join([format_v2_unicode(l) for l in w]) for w in raw_words])
-            res_raw_backup = "   ".join([" ".join(w) for w in raw_words])
         else:
-            # Inteligentny dekoder rozpoznaje zarowno czyste kody, jak i te z indeksami Unicode
-            res_display = " ".join(["".join([dec_v1(s) if "Kod 1" in proto else dec_v2(s) for s in w.strip().split(" ") if s]) for w in txt.split("   ")])
-            res_raw_backup = res_display
+            # Poprawny podział na wyrazy i litery w trybie dekodowania
+            decoded_words = []
+            for w in txt.split("   "):
+                word_chars = []
+                for s in w.strip().split(" "):
+                    if s:
+                        word_chars.append(dec_v1(s) if "Kod 1" in proto else dec_v2(s))
+                decoded_words.append("".join(word_chars))
+            res_display = " ".join(decoded_words)
 
-        # 1. Główny podgląd wyniku (Duży i wyraźny)
+        # 1. Główny podgląd wyniku
         st.markdown(f"**Wynik:** <div style='font-size:1.4rem; font-weight:bold; background-color:#F0F2F6; padding:12px; border-radius:8px; margin-bottom:10px;'>{res_display}</div>", unsafe_allow_html=True)
         
         # 2. Dedykowany moduł kopiowania zawierający INDEKSY
