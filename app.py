@@ -3,13 +3,9 @@ import datetime
 import os
 import json
 import streamlit as st
-from streamlit_cookies_controller import CookieController
 
 # Czysty interfejs bez elementów chemicznych
 st.set_page_config(page_title="Koder", page_icon="📟", layout="wide")
-
-# Inicjalizacja kontrolera ciasteczek (zapis lokalny użytkownika)
-cookies = CookieController()
 
 # --- GLOBALNY PLIK JSON (TYLKO POLUBIENIA I KOMENTARZE) ---
 DATA_FILE = "dane_aplikacji.json"
@@ -38,15 +34,19 @@ def save_global_data(data):
 if "global_store" not in st.session_state:
     st.session_state.global_store = load_global_data()
 
-# --- BEZPIECZNE WCZYTYWANIE HISTORII I NOTATNIKA Z CIASTECZEK ---
-cookie_history = cookies.get("user_history")
-cookie_notepad = cookies.get("user_notepad")
+# --- NATYWNE I PRYWATNE WCZYTYWANIE Z PARAMS URL ---
+# Wykorzystujemy adres przeglądarki do przechowywania notatek i historii bez używania zewnętrznych paczek
+params = st.query_params
 
 if "personal_history" not in st.session_state:
-    st.session_state.personal_history = cookie_history if cookie_history is not None else []
+    if "h" in params:
+        try: st.session_state.personal_history = json.loads(params["h"])
+        except: st.session_state.personal_history = []
+    else:
+        st.session_state.personal_history = []
 
 if "personal_notepad" not in st.session_state:
-    st.session_state.personal_notepad = cookie_notepad if cookie_notepad is not None else ""
+    st.session_state.personal_notepad = params.get("n", "")
 
 # --- STYLOWANIE SYSTEMU INTERFEJSU (CSS) ---
 st.markdown("""
@@ -187,7 +187,6 @@ def dec_v2(s):
 
 if "has_liked" not in st.session_state: st.session_state.has_liked = False
 
-# --- UKŁAD STRONY ---
 st.title("📟 KODER")
 st.write("Uniwersalny system kodowania i dekodowania tekstu.")
 
@@ -227,11 +226,11 @@ with c1:
         
         if not st.session_state.personal_history or st.session_state.personal_history[0] != entry:
             st.session_state.personal_history.insert(0, entry)
-            # Zapis do ciasteczka przeglądarki
-            cookies.set("user_history", st.session_state.personal_history)
+            # Aktualizacja adresu URL w przeglądarce użytkownika
+            st.query_params["h"] = json.dumps(st.session_state.personal_history)
 
 with c2:
-    st.subheader("Historia operacji ")
+    st.subheader("Historia operacji (Tylko Twoja)")
     
     with st.container(height=280):
         if not st.session_state.personal_history:
@@ -242,14 +241,14 @@ with c2:
                 
     if st.button("Wyczyść moją historię", type="primary", key="btn_clear_history"): 
         st.session_state.personal_history = []
-        cookies.remove("user_history")
+        st.query_params["h"] = json.dumps([])
         st.rerun()
 
     st.write(" ")
     st.subheader("📝 Twój Prywatny Notatnik")
     
     note_input = st.text_area(
-        "Zapisz swoje uwagi (Tekst zapisuje się automatycznie w Twojej przeglądarce):",
+        "Zapisz swoje uwagi (Tekst zapisuje się automatycznie w adresie URL przeglądarki):",
         value=st.session_state.personal_notepad,
         placeholder="Wpisz notatki, kody lub sekwencje...",
         height=180,
@@ -258,10 +257,10 @@ with c2:
     
     if note_input != st.session_state.personal_notepad:
         st.session_state.personal_notepad = note_input
-        # Zapis notatnika do ciasteczka przeglądarki
-        cookies.set("user_notepad", note_input)
+        # Automatyczne dodawanie treści notatnika do adresu URL
+        st.query_params["n"] = note_input
 
-# --- SEKCJA GLOBALNYCH POLUBIEŃ I KOMENTARZY (DLA WSZYSTKICH) ---
+# --- SEKCJA GLOBALNYCH POLUBIEŃ I KOMENTARZY (DLA WSZYSTKIAN) ---
 st.write("---")
 st.subheader("💬 Opinie użytkowników")
 
