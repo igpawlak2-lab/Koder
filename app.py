@@ -120,9 +120,18 @@ def enc_v1(l):
         if len(s) > 1 and s[1] == l.lower(): return f"{i}.2"
     return "?"
 
+# Pomocnicza funkcja do wizualizacji Kodu 1 (indeksy dolne tekstowe)
+def format_v1_display(code_str):
+    if "." in code_str:
+        parts = code_str.split(".")
+        return f"{parts[0]}<sub>{parts[1]}</sub>"
+    return code_str
+
 def dec_v1(s):
     s = s.strip()
     if not s: return ""
+    # Obsługa czyszczenia ewentualnych tagów HTML jeśli wklejono bezpośrednio z wyniku
+    s = re.sub(r'<[^>]*>', '.', s).replace('..', '.')
     try:
         if "." in s:
             parts = s.split(".")
@@ -146,9 +155,23 @@ def enc_v2(l):
         if len(s) > 1 and s[1] == l.lower(): return f"{g}.{o}2"
     return "?"
 
+# Pomocnicza funkcja do wizualizacji Kodu 2 (Zapis Grupa_dol Okres_gora)
+def format_v2_display(code_str):
+    if "." in code_str:
+        parts = code_str.split(".")
+        g = parts[0]
+        rest = parts[1]
+        o = rest[0]
+        sub = rest[1] if len(rest) > 1 else ""
+        return f"{g}<sup>{o}</sup><sub>{sub}</sub>" if sub else f"{g}<sup>{o}</sup>"
+    return code_str
+
 def dec_v2(s):
     s = s.strip()
     if not s: return ""
+    # Oczyszczanie wejścia z tagów HTML na wypadek gdyby użytkownik kopiował wynik z suwaka
+    s = re.sub(r'<sup>(.*?)</sup>', r'.\1', s)
+    s = re.sub(r'<sub>(.*?)</sub>', r'\1', s)
     if "." not in s: return "?"
     try:
         parts = s.split(".")
@@ -187,32 +210,42 @@ with c1:
     txt = st.text_input("Wprowadź dane i zatwierdź Enterem:", placeholder="Wpisz dane tutaj...")
     
     if txt:
-        res = ""
+        res_raw = ""
+        res_display = ""
         if mode == "Koduj":
             words = clean_txt(txt).split(' ')
-            res = "   ".join([" ".join([enc_v1(l) if "Kod 1" in proto else enc_v2(l) for l in w]) for w in words])
+            # Generowanie surowej bazy
+            raw_words = [[enc_v1(l) if "Kod 1" in proto else enc_v2(l) for l in w] for w in words]
+            # Łączenie w postać czytelną (z indeksami dolnymi i górnymi HTML)
+            if "Kod 1" in proto:
+                res_display = " &nbsp; &nbsp; ".join([" ".join([format_v1_display(l) for l in w]) for w in raw_words])
+            else:
+                res_display = " &nbsp; &nbsp; ".join([" ".join([format_v2_display(l) for l in w]) for w in raw_words])
+            res_raw = "   ".join([" ".join(w) for w in raw_words])
         else:
-            res = " ".join(["".join([dec_v1(s) if "Kod 1" in proto else dec_v2(s) for s in w.strip().split(" ") if s]) for w in txt.split("   ")])
-        st.info(f"**Wynik:**\n`{res}`")
-        entry = f"[{datetime.datetime.now().strftime('%H:%M:%S')}] {proto} ({mode}): {txt} -> {res}"
+            res_raw = " ".join(["".join([dec_v1(s) if "Kod 1" in proto else dec_v2(s) for s in w.strip().split(" ") if s]) for w in txt.split("   ")])
+            res_display = res_raw
+
+        # Wyświetlanie sformatowanego ładnego wyniku (obsługuje indeksy dolne i górne)
+        st.markdown(f"**Wynik:** <div style='font-size:1.2rem; background-color:#F0F2F6; padding:10px; border-radius:8px;'>{res_display}</div>", unsafe_allow_html=True)
+        
+        entry = f"[{datetime.datetime.now().strftime('%H:%M:%S')}] {proto} ({mode}): {txt} -> {res_raw}"
         if not st.session_state.history or st.session_state.history[0] != entry: st.session_state.history.insert(0, entry)
 
 with c2:
     st.subheader("Historia operacji")
     
-    # Przycisk czyszczenia zostawiamy na górze, żeby był zawsze łatwo dostępny
     if st.button("Wyczyść historię", type="primary", key="btn_clear_history"): 
         st.session_state.history = []
         st.rerun()
         
     st.write(" ")
     
-    # --- NATYWNA RAMKA ZBLOKOWANA SZEWEM WYSOKOŚCI (Wysokość: 260px) ---
+    # --- NATYWNA RAMKA ZBLOKOWANA SZEWEM WYSOKOŚCI ---
     with st.container(height=260):
         if not st.session_state.history:
             st.caption("Brak zarejestrowanych operacji w tej sesji.")
         else:
-            # Wypisujemy historię za pomocą czystych, natywnych komponentów Streamlit
             for item in st.session_state.history: 
                 st.code(item, language="text")
 
