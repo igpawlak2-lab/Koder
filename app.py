@@ -3,10 +3,13 @@ import datetime
 import os
 import json
 import streamlit as st
-import streamlit.components.v1 as components
+from streamlit_cookies_controller import CookieController
 
 # Czysty interfejs bez elementów chemicznych
 st.set_page_config(page_title="Koder", page_icon="📟", layout="wide")
+
+# Inicjalizacja kontrolera ciasteczek (zapis lokalny użytkownika)
+cookies = CookieController()
 
 # --- GLOBALNY PLIK JSON (TYLKO POLUBIENIA I KOMENTARZE) ---
 DATA_FILE = "dane_aplikacji.json"
@@ -35,41 +38,15 @@ def save_global_data(data):
 if "global_store" not in st.session_state:
     st.session_state.global_store = load_global_data()
 
-# --- MECHANIZM PRYWATNEJ PAMIĘCI (LOCAL STORAGE) PRZEZ JS ---
-# Inicjalizacja zmiennych sesyjnych, jeśli lokalna pamięć jeszcze nie odpowiedziała
+# --- BEZPIECZNE WCZYTYWANIE HISTORII I NOTATNIKA Z CIASTECZEK ---
+cookie_history = cookies.get("user_history")
+cookie_notepad = cookies.get("user_notepad")
+
 if "personal_history" not in st.session_state:
-    st.session_state.personal_history = []
+    st.session_state.personal_history = cookie_history if cookie_history is not None else []
+
 if "personal_notepad" not in st.session_state:
-    st.session_state.personal_notepad = ""
-if "js_loaded" not in st.session_state:
-    st.session_state.js_loaded = False
-
-# Skrypt JS do synchronizacji z LocalStorage przeglądarki użytkownika
-def sync_local_storage():
-    js_code = f"""
-    <script>
-    // Ładowanie danych przy pierwszym uruchomieniu
-    if (!window.parent.stLocalStorageLoaded) {{
-        const history = localStorage.getItem('koder_history');
-        const notepad = localStorage.getItem('koder_notepad');
-        
-        const data = {{
-            type: 'LOCAL_STORAGE_DATA',
-            history: history ? JSON.parse(history) : [],
-            notepad: notepad ? notepad : ''
-        }};
-        
-        window.parent.postMessage(data, '*');
-        window.parent.stLocalStorageLoaded = true;
-    }}
-    </script>
-    """
-    components.html(js_code, height=0, width=0)
-
-# Obsługa komunikatów zwrotnych z JavaScriptu (dostępna w Streamlit od wersji 1.30+)
-# Wykorzystujemy prosty trik z query params lub hidden input do wymiany, ale najbezpieczniej
-# pozwolić użytkownikowi na natychmiastowe sterowanie obiektami sesji:
-sync_local_storage()
+    st.session_state.personal_notepad = cookie_notepad if cookie_notepad is not None else ""
 
 # --- STYLOWANIE SYSTEMU INTERFEJSU (CSS) ---
 st.markdown("""
@@ -129,7 +106,6 @@ def clean_txt(t):
     for k, v in z.items(): t = t.replace(k, v)
     return re.sub(r'[^A-Z ]', '', t)
 
-# --- DEKODERY I KODERY ---
 def enc_v1(l):
     for i, (g, o, s) in DATA_MAP.items():
         if s == l: return f"{i}"
@@ -211,6 +187,7 @@ def dec_v2(s):
 
 if "has_liked" not in st.session_state: st.session_state.has_liked = False
 
+# --- UKŁAD STRONY ---
 st.title("📟 KODER")
 st.write("Uniwersalny system kodowania i dekodowania tekstu.")
 
@@ -247,18 +224,14 @@ with c1:
             st.code(res_display, language="text")
         
         entry = f"[{datetime.datetime.now().strftime('%H:%M:%S')}] {proto} ({mode}): {txt} -> {res_display}"
+        
         if not st.session_state.personal_history or st.session_state.personal_history[0] != entry:
             st.session_state.personal_history.insert(0, entry)
-            # Zapis do LocalStorage przeglądarki użytkownika
-            js_save_hist = f"""
-            <script>
-            localStorage.setItem('koder_history', JSON.stringify({json.dumps(st.session_state.personal_history)}));
-            </script>
-            """
-            components.html(js_save_hist, height=0, width=0)
+            # Zapis do ciasteczka przeglądarki
+            cookies.set("user_history", st.session_state.personal_history)
 
 with c2:
-    st.subheader("Historia operacji ")
+    st.subheader("Historia operacji (Tylko Twoja)")
     
     with st.container(height=280):
         if not st.session_state.personal_history:
@@ -269,16 +242,12 @@ with c2:
                 
     if st.button("Wyczyść moją historię", type="primary", key="btn_clear_history"): 
         st.session_state.personal_history = []
-        js_clear_hist = """
-        <script>localStorage.removeItem('koder_history');</script>
-        """
-        components.html(js_clear_hist, height=0, width=0)
+        cookies.remove("user_history")
         st.rerun()
 
     st.write(" ")
     st.subheader("📝 Twój Prywatny Notatnik")
     
-    # Przechwytywanie wpisów notatnika z automatycznym zapisem do LocalStorage
     note_input = st.text_area(
         "Zapisz swoje uwagi (Tekst zapisuje się automatycznie w Twojej przeglądarce):",
         value=st.session_state.personal_notepad,
@@ -289,27 +258,8 @@ with c2:
     
     if note_input != st.session_state.personal_notepad:
         st.session_state.personal_notepad = note_input
-        js_save_note = f"""
-        <script>
-        localStorage.setItem('koder_notepad', {json.dumps(note_input)});
-        </script>
-        """
-        components.html(js_save_note, height=0, width=0)
-
-# --- UKRYTY SKRYPT NASŁUCHUJĄCY DO PRZYWRACANIA DANYCH Z PRZEGLĄDARKI PO ODŚWIEŻENIU ---
-st.components.v1.html("""
-<script>
-window.addEventListener('message', function(event) {
-    if (event.data.type === 'LOCAL_STORAGE_DATA') {
-        const urlParams = new URLSearchParams(window.location.search);
-        // Przekazujemy dane do Streamlit tylko jeśli różnią się od domyślnych, aby uniknąć pętli
-        if(event.data.history.length > 0 || event.data.notepad !== '') {
-             // Trik odświeżenia komponentu Streamlit w pamięci sesyjnej
-        }
-    }
-});
-</script>
-""", height=0, width=0)
+        # Zapis notatnika do ciasteczka przeglądarki
+        cookies.set("user_notepad", note_input)
 
 # --- SEKCJA GLOBALNYCH POLUBIEŃ I KOMENTARZY (DLA WSZYSTKICH) ---
 st.write("---")
@@ -359,4 +309,3 @@ if comments_list:
     for com in comments_list: st.info(com)
 else:
     st.caption("Brak komentarzy. Bądź pierwszy!")
-    
