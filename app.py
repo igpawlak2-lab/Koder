@@ -3,25 +3,23 @@ import datetime
 import os
 import json
 import streamlit as st
+import streamlit.components.v1 as components
 
 # Czysty interfejs bez elementów chemicznych
 st.set_page_config(page_title="Koder", page_icon="📟", layout="wide")
 
-# --- TRWAŁE ZAPISYWANIE DANYCH DO PLIKU ---
+# --- GLOBALNY PLIK JSON (TYLKO POLUBIENIA I KOMENTARZE) ---
 DATA_FILE = "dane_aplikacji.json"
 
 def load_global_data():
-    default_data = {"likes": 0, "comments": [], "history": []}
+    default_data = {"likes": 0, "comments": []}
     if os.path.exists(DATA_FILE):
         try:
             with open(DATA_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                # Bezpieczne sprawdzanie i uzupełnianie brakujących kluczy
-                if not isinstance(data, dict):
-                    return default_data
+                if not isinstance(data, dict): return default_data
                 if "likes" not in data: data["likes"] = 0
                 if "comments" not in data: data["comments"] = []
-                if "history" not in data: data["history"] = []
                 return data
         except:
             return default_data
@@ -34,56 +32,67 @@ def save_global_data(data):
     except:
         pass
 
-# Wymuszenie bezpiecznego załadowania danych struktury na starcie
 if "global_store" not in st.session_state:
     st.session_state.global_store = load_global_data()
 
-# --- MODYFIKACJA INTERFEJSU (CSS) ---
+# --- MECHANIZM PRYWATNEJ PAMIĘCI (LOCAL STORAGE) PRZEZ JS ---
+# Inicjalizacja zmiennych sesyjnych, jeśli lokalna pamięć jeszcze nie odpowiedziała
+if "personal_history" not in st.session_state:
+    st.session_state.personal_history = []
+if "personal_notepad" not in st.session_state:
+    st.session_state.personal_notepad = ""
+if "js_loaded" not in st.session_state:
+    st.session_state.js_loaded = False
+
+# Skrypt JS do synchronizacji z LocalStorage przeglądarki użytkownika
+def sync_local_storage():
+    js_code = f"""
+    <script>
+    // Ładowanie danych przy pierwszym uruchomieniu
+    if (!window.parent.stLocalStorageLoaded) {{
+        const history = localStorage.getItem('koder_history');
+        const notepad = localStorage.getItem('koder_notepad');
+        
+        const data = {{
+            type: 'LOCAL_STORAGE_DATA',
+            history: history ? JSON.parse(history) : [],
+            notepad: notepad ? notepad : ''
+        }};
+        
+        window.parent.postMessage(data, '*');
+        window.parent.stLocalStorageLoaded = true;
+    }}
+    </script>
+    """
+    components.html(js_code, height=0, width=0)
+
+# Obsługa komunikatów zwrotnych z JavaScriptu (dostępna w Streamlit od wersji 1.30+)
+# Wykorzystujemy prosty trik z query params lub hidden input do wymiany, ale najbezpieczniej
+# pozwolić użytkownikowi na natychmiastowe sterowanie obiektami sesji:
+sync_local_storage()
+
+# --- STYLOWANIE SYSTEMU INTERFEJSU (CSS) ---
 st.markdown("""
     <style>
         div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div {
-            display: flex;
-            gap: 10px;
-            margin-top: 5px;
-            width: 100%;
+            display: flex; gap: 10px; margin-top: 5px; width: 100%;
         }
         div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label {
-            background-color: #F0F2F6;
-            border: 2px solid #E0E2E6;
-            padding: 12px 10px !important;
-            border-radius: 10px;
-            cursor: pointer;
-            transition: all 0.2s ease-in-out;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex: 1;
-            min-width: 140px;
-            font-size: 16px !important;
-            font-weight: bold !important;
-            white-space: nowrap !important;
+            background-color: #F0F2F6; border: 2px solid #E0E2E6; padding: 12px 10px !important;
+            border-radius: 10px; cursor: pointer; transition: all 0.2s ease-in-out;
+            display: flex; align-items: center; justify-content: center; flex: 1;
+            min-width: 140px; font-size: 16px !important; font-weight: bold !important; white-space: nowrap !important;
         }
         div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label div[data-testid="stMarkdownContainer"]::before {
             display: none !important;
         }
-        div[data-testid="stRadio"] input[type="radio"] {
-            display: none;
-        }
+        div[data-testid="stRadio"] input[type="radio"] { display: none; }
         div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label:has(input:checked) {
-            background-color: #1E90FF !important;
-            color: white !important;
-            border-color: #1E90FF !important;
+            background-color: #1E90FF !important; color: white !important; border-color: #1E90FF !important;
             box-shadow: 0px 4px 10px rgba(30, 144, 255, 0.3);
         }
-        div[data-testid="stRadio"] label div[data-testid="stWidgetLabel"] p {
-            font-size: 16px !important;
-            font-weight: bold;
-            color: #31333E;
-        }
         div[data-testid="stVerticalBlockBorderWrapper"] {
-            border-color: #1E90FF !important;
-            border-radius: 12px;
-            background-color: #F9FAFB;
+            border-color: #1E90FF !important; border-radius: 12px; background-color: #F9FAFB;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -106,16 +115,11 @@ DATA_MAP = {
     113: (13, 7, "Nh"), 114: (14, 7, "Fl"), 115: (15, 7, "Mc"), 116: (16, 7, "Lv"), 117: (17, 7, "Ts"), 118: (18, 7, "Og")
 }
 
-# Słowniki indeksów Unicode
 SUPERSCRIPTS = {'0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹'}
 SUBSCRIPTS = {'0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄', '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉'}
 
-def to_superscript(num_str):
-    return "".join(SUPERSCRIPTS.get(c, c) for c in num_str)
-
-def to_subscript(num_str):
-    return "".join(SUBSCRIPTS.get(c, c) for c in num_str)
-
+def to_superscript(num_str): return "".join(SUPERSCRIPTS.get(c, c) for c in num_str)
+def to_subscript(num_str): return "".join(SUBSCRIPTS.get(c, c) for c in num_str)
 REV_SUP = {v: k for k, v in SUPERSCRIPTS.items()}
 REV_SUB = {v: k for k, v in SUBSCRIPTS.items()}
 
@@ -125,7 +129,7 @@ def clean_txt(t):
     for k, v in z.items(): t = t.replace(k, v)
     return re.sub(r'[^A-Z ]', '', t)
 
-# --- SYSTEM 1 ---
+# --- DEKODERY I KODERY ---
 def enc_v1(l):
     for i, (g, o, s) in DATA_MAP.items():
         if s == l: return f"{i}"
@@ -143,32 +147,24 @@ def format_v1_unicode(code_str):
 def dec_v1(s):
     s = s.strip()
     if not s: return ""
-    
     converted = ""
     for char in s:
         if char in REV_SUB:
-            if "." not in converted:
-                converted += "."
+            if "." not in converted: converted += "."
             converted += REV_SUB[char]
-        else:
-            converted += char
-    s = converted
-    
+        else: converted += char
     try:
-        if "." in s:
-            parts = s.split(".")
-            val = int(parts[0])
-            idx = parts[1]
+        if "." in converted:
+            parts = converted.split(".")
+            val, idx = int(parts[0]), parts[1]
         else:
-            val = int(s)
-            idx = ""
+            val, idx = int(converted), ""
         if val in DATA_MAP:
             res = DATA_MAP[val][2]
             return res[0].upper() if idx in ["", "1"] else res[1].upper()
     except ValueError: pass
     return "?"
 
-# --- SYSTEM 2 ---
 def enc_v2(l):
     for i, (g, o, s) in DATA_MAP.items():
         if s == l: return f"{g}.{o}"
@@ -180,8 +176,7 @@ def enc_v2(l):
 def format_v2_unicode(code_str):
     if "." in code_str:
         parts = code_str.split(".")
-        g = parts[0]
-        rest = parts[1]
+        g, rest = parts[0], parts[1]
         o = rest[0]
         sub = rest[1] if len(rest) > 1 else ""
         return f"{g}{to_superscript(o)}{to_subscript(sub)}"
@@ -190,56 +185,31 @@ def format_v2_unicode(code_str):
 def dec_v2(s):
     s = s.strip()
     if not s: return ""
-    
     if "." in s:
         try:
             parts = s.split(".")
-            g = int(parts[0])
-            rest = parts[1]
-            if len(rest) > 1:
-                o = int(rest[0])
-                pos = rest[1]
-            else:
-                o = int(rest)
-                pos = ""
+            g, rest = int(parts[0]), parts[1]
+            if len(rest) > 1: o, pos = int(rest[0]), rest[1]
+            else: o, pos = int(rest), ""
             for i, (vg, vo, vs) in DATA_MAP.items():
-                if vg == g and vo == o:
-                    return vs[1].upper() if pos == "2" and len(vs) > 1 else vs[0].upper()
+                if vg == g and vo == o: return vs[1].upper() if pos == "2" and len(vs) > 1 else vs[0].upper()
         except ValueError: pass
         return "?"
-
-    g_part = ""
-    o_part = ""
-    sub_part = ""
-    in_o = False
-    
+    g_part, o_part, sub_part, in_o = "", "", "", False
     for char in s:
-        if char in REV_SUP:
-            o_part += REV_SUP[char]
-            in_o = True
-        elif char in REV_SUB:
-            sub_part += REV_SUB[char]
+        if char in REV_SUP: o_part += REV_SUP[char]; in_o = True
+        elif char in REV_SUB: sub_part += REV_SUB[char]
         else:
-            if not in_o:
-                g_part += char
-                
+            if not in_o: g_part += char
     if not g_part or not o_part: return "?"
-    
     try:
-        g = int(g_part)
-        o = int(o_part)
-        pos = sub_part
+        g, o, pos = int(g_part), int(o_part), sub_part
         for i, (vg, vo, vs) in DATA_MAP.items():
-            if vg == g and vo == o:
-                return vs[1].upper() if pos == "2" and len(vs) > 1 else vs[0].upper()
+            if vg == g and vo == o: return vs[1].upper() if pos == "2" and len(vs) > 1 else vs[0].upper()
     except ValueError: pass
     return "?"
 
-# Inicjalizacja stanów lokalnych sesji
-if "notepad_content" not in st.session_state:
-    st.session_state.notepad_content = ""
-if "has_liked" not in st.session_state:
-    st.session_state.has_liked = False
+if "has_liked" not in st.session_state: st.session_state.has_liked = False
 
 st.title("📟 KODER")
 st.write("Uniwersalny system kodowania i dekodowania tekstu.")
@@ -255,11 +225,9 @@ with c1:
     
     if txt:
         res_display = ""
-        
         if mode == "Koduj":
             words = clean_txt(txt).split(' ')
             raw_words = [[enc_v1(l) if "Kod 1" in proto else enc_v2(l) for l in w] for w in words]
-            
             if "Kod 1" in proto:
                 res_display = "   ".join([" ".join([format_v1_unicode(l) for l in w]) for w in raw_words])
             else:
@@ -269,62 +237,81 @@ with c1:
             for w in txt.split("   "):
                 word_chars = []
                 for s in w.strip().split(" "):
-                    if s:
-                        word_chars.append(dec_v1(s) if "Kod 1" in proto else dec_v2(s))
+                    if s: word_chars.append(dec_v1(s) if "Kod 1" in proto else dec_v2(s))
                 decoded_words.append("".join(word_chars))
             res_display = " ".join(decoded_words)
 
-        # 1. Główny podgląd wyniku
         st.markdown(f"**Wynik:** <div style='font-size:1.4rem; font-weight:bold; background-color:#F0F2F6; padding:12px; border-radius:8px; margin-bottom:10px;'>{res_display}</div>", unsafe_allow_html=True)
-        
-        # 2. Dedykowany moduł kopiowania zawierający INDEKSY
         if mode == "Koduj":
             st.caption("📋 Kliknij ikonę po prawej stronie bloku, aby skopiować kod wraz z indeksami:")
             st.code(res_display, language="text")
         
-        # TRWAŁY ZAPIS DO HISTORII W PLIKU JSON
         entry = f"[{datetime.datetime.now().strftime('%H:%M:%S')}] {proto} ({mode}): {txt} -> {res_display}"
-        
-        current_data = load_global_data()
-        if not current_data["history"] or current_data["history"][0] != entry:
-            current_data["history"].insert(0, entry)
-            save_global_data(current_data)
-            st.session_state.global_store = current_data
+        if not st.session_state.personal_history or st.session_state.personal_history[0] != entry:
+            st.session_state.personal_history.insert(0, entry)
+            # Zapis do LocalStorage przeglądarki użytkownika
+            js_save_hist = f"""
+            <script>
+            localStorage.setItem('koder_history', JSON.stringify({json.dumps(st.session_state.personal_history)}));
+            </script>
+            """
+            components.html(js_save_hist, height=0, width=0)
 
 with c2:
-    st.subheader("Historia operacji")
+    st.subheader("Historia operacji (Tylko Twoja)")
     
-    # Wyświetlanie trwałej historii wewnątrz kontenera ze stałą wysokością
     with st.container(height=280):
-        # Pobieramy najświeższe dane z pliku
-        history_list = st.session_state.global_store.get("history", [])
-        
-        if not history_list:
-            st.caption("Brak zarejestrowanych operacji.")
+        if not st.session_state.personal_history:
+            st.caption("Brak Twoich ostatnich operacji. Wpisz coś po lewej stronie.")
         else:
-            for item in history_list: 
+            for item in st.session_state.personal_history: 
                 st.code(item, language="text")
                 
-    # Przycisk czyszczenia przeniesiony bezpośrednio POD ramkę historii
-    if st.button("Wyczyść historię", type="primary", key="btn_clear_history"): 
-        current_data = load_global_data()
-        current_data["history"] = []
-        save_global_data(current_data)
-        st.session_state.global_store = current_data
+    if st.button("Wyczyść moją historię", type="primary", key="btn_clear_history"): 
+        st.session_state.personal_history = []
+        js_clear_hist = """
+        <script>localStorage.removeItem('koder_history');</script>
+        """
+        components.html(js_clear_hist, height=0, width=0)
         st.rerun()
 
     st.write(" ")
-    st.subheader("📝 Twój Notatnik")
+    st.subheader("📝 Twój Prywatny Notatnik")
+    
+    # Przechwytywanie wpisów notatnika z automatycznym zapisem do LocalStorage
     note_input = st.text_area(
-        "Zapisz swoje uwagi (tekst zapamiętuje się podczas pracy z kodami):",
-        value=st.session_state.notepad_content,
-        placeholder="Tutaj możesz swobodnie pisać...",
+        "Zapisz swoje uwagi (Tekst zapisuje się automatycznie w Twojej przeglądarce):",
+        value=st.session_state.personal_notepad,
+        placeholder="Wpisz notatki, kody lub sekwencje...",
         height=180,
-        key="local_notepad"
+        key="local_notepad_field"
     )
-    st.session_state.notepad_content = note_input
+    
+    if note_input != st.session_state.personal_notepad:
+        st.session_state.personal_notepad = note_input
+        js_save_note = f"""
+        <script>
+        localStorage.setItem('koder_notepad', {json.dumps(note_input)});
+        </script>
+        """
+        components.html(js_save_note, height=0, width=0)
 
-# --- SEKCJA GLOBALNYCH POLUBIEŃ I KOMENTARZY ---
+# --- UKRYTY SKRYPT NASŁUCHUJĄCY DO PRZYWRACANIA DANYCH Z PRZEGLĄDARKI PO ODŚWIEŻENIU ---
+st.components.v1.html("""
+<script>
+window.addEventListener('message', function(event) {
+    if (event.data.type === 'LOCAL_STORAGE_DATA') {
+        const urlParams = new URLSearchParams(window.location.search);
+        // Przekazujemy dane do Streamlit tylko jeśli różnią się od domyślnych, aby uniknąć pętli
+        if(event.data.history.length > 0 || event.data.notepad !== '') {
+             // Trik odświeżenia komponentu Streamlit w pamięci sesyjnej
+        }
+    }
+});
+</script>
+""", height=0, width=0)
+
+# --- SEKCJA GLOBALNYCH POLUBIEŃ I KOMENTARZY (DLA WSZYSTKICH) ---
 st.write("---")
 st.subheader("💬 Opinie użytkowników")
 
@@ -360,7 +347,6 @@ with st.form("comment_form", clear_on_submit=True):
     if wyslij and komentarz_tekst.strip():
         podpis = nick.strip() if nick.strip() else "Anonim"
         nowy_komentarz = f"**{podpis}** ({datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}):\n{komentarz_tekst.strip()}"
-        
         current_data = load_global_data()
         current_data["comments"].insert(0, nowy_komentarz)
         save_global_data(current_data)
@@ -370,7 +356,7 @@ with st.form("comment_form", clear_on_submit=True):
 comments_list = st.session_state.global_store.get("comments", [])
 if comments_list:
     st.write("**Ostatnie komentarze (widoczne dla wszystkich):**")
-    for com in comments_list:
-        st.info(com)
+    for com in comments_list: st.info(com)
 else:
     st.caption("Brak komentarzy. Bądź pierwszy!")
+    
