@@ -3,11 +3,12 @@ import datetime
 import os
 import json
 import streamlit as st
+import streamlit.components.v1 as components
 
 # Czysty interfejs bez elementów chemicznych
 st.set_page_config(page_title="Koder", page_icon="📟", layout="wide")
 
-# --- TRWAŁE ZAPISYWANIE DANYCH DO PLIKU (Żeby opinie i lajki nie znikały) ---
+# --- TRWAŁE ZAPISYWANIE DANYCH DO PLIKU ---
 DATA_FILE = "dane_aplikacji.json"
 
 def load_global_data():
@@ -26,14 +27,12 @@ def save_global_data(data):
     except:
         pass
 
-# Ładowanie danych na starcie do pamięci podręcznej sesji
 if "global_store" not in st.session_state:
     st.session_state.global_store = load_global_data()
 
 # --- MODYFIKACJA INTERFEJSU (CSS) ---
 st.markdown("""
     <style>
-        /* Zamiana st.radio w duże, prostokątne przyciski */
         div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div {
             display: flex;
             gap: 10px;
@@ -56,28 +55,23 @@ st.markdown("""
             font-weight: bold !important;
             white-space: nowrap !important;
         }
-        /* Ukrycie domyślnych małych kółek radio */
         div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label div[data-testid="stMarkdownContainer"]::before {
             display: none !important;
         }
         div[data-testid="stRadio"] input[type="radio"] {
             display: none;
         }
-        /* Efekt podświetlenia wybranego kafelka (akcent niebieski) */
         div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label:has(input:checked) {
             background-color: #1E90FF !important;
             color: white !important;
             border-color: #1E90FF !important;
             box-shadow: 0px 4px 10px rgba(30, 144, 255, 0.3);
         }
-        /* Nagłówki nad kafelkami */
         div[data-testid="stRadio"] label div[data-testid="stWidgetLabel"] p {
             font-size: 16px !important;
             font-weight: bold;
             color: #31333E;
         }
-        
-        /* Wymuszenie koloru niebieskiego dla natywnej ramki Streamlit */
         div[data-testid="stVerticalBlockBorderWrapper"] {
             border-color: #1E90FF !important;
             border-radius: 12px;
@@ -86,7 +80,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Ukryta mapa danych
 DATA_MAP = {
     1: (1, 1, "H"), 2: (18, 1, "He"), 3: (1, 2, "Li"), 4: (2, 2, "Be"), 5: (13, 2, "B"), 6: (14, 2, "C"), 
     7: (15, 2, "N"), 8: (16, 2, "O"), 9: (17, 2, "F"), 10: (18, 2, "Ne"), 11: (1, 3, "Na"), 12: (2, 3, "Mg"),
@@ -105,13 +98,27 @@ DATA_MAP = {
     113: (13, 7, "Nh"), 114: (14, 7, "Fl"), 115: (15, 7, "Mc"), 116: (16, 7, "Lv"), 117: (17, 7, "Ts"), 118: (18, 7, "Og")
 }
 
+# Słowniki do konwersji na prawdziwe znaki indeksów Unicode (Kopiowalne)
+SUPERSCRIPTS = {'0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹'}
+SUBSCRIPTS = {'0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄', '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉'}
+
+def to_superscript(num_str):
+    return "".join(SUPERSCRIPTS.get(c, c) for c in num_str)
+
+def to_subscript(num_str):
+    return "".join(SUBSCRIPTS.get(c, c) for c in num_str)
+
+# Mapowanie odwrócone dla dekodera (zamiana indeksów Unicode na zwykłe liczby i kropki)
+REV_SUP = {v: k for k, v in SUPERSCRIPTS.items()}
+REV_SUB = {v: k for k, v in SUBSCRIPTS.items()}
+
 def clean_txt(t):
     z = {'Ą': 'A', 'Ć': 'C', 'Ę': 'E', 'Ł': 'L', 'Ń': 'N', 'Ó': 'O', 'Ś': 'S', 'Ź': 'Z', 'Ż': 'Z'}
     t = t.upper()
     for k, v in z.items(): t = t.replace(k, v)
     return re.sub(r'[^A-Z ]', '', t)
 
-# --- POPRAWIONY KOD 1 ---
+# --- SYSTEM 1 ---
 def enc_v1(l):
     for i, (g, o, s) in DATA_MAP.items():
         if s == l: return f"{i}"
@@ -120,16 +127,25 @@ def enc_v1(l):
         if len(s) > 1 and s[1] == l.lower(): return f"{i}.2"
     return "?"
 
-# Pomocnicza funkcja do wizualizacji Kodu 1 (indeksy dolne tekstowe)
-def format_v1_display(code_str):
+def format_v1_unicode(code_str):
     if "." in code_str:
         parts = code_str.split(".")
-        return f"{parts[0]}<sub>{parts[1]}</sub>"
+        return f"{parts[0]}{to_subscript(parts[1])}"
     return code_str
 
 def dec_v1(s):
     s = s.strip()
     if not s: return ""
+    # Konwersja indeksów Unicode z powrotem na format z kropką
+    converted = ""
+    for char in s:
+        if char in REV_SUB:
+            if not converted.contains("."):  # dodaj kropkę raz przed indeksem dolnym
+                converted += "."
+            converted += REV_SUB[char]
+        else:
+            converted += char
+    s = converted
     try:
         if "." in s:
             parts = s.split(".")
@@ -144,7 +160,7 @@ def dec_v1(s):
     except ValueError: pass
     return "?"
 
-# --- POPRAWIONY KOD 2 ---
+# --- SYSTEM 2 ---
 def enc_v2(l):
     for i, (g, o, s) in DATA_MAP.items():
         if s == l: return f"{g}.{o}"
@@ -153,23 +169,39 @@ def enc_v2(l):
         if len(s) > 1 and s[1] == l.lower(): return f"{g}.{o}2"
     return "?"
 
-# Pomocnicza funkcja do wizualizacji Kodu 2 (Zapis Grupa_dol Okres_gora)
-def format_v2_display(code_str):
+def format_v2_unicode(code_str):
     if "." in code_str:
         parts = code_str.split(".")
         g = parts[0]
         rest = parts[1]
         o = rest[0]
         sub = rest[1] if len(rest) > 1 else ""
-        return f"{g}<sup>{o}</sup><sub>{sub}</sub>" if sub else f"{g}<sup>{o}</sup>"
+        return f"{g}{to_superscript(o)}{to_subscript(sub)}"
     return code_str
 
 def dec_v2(s):
     s = s.strip()
     if not s: return ""
-    if "." not in s: return "?"
+    # Odbudowa struktury g.oX z indeksów Unicode
+    g_part = ""
+    o_part = ""
+    sub_part = ""
+    
+    in_o = False
+    for char in s:
+        if char in REV_SUP:
+            o_part += REV_SUP[char]
+            in_o = True
+        elif char in REV_SUB:
+            sub_part += REV_SUB[char]
+        else:
+            if not in_o:
+                g_part += char
+    
+    if not g_part or not o_part: return "?"
+    full_s = f"{g_part}.{o_part}{sub_part}"
     try:
-        parts = s.split(".")
+        parts = full_s.split(".")
         g = int(parts[0])
         rest = parts[1]
         if len(rest) > 1:
@@ -184,7 +216,7 @@ def dec_v2(s):
     except ValueError: pass
     return "?"
 
-# Lokalna historia sesji danej przeglądarki
+# Historia sesji
 if "history" not in st.session_state: 
     st.session_state.history = []
 if "has_liked" not in st.session_state:
@@ -205,42 +237,42 @@ with c1:
     txt = st.text_input("Wprowadź dane i zatwierdź Enterem:", placeholder="Wpisz dane tutaj...")
     
     if txt:
-        res_raw = ""
         res_display = ""
+        res_raw_backup = ""
+        
         if mode == "Koduj":
             words = clean_txt(txt).split(' ')
             raw_words = [[enc_v1(l) if "Kod 1" in proto else enc_v2(l) for l in w] for w in words]
             
+            # Budowanie pełnego wyniku opartego o znaki Unicode (Kopiowalne!)
             if "Kod 1" in proto:
-                res_display = " &nbsp; &nbsp; ".join([" ".join([format_v1_display(l) for l in w]) for w in raw_words])
+                res_display = "   ".join([" ".join([format_v1_unicode(l) for l in w]) for w in raw_words])
             else:
-                res_display = " &nbsp; &nbsp; ".join([" ".join([format_v2_display(l) for l in w]) for w in raw_words])
-            res_raw = "   ".join([" ".join(w) for w in raw_words])
+                res_display = "   ".join([" ".join([format_v2_unicode(l) for l in w]) for w in raw_words])
+            res_raw_backup = "   ".join([" ".join(w) for w in raw_words])
         else:
-            res_raw = " ".join(["".join([dec_v1(s) if "Kod 1" in proto else dec_v2(s) for s in w.strip().split(" ") if s]) for w in txt.split("   ")])
-            res_display = res_raw
+            # Inteligentny dekoder rozpoznaje zarowno czyste kody, jak i te z indeksami Unicode
+            res_display = " ".join(["".join([dec_v1(s) if "Kod 1" in proto else dec_v2(s) for s in w.strip().split(" ") if s]) for w in txt.split("   ")])
+            res_raw_backup = res_display
 
-        # 1. Wyświetlanie sformatowanego ładnego wyniku (indeksy dolne i górne)
-        st.markdown(f"**Wynik:** <div style='font-size:1.3rem; background-color:#F0F2F6; padding:12px; border-radius:8px; margin-bottom:10px;'>{res_display}</div>", unsafe_allow_html=True)
+        # 1. Główny podgląd wyniku (Duży i wyraźny)
+        st.markdown(f"**Wynik:** <div style='font-size:1.4rem; font-weight:bold; background-color:#F0F2F6; padding:12px; border-radius:8px; margin-bottom:10px;'>{res_display}</div>", unsafe_allow_html=True)
         
-        # 2. SEKCJA SZYBKIEGO KOPIOWANIA (Pojawia się tylko podczas kodowania, żeby móc łatwo skopiować czysty ciąg)
+        # 2. Dedykowany moduł kopiowania zawierający INDEKSY
         if mode == "Koduj":
-            st.caption("📋 Skopiuj czysty kod do schowka (gotowy do odkodowania):")
-            st.code(res_raw, language="text")
+            st.caption("📋 Kliknij ikonę po prawej stronie bloku, aby skopiować kod wraz z indeksami:")
+            st.code(res_display, language="text")
         
-        entry = f"[{datetime.datetime.now().strftime('%H:%M:%S')}] {proto} ({mode}): {txt} -> {res_raw}"
+        entry = f"[{datetime.datetime.now().strftime('%H:%M:%S')}] {proto} ({mode}): {txt} -> {res_display}"
         if not st.session_state.history or st.session_state.history[0] != entry: st.session_state.history.insert(0, entry)
 
 with c2:
     st.subheader("Historia operacji")
-    
     if st.button("Wyczyść historię", type="primary", key="btn_clear_history"): 
         st.session_state.history = []
         st.rerun()
         
     st.write(" ")
-    
-    # --- NATYWNA RAMKA ZBLOKOWANA SZEWEM WYSOKOŚCI ---
     with st.container(height=260):
         if not st.session_state.history:
             st.caption("Brak zarejestrowanych operacji w tej sesji.")
@@ -248,10 +280,8 @@ with c2:
             for item in st.session_state.history: 
                 st.code(item, language="text")
 
-    # --- BEZPIECZNY NOTATNIK ---
     st.write(" ")
     st.subheader("📝 Twój Notatnik")
-    
     note_input = st.text_area(
         "Zapisz swoje uwagi (tekst zapamiętuje się podczas pracy z kodami):",
         value=st.session_state.notepad_content,
