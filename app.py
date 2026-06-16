@@ -130,8 +130,6 @@ def format_v1_display(code_str):
 def dec_v1(s):
     s = s.strip()
     if not s: return ""
-    # Obsługa czyszczenia ewentualnych tagów HTML jeśli wklejono bezpośrednio z wyniku
-    s = re.sub(r'<[^>]*>', '.', s).replace('..', '.')
     try:
         if "." in s:
             parts = s.split(".")
@@ -169,9 +167,6 @@ def format_v2_display(code_str):
 def dec_v2(s):
     s = s.strip()
     if not s: return ""
-    # Oczyszczanie wejścia z tagów HTML na wypadek gdyby użytkownik kopiował wynik z suwaka
-    s = re.sub(r'<sup>(.*?)</sup>', r'.\1', s)
-    s = re.sub(r'<sub>(.*?)</sub>', r'\1', s)
     if "." not in s: return "?"
     try:
         parts = s.split(".")
@@ -214,9 +209,8 @@ with c1:
         res_display = ""
         if mode == "Koduj":
             words = clean_txt(txt).split(' ')
-            # Generowanie surowej bazy
             raw_words = [[enc_v1(l) if "Kod 1" in proto else enc_v2(l) for l in w] for w in words]
-            # Łączenie w postać czytelną (z indeksami dolnymi i górnymi HTML)
+            
             if "Kod 1" in proto:
                 res_display = " &nbsp; &nbsp; ".join([" ".join([format_v1_display(l) for l in w]) for w in raw_words])
             else:
@@ -226,8 +220,13 @@ with c1:
             res_raw = " ".join(["".join([dec_v1(s) if "Kod 1" in proto else dec_v2(s) for s in w.strip().split(" ") if s]) for w in txt.split("   ")])
             res_display = res_raw
 
-        # Wyświetlanie sformatowanego ładnego wyniku (obsługuje indeksy dolne i górne)
-        st.markdown(f"**Wynik:** <div style='font-size:1.2rem; background-color:#F0F2F6; padding:10px; border-radius:8px;'>{res_display}</div>", unsafe_allow_html=True)
+        # 1. Wyświetlanie sformatowanego ładnego wyniku (indeksy dolne i górne)
+        st.markdown(f"**Wynik:** <div style='font-size:1.3rem; background-color:#F0F2F6; padding:12px; border-radius:8px; margin-bottom:10px;'>{res_display}</div>", unsafe_allow_html=True)
+        
+        # 2. SEKCJA SZYBKIEGO KOPIOWANIA (Pojawia się tylko podczas kodowania, żeby móc łatwo skopiować czysty ciąg)
+        if mode == "Koduj":
+            st.caption("📋 Skopiuj czysty kod do schowka (gotowy do odkodowania):")
+            st.code(res_raw, language="text")
         
         entry = f"[{datetime.datetime.now().strftime('%H:%M:%S')}] {proto} ({mode}): {txt} -> {res_raw}"
         if not st.session_state.history or st.session_state.history[0] != entry: st.session_state.history.insert(0, entry)
