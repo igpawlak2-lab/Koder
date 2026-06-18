@@ -3,6 +3,7 @@ import datetime
 import os
 import json
 import streamlit as st
+import streamlit.components.v1 as components
 
 # Czysty interfejs aplikacji
 st.set_page_config(page_title="Koder", page_icon="📟", layout="wide")
@@ -228,36 +229,69 @@ with c1:
             st.query_params["h"] = json.dumps(st.session_state.personal_history)
 
 with c2:
-    st.subheader("Historia operacji ")
+    st.subheader("Historia operacji (Tylko Twoja)")
     
-    with st.container(height=280):
+    # Przycisk do czyszczenia osobistej historii operacji użytkownika
+    if st.button("🗑️ Wyczyść historię operacji", type="primary"):
+        st.session_state.personal_history = []
+        st.query_params["h"] = json.dumps([])
+        st.rerun()
+    
+    with st.container(height=240):
         if not st.session_state.personal_history:
             st.caption("Brak Twoich ostatnich operacji. Wpisz coś po lewej stronie.")
         else:
             for item in st.session_state.personal_history: 
                 st.code(item, language="text")
-                
-    if st.button("Wyczyść moją historię", type="primary", key="btn_clear_history"): 
-        st.session_state.personal_history = []
-        st.query_params["h"] = json.dumps([])
-        st.rerun()
 
     st.write(" ")
     st.subheader("📝 Twój Prywatny Notatnik")
     
-    # Funkcja wymuszająca natychmiastowy zapis do adresu URL przy każdej edycji
+    # Skrypt JavaScript przywracający kopię zapasową z LocalStorage
+    if not st.session_state.personal_notepad:
+        components.html(
+            """
+            <script>
+                var savedNote = localStorage.getItem("koder_notepad_backup");
+                if (savedNote && savedNote !== "null") {
+                    var currentUrl = new URL(window.parent.location.href);
+                    if (!currentUrl.searchParams.get("n")) {
+                        currentUrl.searchParams.set("n", savedNote);
+                        window.parent.location.href = currentUrl.href;
+                    }
+                }
+            </script>
+            """, height=0, width=0
+        )
+
     def save_notepad_instantly():
         if "local_notepad_field" in st.session_state:
-            st.session_state.personal_notepad = st.session_state.local_notepad_field
-            st.query_params["n"] = st.session_state.local_notepad_field
+            val = st.session_state.local_notepad_field
+            st.session_state.personal_notepad = val
+            st.query_params["n"] = val
 
     note_input = st.text_area(
-        "Zapisz swoje uwagi :",
+        "Zapisz swoje uwagi (Tekst zapisuje się automatycznie w pamięci przeglądarki):",
         value=st.session_state.personal_notepad,
         placeholder="Wpisz notatki, kody lub sekwencje...",
         height=180,
         key="local_notepad_field",
         on_change=save_notepad_instantly
+    )
+    
+    # Skrypt JavaScript zapisujący dane w czasie rzeczywistym z klawiatury
+    components.html(
+        f"""
+        <script>
+            var textareas = window.parent.document.querySelectorAll("textarea");
+            if(textareas.length > 0) {{
+                var ta = textareas[0];
+                ta.addEventListener('input', function(e) {{
+                    localStorage.setItem("koder_notepad_backup", e.target.value);
+                }});
+            }}
+        </script>
+        """, height=0, width=0
     )
 
 # --- SEKCJA GLOBALNYCH POLUBIEŃ I KOMENTARZY (DLA WSZYSTKICH) ---
