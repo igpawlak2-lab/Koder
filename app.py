@@ -249,7 +249,7 @@ with c1:
             st.query_params["h"] = json.dumps(st.session_state.personal_history)
 
 with c2:
-    st.subheader("Historia operacji (Tylko Twoja)")
+    st.subheader("Historia operacji ")
     
     if st.button("🗑️ Wyczyść historię ", type="primary"):
         st.session_state.personal_history = []
