@@ -8,7 +8,7 @@ import streamlit.components.v1 as components
 # Czysty interfejs aplikacji
 st.set_page_config(page_title="Koder", page_icon="📟", layout="wide")
 
-# --- GLOBALNY PLIK JSON (TYLKO POLUBIENIA I KOMENTARZE) ---
+# --- GLOBALNY PLIK JSON (POLUBIENIA I KOMENTARZE STRUKTURALNE) ---
 DATA_FILE = "dane_aplikacji.json"
 
 def load_global_data():
@@ -20,6 +20,15 @@ def load_global_data():
                 if not isinstance(data, dict): return default_data
                 if "likes" not in data: data["likes"] = 0
                 if "comments" not in data: data["comments"] = []
+                
+                # Konwersja starych komentarzy tekstowych na nowy format słownikowy, jeśli istnieją
+                migrated_comments = []
+                for c in data["comments"]:
+                    if isinstance(c, str):
+                        migrated_comments.append({"text": c, "session_id": "legacy"})
+                    else:
+                        migrated_comments.append(c)
+                data["comments"] = migrated_comments
                 return data
         except:
             return default_data
@@ -34,6 +43,14 @@ def save_global_data(data):
 
 if "global_store" not in st.session_state:
     st.session_state.global_store = load_global_data()
+
+# Pobranie ID aktualnej sesji użytkownika do weryfikacji autorstwa komentarzy
+try:
+    from streamlit.runtime.scriptrunner import get_script_run_ctx
+    ctx = get_script_run_ctx()
+    current_session_id = ctx.session_id if ctx else "unknown"
+except:
+    current_session_id = "unknown"
 
 # --- PRYWATNE WCZYTYWANIE Z PARAMS URL ---
 params = st.query_params
@@ -229,9 +246,8 @@ with c1:
             st.query_params["h"] = json.dumps(st.session_state.personal_history)
 
 with c2:
-    st.subheader("Historia operacji ")
+    st.subheader("Historia operacji (Tylko Twoja)")
     
-    # Przycisk do czyszczenia osobistej historii operacji użytkownika
     if st.button("🗑️ Wyczyść historię operacji", type="primary"):
         st.session_state.personal_history = []
         st.query_params["h"] = json.dumps([])
@@ -245,9 +261,8 @@ with c2:
                 st.code(item, language="text")
 
     st.write(" ")
-    st.subheader("📝 Twój Notatnik")
+    st.subheader("📝 Twój Prywatny Notatnik")
     
-    # Skrypt JavaScript przywracający kopię zapasową z LocalStorage
     if not st.session_state.personal_notepad:
         components.html(
             """
@@ -271,7 +286,7 @@ with c2:
             st.query_params["n"] = val
 
     note_input = st.text_area(
-        "Zapisz swoje uwag:",
+        "Zapisz swoje uwagi (Tekst zapisuje się automatycznie w pamięci przeglądarki):",
         value=st.session_state.personal_notepad,
         placeholder="Wpisz notatki, kody lub sekwencje...",
         height=180,
@@ -279,7 +294,6 @@ with c2:
         on_change=save_notepad_instantly
     )
     
-    # Skrypt JavaScript zapisujący dane w czasie rzeczywistym z klawiatury
     components.html(
         f"""
         <script>
@@ -329,9 +343,16 @@ with st.form("comment_form", clear_on_submit=True):
     
     if wyslij and komentarz_tekst.strip():
         podpis = nick.strip() if nick.strip() else "Anonim"
-        nowy_komentarz = f"**{podpis}** ({datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}):\n{komentarz_tekst.strip()}"
+        nowy_komentarz_tekst = f"**{podpis}** ({datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}):\n{komentarz_tekst.strip()}"
+        
+        # Zapisujemy jako strukturę słownikową zawierającą ID sesji twórcy
+        nowy_komentarz_obj = {
+            "text": nowy_komentarz_tekst,
+            "session_id": current_session_id
+        }
+        
         current_data = load_global_data()
-        current_data["comments"].insert(0, nowy_komentarz)
+        current_data["comments"].insert(0, nowy_komentarz_obj)
         save_global_data(current_data)
         st.session_state.global_store = current_data
         st.rerun()
@@ -339,6 +360,20 @@ with st.form("comment_form", clear_on_submit=True):
 comments_list = st.session_state.global_store.get("comments", [])
 if comments_list:
     st.write("**Ostatnie komentarze (widoczne dla wszystkich):**")
-    for com in comments_list: st.info(com)
+    for idx, com in enumerate(comments_list):
+        cc1, cc2 = st.columns([5, 1])
+        with cc1:
+            st.info(com["text"])
+        with cc2:
+            # Przycisk usuwania pojawia się tylko, jeśli session_id pasuje do aktualnego użytkownika
+            if com.get("session_id") == current_session_id and current_session_id != "unknown":
+                if st.button("❌ Usuń", key=f"del_com_{idx}", type="primary", use_container_width=True):
+                    current_data = load_global_data()
+                    # Usuwamy konkretny komentarz po indeksie
+                    if idx < len(current_data["comments"]):
+                        current_data["comments"].pop(idx)
+                        save_global_data(current_data)
+                        st.session_state.global_store = current_data
+                        st.rerun()
 else:
     st.caption("Brak komentarzy. Bądź pierwszy!")
