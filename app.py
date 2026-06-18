@@ -228,7 +228,7 @@ with c1:
             st.query_params["h"] = json.dumps(st.session_state.personal_history)
 
 with c2:
-    st.subheader("Historia operacji (Tylko Twoja)")
+    st.subheader("Historia operacji ")
     
     with st.container(height=280):
         if not st.session_state.personal_history:
@@ -252,7 +252,7 @@ with c2:
             st.query_params["n"] = st.session_state.local_notepad_field
 
     note_input = st.text_area(
-        "Zapisz swoje uwagi (Tekst zapisuje się automatycznie w adresie URL przeglądarki):",
+        "Zapisz swoje uwagi :",
         value=st.session_state.personal_notepad,
         placeholder="Wpisz notatki, kody lub sekwencje...",
         height=180,
