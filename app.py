@@ -21,13 +21,16 @@ def load_global_data():
                 if "likes" not in data: data["likes"] = 0
                 if "comments" not in data: data["comments"] = []
                 
-                # Konwersja starych komentarzy tekstowych na nowy format słownikowy, jeśli istnieją
+                # Pancerna konwersja starych komentarzy na format słownikowy
                 migrated_comments = []
                 for c in data["comments"]:
-                    if isinstance(c, str):
+                    if isinstance(c, dict) and "text" in c:
+                        migrated_comments.append(c)
+                    elif isinstance(c, str):
                         migrated_comments.append({"text": c, "session_id": "legacy"})
                     else:
-                        migrated_comments.append(c)
+                        # Awaryjne zabezpieczenie na wypadek dziwnych struktur danych
+                        migrated_comments.append({"text": str(c), "session_id": "legacy"})
                 data["comments"] = migrated_comments
                 return data
         except:
@@ -345,7 +348,6 @@ with st.form("comment_form", clear_on_submit=True):
         podpis = nick.strip() if nick.strip() else "Anonim"
         nowy_komentarz_tekst = f"**{podpis}** ({datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}):\n{komentarz_tekst.strip()}"
         
-        # Zapisujemy jako strukturę słownikową zawierającą ID sesji twórcy
         nowy_komentarz_obj = {
             "text": nowy_komentarz_tekst,
             "session_id": current_session_id
@@ -365,11 +367,9 @@ if comments_list:
         with cc1:
             st.info(com["text"])
         with cc2:
-            # Przycisk usuwania pojawia się tylko, jeśli session_id pasuje do aktualnego użytkownika
             if com.get("session_id") == current_session_id and current_session_id != "unknown":
                 if st.button("❌ Usuń", key=f"del_com_{idx}", type="primary", use_container_width=True):
                     current_data = load_global_data()
-                    # Usuwamy konkretny komentarz po indeksie
                     if idx < len(current_data["comments"]):
                         current_data["comments"].pop(idx)
                         save_global_data(current_data)
