@@ -244,22 +244,23 @@ with c2:
         st.query_params["h"] = json.dumps([])
         st.rerun()
 
-    st.write(" ")
+     st.write(" ")
     st.subheader("📝 Twój Prywatny Notatnik")
     
+    # Funkcja wymuszająca natychmiastowy zapis do adresu URL przy każdej zmianie tekstu
+    def save_notepad_instantly():
+        if "local_notepad_field" in st.session_state:
+            st.session_state.personal_notepad = st.session_state.local_notepad_field
+            st.query_params["n"] = st.session_state.local_notepad_field
+
     note_input = st.text_area(
         "Zapisz swoje uwagi (Tekst zapisuje się automatycznie w adresie URL przeglądarki):",
         value=st.session_state.personal_notepad,
         placeholder="Wpisz notatki, kody lub sekwencje...",
         height=180,
-        key="local_notepad_field"
+        key="local_notepad_field",
+        on_change=save_notepad_instantly  # <- Ta linijka naprawia problem na laptopie
     )
-    
-    if note_input != st.session_state.personal_notepad:
-        st.session_state.personal_notepad = note_input
-        # Automatyczne dodawanie treści notatnika do adresu URL
-        st.query_params["n"] = note_input
-
 # --- SEKCJA GLOBALNYCH POLUBIEŃ I KOMENTARZY (DLA WSZYSTKIAN) ---
 st.write("---")
 st.subheader("💬 Opinie użytkowników")
