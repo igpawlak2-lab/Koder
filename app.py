@@ -4,7 +4,7 @@ import os
 import json
 import streamlit as st
 
-# Czysty interfejs bez elementów chemicznych
+# Czysty interfejs aplikacji
 st.set_page_config(page_title="Koder", page_icon="📟", layout="wide")
 
 # --- GLOBALNY PLIK JSON (TYLKO POLUBIENIA I KOMENTARZE) ---
@@ -34,8 +34,7 @@ def save_global_data(data):
 if "global_store" not in st.session_state:
     st.session_state.global_store = load_global_data()
 
-# --- NATYWNE I PRYWATNE WCZYTYWANIE Z PARAMS URL ---
-# Wykorzystujemy adres przeglądarki do przechowywania notatek i historii bez używania zewnętrznych paczek
+# --- PRYWATNE WCZYTYWANIE Z PARAMS URL ---
 params = st.query_params
 
 if "personal_history" not in st.session_state:
@@ -48,7 +47,7 @@ if "personal_history" not in st.session_state:
 if "personal_notepad" not in st.session_state:
     st.session_state.personal_notepad = params.get("n", "")
 
-# --- STYLOWANIE SYSTEMU INTERFEJSU (CSS) ---
+# --- STYLOWANIE INTERFEJSU (CSS) ---
 st.markdown("""
     <style>
         div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div {
@@ -226,11 +225,10 @@ with c1:
         
         if not st.session_state.personal_history or st.session_state.personal_history[0] != entry:
             st.session_state.personal_history.insert(0, entry)
-            # Aktualizacja adresu URL w przeglądarce użytkownika
             st.query_params["h"] = json.dumps(st.session_state.personal_history)
 
 with c2:
-    st.subheader("Historia operacji")
+    st.subheader("Historia operacji (Tylko Twoja)")
     
     with st.container(height=280):
         if not st.session_state.personal_history:
@@ -244,10 +242,10 @@ with c2:
         st.query_params["h"] = json.dumps([])
         st.rerun()
 
-     st.write(" ")
+    st.write(" ")
     st.subheader("📝 Twój Prywatny Notatnik")
     
-    # Funkcja wymuszająca natychmiastowy zapis do adresu URL przy każdej zmianie tekstu
+    # Funkcja wymuszająca natychmiastowy zapis do adresu URL przy każdej edycji
     def save_notepad_instantly():
         if "local_notepad_field" in st.session_state:
             st.session_state.personal_notepad = st.session_state.local_notepad_field
@@ -259,9 +257,10 @@ with c2:
         placeholder="Wpisz notatki, kody lub sekwencje...",
         height=180,
         key="local_notepad_field",
-        on_change=save_notepad_instantly  # <- Ta linijka naprawia problem na laptopie
+        on_change=save_notepad_instantly
     )
-# --- SEKCJA GLOBALNYCH POLUBIEŃ I KOMENTARZY (DLA WSZYSTKIAN) ---
+
+# --- SEKCJA GLOBALNYCH POLUBIEŃ I KOMENTARZY (DLA WSZYSTKICH) ---
 st.write("---")
 st.subheader("💬 Opinie użytkowników")
 
