@@ -229,7 +229,7 @@ with c1:
             st.query_params["h"] = json.dumps(st.session_state.personal_history)
 
 with c2:
-    st.subheader("Historia operacji (Tylko Twoja)")
+    st.subheader("Historia operacji ")
     
     # Przycisk do czyszczenia osobistej historii operacji użytkownika
     if st.button("🗑️ Wyczyść historię operacji", type="primary"):
@@ -245,7 +245,7 @@ with c2:
                 st.code(item, language="text")
 
     st.write(" ")
-    st.subheader("📝 Twój Prywatny Notatnik")
+    st.subheader("📝 Twój Notatnik")
     
     # Skrypt JavaScript przywracający kopię zapasową z LocalStorage
     if not st.session_state.personal_notepad:
@@ -271,7 +271,7 @@ with c2:
             st.query_params["n"] = val
 
     note_input = st.text_area(
-        "Zapisz swoje uwagi (Tekst zapisuje się automatycznie w pamięci przeglądarki):",
+        "Zapisz swoje uwag:",
         value=st.session_state.personal_notepad,
         placeholder="Wpisz notatki, kody lub sekwencje...",
         height=180,
