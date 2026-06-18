@@ -251,7 +251,7 @@ with c1:
 with c2:
     st.subheader("Historia operacji (Tylko Twoja)")
     
-    if st.button("🗑️ Wyczyść historię operacji", type="primary"):
+    if st.button("🗑️ Wyczyść historię ", type="primary"):
         st.session_state.personal_history = []
         st.query_params["h"] = json.dumps([])
         st.rerun()
@@ -264,7 +264,7 @@ with c2:
                 st.code(item, language="text")
 
     st.write(" ")
-    st.subheader("📝 Twój Prywatny Notatnik")
+    st.subheader("📝 Twój Notatnik")
     
     if not st.session_state.personal_notepad:
         components.html(
@@ -289,7 +289,7 @@ with c2:
             st.query_params["n"] = val
 
     note_input = st.text_area(
-        "Zapisz swoje uwagi (Tekst zapisuje się automatycznie w pamięci przeglądarki):",
+        "Zapisz swoje uwagi:",
         value=st.session_state.personal_notepad,
         placeholder="Wpisz notatki, kody lub sekwencje...",
         height=180,
