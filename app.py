@@ -166,12 +166,24 @@ st.markdown(f"""
             color: {text_color} !important;
         }}
 
-        /* Dynamiczny kolor dla pól do wpisywania tekstu i obszarów tekstowych (4. kwadrat) */
+        /* Dynamiczny kolor dla pól do wpisywania tekstu oraz bezwzględne usunięcie niebieskiej ramki (focus/active) */
         div[data-testid="stTextInput"] input, 
         div[data-testid="stTextArea"] textarea {{
             background-color: {input_bg_color} !important;
             color: {input_text_color} !important;
             border: 1px solid {theme_color} !important;
+            outline: none !important;
+            box-shadow: none !important;
+        }}
+        
+        /* Usunięcie niebieskiej obwódki w stanie aktywnym i najechania dla pól tekstowych */
+        div[data-testid="stTextInput"] input:focus, 
+        div[data-testid="stTextArea"] textarea:focus,
+        div[data-testid="stTextInput"] input:active, 
+        div[data-testid="stTextArea"] textarea:active {{
+            border: 1px solid {theme_color} !important;
+            outline: none !important;
+            box-shadow: none !important;
         }}
 
         /* Wymuszenie koloru wybranego w 3. kwadracie dla wszystkich przycisków akcji */
