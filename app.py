@@ -75,8 +75,7 @@ if current_user not in st.session_state.global_store["user_data"]:
         "saved_nick": "",
         "theme_color": "#1E90FF",      
         "bg_color": "#FFFFFF",         
-        "clear_btn_color": "#5cb85c",
-        "input_bg_color": "#F0F2F6"
+        "clear_btn_color": "#5cb85c"
     }
     save_global_data(st.session_state.global_store)
 
@@ -96,9 +95,6 @@ if "bg_color" not in user_profile:
 if "clear_btn_color" not in user_profile:
     user_profile["clear_btn_color"] = "#5cb85c"
     updated_profile = True
-if "input_bg_color" not in user_profile:
-    user_profile["input_bg_color"] = "#F0F2F6"
-    updated_profile = True
 
 if updated_profile:
     save_global_data(st.session_state.global_store)
@@ -107,7 +103,6 @@ if updated_profile:
 theme_color = user_profile.get("theme_color", "#1E90FF")
 bg_color = user_profile.get("bg_color", "#FFFFFF")
 clear_btn_color = user_profile.get("clear_btn_color", "#5cb85c")
-input_bg_color = user_profile.get("input_bg_color", "#F0F2F6")
 
 # Funkcja pomocnicza do obliczania kontrastu tekstu (czarny lub biały)
 def get_contrast_text_color(hex_color):
@@ -122,7 +117,6 @@ def get_contrast_text_color(hex_color):
 text_color = get_contrast_text_color(theme_color)
 clear_btn_text_color = get_contrast_text_color(clear_btn_color)
 main_text_theme = get_contrast_text_color(bg_color)
-input_text_color = get_contrast_text_color(input_bg_color)
 
 # --- STYLOWANIE INTERFEJSU CSS ---
 st.markdown(f"""
@@ -164,38 +158,6 @@ st.markdown(f"""
         }}
         div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label:has(input:checked) div[data-testid="stMarkdownContainer"] {{
             color: {text_color} !important;
-        }}
-
-        /* Dynamiczny kolor dla pól do wpisywania tekstu oraz bezwzględne usunięcie niebieskiej ramki (focus/active) */
-        div[data-testid="stTextInput"] input, 
-        div[data-testid="stTextArea"] textarea,
-        div[data-testid="stInputInstructions"] {{
-            background-color: {input_bg_color} !important;
-            color: {input_text_color} !important;
-            border: 1px solid {theme_color} !important;
-            outline: none !important;
-            box-shadow: none !important;
-        }}
-        
-        /* Usunięcie niebieskiej obwódki w stanie aktywnym i najechania dla pól tekstowych i ich kontenerów nadrzędnych */
-        div[data-testid="stTextInput"] input:focus, 
-        div[data-testid="stTextArea"] textarea:focus,
-        div[data-testid="stTextInput"] input:active, 
-        div[data-testid="stTextArea"] textarea:active,
-        div[data-testid="stTextInput"]:focus-within,
-        div[data-testid="stTextArea"]:focus-within,
-        div[data-component-name="stTextInput"] > div,
-        div[data-component-name="stTextArea"] > div {{
-            border-color: {theme_color} !important;
-            outline: none !important;
-            box-shadow: none !important;
-        }}
-        
-        /* Całkowite wyczyszczenie natywnych stylów fokusujących we frameworku */
-        .stApp :focus, .stApp :focus-within, .stApp :focus-visible {{
-            outline: none !important;
-            box-shadow: none !important;
-            border-color: {theme_color} !important;
         }}
 
         /* Wymuszenie koloru wybranego w 3. kwadracie dla wszystkich przycisków akcji */
@@ -473,11 +435,11 @@ with col_like2:
 
 st.write(" ")
 
-# --- PANEL PERSONALIZACJI WYGLĄDU (4 KWADRATY) ---
+# --- PANEL PERSONALIZACJI WYGLĄDU (3 KWADRATY) ---
 with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
     st.subheader("Ustawienia kolorów aplikacji")
     
-    cc_col1, cc_col2, cc_col3, cc_col4 = st.columns(4)
+    cc_col1, cc_col2, cc_col3 = st.columns(3)
     with cc_col1:
         chosen_color = st.color_picker("Aktywny przycisk wyboru:", value=theme_color)
         if chosen_color != theme_color:
@@ -496,13 +458,6 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
         chosen_clear_color = st.color_picker("Przyciski akcji:", value=clear_btn_color)
         if chosen_clear_color != clear_btn_color:
             st.session_state.global_store["user_data"][current_user]["clear_btn_color"] = chosen_clear_color
-            save_global_data(st.session_state.global_store)
-            st.rerun()
-
-    with cc_col4:
-        chosen_input_bg = st.color_picker("Pola wpisywania tekstu:", value=input_bg_color)
-        if chosen_input_bg != input_bg_color:
-            st.session_state.global_store["user_data"][current_user]["input_bg_color"] = chosen_input_bg
             save_global_data(st.session_state.global_store)
             st.rerun()
 
@@ -535,8 +490,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                     "saved_nick": "",
                     "theme_color": "#1E90FF",
                     "bg_color": "#FFFFFF",
-                    "clear_btn_color": "#5cb85c",
-                    "input_bg_color": "#F0F2F6"
+                    "clear_btn_color": "#5cb85c"
                 }
                 save_global_data(st.session_state.global_store)
                 
