@@ -85,7 +85,11 @@ if "user_author_key" not in st.session_state:
         st.query_params["ak"] = st.session_state.user_author_key
 
 current_user = st.session_state.user_author_key
+
+# Rangi i uprawnienia
 is_admin = (current_user == "admin")
+is_moderator = (current_user == "moderator")
+is_staff = is_admin or is_moderator  # Wspólna zmienna dla obsługi (Admin + Moderator)
 
 # Upewniamy się, że w strukturze bazy istnieje profil dla aktualnego użytkownika
 if "user_data" not in st.session_state.global_store:
@@ -104,8 +108,7 @@ if current_user not in st.session_state.global_store["user_data"]:
     }
     save_global_data(st.session_state.global_store)
 
-# ISTNIEJĄCE KONTO: Kompatybilność wsteczna. Jeśli konto już istnieje, ale nie ma pól,
-# dajemy mu sztywne wartości startowe bazowe, aby zmiana admina ich nie nadpisywała dynamicznie.
+# ISTNIEJĄCE KONTO: Kompatybilność wsteczna.
 user_profile = st.session_state.global_store["user_data"][current_user]
 updated_profile = False
 
@@ -335,9 +338,11 @@ def dec_v2(s):
     except ValueError: pass
     return "?"
 
-# --- DYNAMICZNY NAGŁÓWEK Z IDENTYFIKACJĄ ADMINA ---
+# --- DYNAMICZNY NAGŁÓWEK Z IDENTYFIKACJĄ RANGI ---
 if is_admin:
     st.markdown("<h1 style='margin-bottom: 0;'>📟 KODER <span style='color: #FF4B4B; font-size: 1.2rem; vertical-align: middle; background-color: rgba(255,75,75,0.1); padding: 4px 8px; border-radius: 6px; margin-left: 10px; font-weight: bold;'>Admin</span></h1>", unsafe_allow_html=True)
+elif is_moderator:
+    st.markdown("<h1 style='margin-bottom: 0;'>📟 KODER <span style='color: #FFA500; font-size: 1.2rem; vertical-align: middle; background-color: rgba(255,165,0,0.1); padding: 4px 8px; border-radius: 6px; margin-left: 10px; font-weight: bold;'>Moderator</span></h1>", unsafe_allow_html=True)
 else:
     st.title("📟 KODER")
 
@@ -417,7 +422,6 @@ with c1:
     ann_size = st.session_state.global_store.get("announcement_size", 16)
     ann_bg = st.session_state.global_store.get("announcement_bg_color", "#e7f3fe")
     
-    # Automatyczny kontrast dla tekstu na tablicy ogłoszeń
     ann_text_color = "#0c5460" if get_contrast_text_color(ann_bg) == "#000000" else "#FFFFFF"
     ann_border_color = "#2196F3" if ann_text_color == "#0c5460" else ann_bg
     
@@ -440,8 +444,9 @@ with c1:
         unsafe_allow_html=True
     )
     
-    if is_admin:
-        st.caption("🛠️ Panel zarządzania ogłoszeniem (Widoczny tylko dla Admina):")
+    # Dostęp ma Admin ORAZ Moderator
+    if is_staff:
+        st.caption(f"🛠️ Panel zarządzania ogłoszeniem (Widoczny dla roli: {'Admin' if is_admin else 'Moderator'}):")
         
         new_announcement_text = st.text_area(
             "Zmień treść ogłoszenia globalnego:", 
@@ -565,7 +570,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
             save_global_data(st.session_state.global_store)
             st.rerun()
 
-    # --- PANEL ADMINA: DOMYŚLNE BARWY STARTOWE ---
+    # --- PANEL ADMINA: DOMYŚLNE BARWY STARTOWE (TYLKO DLA ADMINA!) ---
     if is_admin:
         st.write("---")
         st.subheader("👑 Panel Admina: Domyślny motyw startowy dla nowych użytkowników")
@@ -610,7 +615,6 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
             st.session_state.user_author_key = clean_key
             st.query_params["ak"] = clean_key
             
-            # Tworzenie profilu z domyślnymi kolorami ADMINA, jeśli to zupełnie nowy klucz
             if clean_key not in st.session_state.global_store["user_data"]:
                 st.session_state.global_store["user_data"][clean_key] = {
                     "history": [], 
@@ -667,8 +671,10 @@ if comments_list:
             with cc2:
                 my_key = st.session_state.user_author_key
                 
-                if is_admin:
-                    if st.button("🗑️ Usuń (ADMIN)", key=f"del_com_{idx}", type="primary", use_container_width=True):
+                # Zmieniono logikę: Przycisk usuwania widoczny dla Admina i Moderatora
+                if is_staff:
+                    label_btn = "🗑️ Usuń (ADMIN)" if is_admin else "🗑️ Usuń (MOD)"
+                    if st.button(label_btn, key=f"del_com_{idx}", type="primary", use_container_width=True):
                         current_data = load_global_data()
                         if idx < len(current_data["comments"]):
                             current_data["comments"].pop(idx)
