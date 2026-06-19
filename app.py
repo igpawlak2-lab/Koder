@@ -73,7 +73,7 @@ if current_user not in st.session_state.global_store["user_data"]:
         "notepad": "", 
         "has_liked": False, 
         "saved_nick": "",
-        "theme_color": "#1E90FF" # Domyślny piękny niebieski
+        "theme_color": "#1E90FF"
     }
     save_global_data(st.session_state.global_store)
 
@@ -94,12 +94,11 @@ if updated_profile:
 # Wyciągamy kolor motywu użytkownika
 theme_color = user_profile.get("theme_color", "#1E90FF")
 
-# Funkcja pomocnicza do obliczania jasności koloru (żeby dobrać biały lub czarny tekst)
+# Funkcja pomocnicza do obliczania jasności koloru
 def get_contrast_text_color(hex_color):
     hex_color = hex_color.lstrip('#')
     try:
         r, g, b = int(hex_color[0:2], 16), int(hex_color[2:4], 16), int(hex_color[4:6], 16)
-        # Standardowa formuła YIQ określająca jasność postrzeganą przez ludzkie oko
         brightness = (r * 299 + g * 587 + b * 114) / 1000
         return "#000000" if brightness > 128 else "#FFFFFF"
     except:
@@ -107,23 +106,23 @@ def get_contrast_text_color(hex_color):
 
 text_color = get_contrast_text_color(theme_color)
 
-# --- STYLOWANIE INTERFEJSU (CSS Z DYNAMICZNYM KOLOREM) ---
+# --- STYLOWANIE INTERFEJSU (POPRAWIONE KLAMRY DLA ZMIENNYCH CSS) ---
 st.markdown(f"""
     <style>
-        div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div {
+        div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div {{
             display: flex; gap: 10px; margin-top: 5px; width: 100%;
-        }
-        div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label {
+        }}
+        div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label {{
             background-color: #F0F2F6; border: 2px solid #E0E2E6; padding: 12px 10px !important;
             border-radius: 10px; cursor: pointer; transition: all 0.2s ease-in-out;
             display: flex; align-items: center; justify-content: center; flex: 1;
             min-width: 140px; font-size: 16px !important; font-weight: bold !important; white-space: nowrap !important;
             color: #31333F !important;
-        }
-        div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label div[data-testid="stMarkdownContainer"]::before {
+        }}
+        div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label div[data-testid="stMarkdownContainer"]::before {{
             display: none !important;
-        }
-        div[data-testid="stRadio"] input[type="radio"] { display: none; }
+        }}
+        div[data-testid="stRadio"] input[type="radio"] {{ display: none; }}
         div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label:has(input:checked) {{
             background-color: {theme_color} !important; 
             color: {text_color} !important; 
