@@ -13,7 +13,14 @@ st.set_page_config(page_title="Koder", page_icon="📟", layout="wide")
 DATA_FILE = "dane_aplikacji.json"
 
 def load_global_data():
-    default_data = {"likes": 0, "comments": [], "user_data": {}, "announcement": "Brak aktualnych ogłoszeń."}
+    default_data = {
+        "likes": 0, 
+        "comments": [], 
+        "user_data": {}, 
+        "announcement": "Brak aktualnych ogłoszeń.",
+        "announcement_font": "sans-serif",
+        "announcement_size": 16
+    }
     if os.path.exists(DATA_FILE):
         try:
             with open(DATA_FILE, "r", encoding="utf-8") as f:
@@ -23,6 +30,8 @@ def load_global_data():
                 if "comments" not in data: data["comments"] = []
                 if "user_data" not in data: data["user_data"] = {}
                 if "announcement" not in data: data["announcement"] = "Brak aktualnych ogłoszeń."
+                if "announcement_font" not in data: data["announcement_font"] = "sans-serif"
+                if "announcement_size" not in data: data["announcement_size"] = 16
                 
                 # Pancerna konwersja starych komentarzy
                 migrated_comments = []
@@ -379,28 +388,72 @@ with c1:
             save_global_data(st.session_state.global_store)
             st.rerun()
 
-    # --- TABLICA OGŁOSZEŃ (TYLKO POD PANELEM STEROWANIA) ---
+    # --- TABLICA OGŁOSZEŃ (Z PERSONALIZACJĄ TEKSTU) ---
     st.write("---")
     st.subheader("📢 Tablica Ogłoszeń")
     
-    # Wyświetlanie aktualnego ogłoszenia dla każdego użytkownika
+    # Wyciąganie globalnych parametrów ogłoszenia
     current_announcement = st.session_state.global_store.get("announcement", "Brak aktualnych ogłoszeń.")
-    st.info(current_announcement)
+    ann_font = st.session_state.global_store.get("announcement_font", "sans-serif")
+    ann_size = st.session_state.global_store.get("announcement_size", 16)
     
-    # Blok edycji widoczny tylko i wyłącznie dla administratora
+    # Wyświetlanie ogłoszenia w dedykowanym stylizowanym kontenerze HTML
+    st.markdown(
+        f"""
+        <div style="
+            background-color: #e7f3fe; 
+            border-left: 6px solid #2196F3; 
+            padding: 15px; 
+            border-radius: 6px; 
+            margin-bottom: 15px;
+            font-family: {ann_font}, Arial, sans-serif; 
+            font-size: {ann_size}px; 
+            color: #0c5460;
+            line-height: 1.5;
+        ">
+            {current_announcement}
+        </div>
+        """, 
+        unsafe_allow_html=True
+    )
+    
+    # Blok zarządzania ogłoszeniem – dostępny tylko dla administratora
     if is_admin:
         st.caption("🛠️ Panel zarządzania ogłoszeniem (Widoczny tylko dla Admina):")
+        
         new_announcement_text = st.text_area(
             "Zmień treść ogłoszenia globalnego:", 
             value=current_announcement, 
             placeholder="Wpisz nowe ogłoszenie..."
         )
-        if st.button("💾 Zapisz ogłoszenie", key="save_announcement_btn"):
+        
+        # Wybór czcionki i rozmiaru w dwóch kolumnach
+        f_col1, f_col2 = st.columns(2)
+        with f_col1:
+            font_options = {
+                "Bezszeryfowa (Modern)": "sans-serif",
+                "Szeryfowa (Classic)": "serif",
+                "Monospace (Kodowa)": "monospace",
+                "Comic Sans MS": "'Comic Sans MS', cursive",
+                "Impact (Pogrubiona)": "Impact, Charcoal"
+            }
+            # Znajdowanie aktualnego indeksu wyboru
+            current_font_index = list(font_options.values()).index(ann_font) if ann_font in font_options.values() else 0
+            chosen_font_label = st.selectbox("Wybierz krój czcionki:", list(font_options.keys()), index=current_font_index)
+            selected_font_value = font_options[chosen_font_label]
+            
+        with f_col2:
+            selected_size_value = st.slider("Wielkość tekstu (px):", min_value=12, max_value=36, value=int(ann_size), step=1)
+            
+        if st.button("💾 Zapisz ogłoszenie i wygląd", key="save_announcement_btn"):
             current_data = load_global_data()
             current_data["announcement"] = new_announcement_text.strip()
+            current_data["announcement_font"] = selected_font_value
+            current_data["announcement_size"] = selected_size_value
+            
             save_global_data(current_data)
             st.session_state.global_store = current_data
-            st.success("Ogłoszenie zostało pomyślnie zaktualizowane!")
+            st.success("Ogłoszenie oraz jego formatowanie zostały zaktualizowane!")
             st.rerun()
 
 with c2:
