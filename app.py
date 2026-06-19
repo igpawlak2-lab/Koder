@@ -68,16 +68,47 @@ if "user_data" not in st.session_state.global_store:
     st.session_state.global_store["user_data"] = {}
 
 if current_user not in st.session_state.global_store["user_data"]:
-    st.session_state.global_store["user_data"][current_user] = {"history": [], "notepad": "", "has_liked": False, "saved_nick": ""}
+    st.session_state.global_store["user_data"][current_user] = {
+        "history": [], 
+        "notepad": "", 
+        "has_liked": False, 
+        "saved_nick": "",
+        "theme_color": "#1E90FF" # Domyślny piękny niebieski
+    }
     save_global_data(st.session_state.global_store)
 
-# Zapewnienie kompatybilności wstecznej dla pola saved_nick w istniejących profilach
-if "saved_nick" not in st.session_state.global_store["user_data"][current_user]:
-    st.session_state.global_store["user_data"][current_user]["saved_nick"] = ""
+# Zapewnienie kompatybilności wstecznej dla nowych pól w istniejących profilach
+user_profile = st.session_state.global_store["user_data"][current_user]
+updated_profile = False
+
+if "saved_nick" not in user_profile:
+    user_profile["saved_nick"] = ""
+    updated_profile = True
+if "theme_color" not in user_profile:
+    user_profile["theme_color"] = "#1E90FF"
+    updated_profile = True
+
+if updated_profile:
     save_global_data(st.session_state.global_store)
 
-# --- STYLOWANIE INTERFEJSU (CSS) ---
-st.markdown("""
+# Wyciągamy kolor motywu użytkownika
+theme_color = user_profile.get("theme_color", "#1E90FF")
+
+# Funkcja pomocnicza do obliczania jasności koloru (żeby dobrać biały lub czarny tekst)
+def get_contrast_text_color(hex_color):
+    hex_color = hex_color.lstrip('#')
+    try:
+        r, g, b = int(hex_color[0:2], 16), int(hex_color[2:4], 16), int(hex_color[4:6], 16)
+        # Standardowa formuła YIQ określająca jasność postrzeganą przez ludzkie oko
+        brightness = (r * 299 + g * 587 + b * 114) / 1000
+        return "#000000" if brightness > 128 else "#FFFFFF"
+    except:
+        return "#FFFFFF"
+
+text_color = get_contrast_text_color(theme_color)
+
+# --- STYLOWANIE INTERFEJSU (CSS Z DYNAMICZNYM KOLOREM) ---
+st.markdown(f"""
     <style>
         div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div {
             display: flex; gap: 10px; margin-top: 5px; width: 100%;
@@ -87,18 +118,24 @@ st.markdown("""
             border-radius: 10px; cursor: pointer; transition: all 0.2s ease-in-out;
             display: flex; align-items: center; justify-content: center; flex: 1;
             min-width: 140px; font-size: 16px !important; font-weight: bold !important; white-space: nowrap !important;
+            color: #31333F !important;
         }
         div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label div[data-testid="stMarkdownContainer"]::before {
             display: none !important;
         }
         div[data-testid="stRadio"] input[type="radio"] { display: none; }
-        div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label:has(input:checked) {
-            background-color: #1E90FF !important; color: white !important; border-color: #1E90FF !important;
-            box-shadow: 0px 4px 10px rgba(30, 144, 255, 0.3);
-        }
-        div[data-testid="stVerticalBlockBorderWrapper"] {
-            border-color: #1E90FF !important; border-radius: 12px; background-color: #F9FAFB;
-        }
+        div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label:has(input:checked) {{
+            background-color: {theme_color} !important; 
+            color: {text_color} !important; 
+            border-color: {theme_color} !important;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.15);
+        }}
+        div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label:has(input:checked) div[data-testid="stMarkdownContainer"] {{
+            color: {text_color} !important;
+        }}
+        div[data-testid="stVerticalBlockBorderWrapper"] {{
+            border-color: {theme_color} !important; border-radius: 12px; background-color: #F9FAFB;
+        }}
     </style>
 """, unsafe_allow_html=True)
 
@@ -235,10 +272,10 @@ components.html(
 )
 
 # Pobieranie spersonalizowanych danych użytkownika z globalnej bazy JSON
-user_history = st.session_state.global_store["user_data"][current_user].get("history", [])
-user_notepad_content = st.session_state.global_store["user_data"][current_user].get("notepad", "")
-user_has_liked = st.session_state.global_store["user_data"][current_user].get("has_liked", False)
-user_saved_nick = st.session_state.global_store["user_data"][current_user].get("saved_nick", "")
+user_history = user_profile.get("history", [])
+user_notepad_content = user_profile.get("notepad", "")
+user_has_liked = user_profile.get("has_liked", False)
+user_saved_nick = user_profile.get("saved_nick", "")
 
 c1, c2 = st.columns([1.6, 1.4])
 with c1:
@@ -345,11 +382,18 @@ with st.expander("🔑 Zarządzanie Twoim Identyfikatorem"):
     st.write("**Twój aktualny klucz konta:**")
     st.code(st.session_state.user_author_key, language="text")
     
-    # Dodanie pola do ustawienia stałego nicku
+    # 1. Pole wyboru stałego nicku
     current_nick_val = st.session_state.global_store["user_data"][current_user].get("saved_nick", "")
     new_nick = st.text_input("Ustaw swój stały podpis (nick):", value=current_nick_val, placeholder="Wpisz stały nick...")
     if new_nick != current_nick_val:
         st.session_state.global_store["user_data"][current_user]["saved_nick"] = new_nick.strip()
+        save_global_data(st.session_state.global_store)
+        st.rerun()
+        
+    # 2. Próbnik kolorów przycisków (Color Picker)
+    chosen_color = st.color_picker("Wybierz kolor przycisków wyboru:", value=theme_color)
+    if chosen_color != theme_color:
+        st.session_state.global_store["user_data"][current_user]["theme_color"] = chosen_color
         save_global_data(st.session_state.global_store)
         st.rerun()
         
@@ -364,7 +408,13 @@ with st.expander("🔑 Zarządzanie Twoim Identyfikatorem"):
             st.query_params["ak"] = clean_key
             
             if clean_key not in st.session_state.global_store["user_data"]:
-                st.session_state.global_store["user_data"][clean_key] = {"history": [], "notepad": "", "has_liked": False, "saved_nick": ""}
+                st.session_state.global_store["user_data"][clean_key] = {
+                    "history": [], 
+                    "notepad": "", 
+                    "has_liked": False, 
+                    "saved_nick": "",
+                    "theme_color": "#1E90FF"
+                }
                 save_global_data(st.session_state.global_store)
                 
             components.html(
@@ -381,7 +431,6 @@ with st.expander("🔑 Zarządzanie Twoim Identyfikatorem"):
 is_admin = (st.session_state.user_author_key == "admin")
 
 with st.form("comment_form", clear_on_submit=True):
-    # Automatycznie wstawiamy zapisany nick jako domyślną wartość pola
     default_author = user_saved_nick if user_saved_nick else ""
     nick = st.text_input("Twój podpis/nick:", value=default_author, placeholder="Anonim")
     komentarz_tekst = st.text_area("Napisz komentarz o stronie:", placeholder="Wpisz swoją opinię tutaj...")
