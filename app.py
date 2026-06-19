@@ -118,7 +118,7 @@ text_color = get_contrast_text_color(theme_color)
 clear_btn_text_color = get_contrast_text_color(clear_btn_color)
 main_text_theme = get_contrast_text_color(bg_color)
 
-# --- STYLOWANIE INTERFEJSU (PANCERNE NAPRAWIONE SELEKTORY CSS) ---
+# --- STYLOWANIE INTERFEJSU (PANCERNE, BEZPOŚREDNIE SELEKTORY) ---
 st.markdown(f"""
     <style>
         /* Dynamiczny kolor tła całej aplikacji oraz dopasowanie koloru głównych tekstów */
@@ -159,7 +159,7 @@ st.markdown(f"""
             color: {text_color} !important;
         }}
         
-        /* Zmiana koloru małych kropek radiowych wewnątrz zaznaczonych elementów */
+        /* Kolor małych zielonych/niebieskich kropek wewnątrz zaznaczonych elementów radiowych */
         div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label:has(input:checked) span[data-testid="stRadioButtonToogleChecked"] {{
             background-color: {text_color} !important;
             border-color: {text_color} !important;
@@ -168,29 +168,34 @@ st.markdown(f"""
             background-color: {theme_color} !important;
         }}
 
-        /* NAPRAWA: Całkowite wymuszenie koloru dla przycisku Historii, Cofnięcia polubienia oraz Usuwania komentarzy */
-        div.stButton > button[type="primary"], 
-        div[data-testid="stColumn"] + div.stButton > button,
-        .stApp button:has(div:contains("Cofnij polubienie")),
-        .stApp button:has(div:contains("Wyczyść historię")),
-        .stApp button:has(div:contains("Usuń")) {{
+        /* CAŁKOWITA REFORMACJA: Przechwycenie wszystkich przycisków akcji (wtórnych i głównych) i narzucenie wybranego koloru */
+        div.stButton > button[data-testid="stBaseButton-secondary"],
+        div.stButton > button[data-testid="stBaseButton-primary"],
+        .stApp div.stButton > button {{
             background-color: {clear_btn_color} !important;
             color: {clear_btn_text_color} !important;
             border: 2px solid {clear_btn_color} !important;
             border-radius: 8px !important;
             font-weight: bold !important;
-            box-shadow: 0px 2px 5px rgba(0,0,0,0.1);
-            transition: all 0.2s ease-in-out;
+            box-shadow: 0px 2px 5px rgba(0,0,0,0.1) !important;
+            transition: all 0.2s ease-in-out !important;
         }}
         
-        /* Efekt najechania i aktywacji przycisków akcji */
-        .stApp button:has(div:contains("Cofnij polubienie")):hover,
-        .stApp button:has(div:contains("Wyczyść historię")):hover,
-        .stApp button:has(div:contains("Usuń")):hover,
-        div.stButton > button[type="primary"]:hover {{
+        /* Teksty wewnątrz przycisków również muszą słuchać wybranego koloru kontrastowego */
+        .stApp div.stButton > button p,
+        .stApp div.stButton > button div,
+        .stApp div.stButton > button span {{
+            color: {clear_btn_text_color} !important;
+        }}
+        
+        /* Efekt najechania (hover) */
+        div.stButton > button[data-testid="stBaseButton-secondary"]:hover,
+        div.stButton > button[data-testid="stBaseButton-primary"]:hover,
+        .stApp div.stButton > button:hover {{
+            background-color: {clear_btn_color} !important;
             opacity: 0.85 !important;
-            transform: scale(1.01);
             border-color: {clear_btn_color} !important;
+            transform: scale(1.01);
         }}
         
         /* Obramowanie kontenerów bocznych */
