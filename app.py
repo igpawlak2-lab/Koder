@@ -67,7 +67,7 @@ def save_global_data(data):
 if "global_store" not in st.session_state:
     st.session_state.global_store = load_global_data()
 
-# Pobieranie domyślnych kolorów startowych z pliku JSON
+# Pobieranie domyślnych kolorów startowych z pliku JSON (dla nowych kont)
 def_theme = st.session_state.global_store.get("default_theme_color", "#1E90FF")
 def_bg = st.session_state.global_store.get("default_bg_color", "#FFFFFF")
 def_clear = st.session_state.global_store.get("default_clear_btn_color", "#5cb85c")
@@ -89,7 +89,7 @@ is_admin = (current_user == "admin")
 if "user_data" not in st.session_state.global_store:
     st.session_state.global_store["user_data"] = {}
 
-# Jeśli użytkownik wchodzi pierwszy raz – pobiera aktualne dynamiczne wartości od admina
+# NOWE KONTO: Pobiera aktualne wartości ustawione przez admina i zapisuje na stałe w bazie JSON
 if current_user not in st.session_state.global_store["user_data"]:
     st.session_state.global_store["user_data"][current_user] = {
         "history": [], 
@@ -102,7 +102,8 @@ if current_user not in st.session_state.global_store["user_data"]:
     }
     save_global_data(st.session_state.global_store)
 
-# Zapewnienie kompatybilności wstecznej dla pól kolorów u istniejących użytkowników
+# ISTNIEJĄCE KONTO: Kompatybilność wsteczna. Jeśli konto już istnieje, ale nie ma pól,
+# dajemy mu sztywne wartości startowe bazowe, aby zmiana admina ich nie nadpisywała dynamicznie.
 user_profile = st.session_state.global_store["user_data"][current_user]
 updated_profile = False
 
@@ -110,22 +111,22 @@ if "saved_nick" not in user_profile:
     user_profile["saved_nick"] = ""
     updated_profile = True
 if "theme_color" not in user_profile:
-    user_profile["theme_color"] = def_theme
+    user_profile["theme_color"] = "#1E90FF"
     updated_profile = True
 if "bg_color" not in user_profile:
-    user_profile["bg_color"] = def_bg
+    user_profile["bg_color"] = "#FFFFFF"
     updated_profile = True
 if "clear_btn_color" not in user_profile:
-    user_profile["clear_btn_color"] = def_clear
+    user_profile["clear_btn_color"] = "#5cb85c"
     updated_profile = True
 
 if updated_profile:
     save_global_data(st.session_state.global_store)
 
-# Wyciągamy spersonalizowane kolory motywu użytkownika
-theme_color = user_profile.get("theme_color", def_theme)
-bg_color = user_profile.get("bg_color", def_bg)
-clear_btn_color = user_profile.get("clear_btn_color", def_clear)
+# Wyciągamy spersonalizowane kolory przypisane do danego profilu (wczytane z bazy)
+theme_color = user_profile.get("theme_color", "#1E90FF")
+bg_color = user_profile.get("bg_color", "#FFFFFF")
+clear_btn_color = user_profile.get("clear_btn_color", "#5cb85c")
 
 # Funkcja pomocnicza do obliczania kontrastu tekstu (czarny lub biały)
 def get_contrast_text_color(hex_color):
@@ -593,6 +594,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
             st.session_state.user_author_key = clean_key
             st.query_params["ak"] = clean_key
             
+            # Tworzenie profilu z domyślnymi kolorami ADMINA, jeśli to zupełnie nowy klucz
             if clean_key not in st.session_state.global_store["user_data"]:
                 st.session_state.global_store["user_data"][clean_key] = {
                     "history": [], 
