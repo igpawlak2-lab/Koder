@@ -26,7 +26,6 @@ def load_global_data():
                 migrated_comments = []
                 for c in data["comments"]:
                     if isinstance(c, dict) and "text" in c:
-                        # Jeśli stary komentarz nie miał author_key, przypisujemy mu legacy
                         if "author_key" not in c:
                             c["author_key"] = c.get("session_id", "legacy")
                         migrated_comments.append(c)
@@ -63,9 +62,16 @@ if "personal_history" not in st.session_state:
 if "personal_notepad" not in st.session_state:
     st.session_state.personal_notepad = params.get("n", "")
 
-# Zarządzanie Kluczem Autora przez Query Params / Session State
+# --- BEZPIECZNE GENEROWANIE I SYNCHRONIZACJA KLUCZA KONTA ---
 if "user_author_key" not in st.session_state:
-    st.session_state.user_author_key = params.get("ak", "")
+    # 1. Sprawdzamy pasek URL
+    url_key = params.get("ak", "")
+    if url_key:
+        st.session_state.user_author_key = url_key
+    else:
+        # 2. Jeśli brak w URL, generujemy nowy unikalny klucz natychmiast w Pythonie
+        st.session_state.user_author_key = f"usr_{uuid.uuid4().hex[:16]}"
+        st.query_params["ak"] = st.session_state.user_author_key
 
 # --- STYLOWANIE INTERFEJSU (CSS) ---
 st.markdown("""
@@ -209,25 +215,25 @@ if "has_liked" not in st.session_state: st.session_state.has_liked = False
 st.title("📟 KODER")
 st.write("Uniwersalny system kodowania i dekodowania tekstu.")
 
-# --- SKRYPT LOCALSTORAGE DLA TOŻSAMOŚCI AUTORA (ZAKORZENIENIE KONTA) ---
-if not st.session_state.user_author_key:
-    components.html(
-        """
-        <script>
-            var key = localStorage.getItem("koder_author_key");
-            if (!key) {
-                // Jeśli brak klucza, generujemy losowy unikalny identyfikator
-                key = 'usr_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-                localStorage.setItem("koder_author_key", key);
-            }
-            var currentUrl = new URL(window.parent.location.href);
-            if (!currentUrl.searchParams.get("ak")) {
-                currentUrl.searchParams.set("ak", key);
-                window.parent.location.href = currentUrl.href;
-            }
-        </script>
-        """, height=0, width=0
-    )
+# --- AUTOMATYCZNA TRWAŁOŚĆ KLUCZA W LOCALSTORAGE ---
+components.html(
+    f"""
+    <script>
+        var savedKey = localStorage.getItem("koder_author_key2");
+        var currentUrl = new URL(window.parent.location.href);
+        var urlKey = currentUrl.searchParams.get("ak");
+        
+        if (savedKey && savedKey !== urlKey) {{
+            // Jeśli mamy zapisany klucz w przeglądarce, a nie ma go w URL -> przywracamy
+            currentUrl.searchParams.set("ak", savedKey);
+            window.parent.location.href = currentUrl.href;
+        }} else if (!savedKey && urlKey) {{
+            // Jeśli klucz wygenerował się w Pythonie -> zapisujemy go trwale w przeglądarce
+            localStorage.setItem("koder_author_key2", urlKey);
+        }}
+    </script>
+    """, height=0, width=0
+)
 
 c1, c2 = st.columns([1.6, 1.4])
 with c1:
@@ -358,12 +364,12 @@ with col_like2:
 
 st.write(" ")
 
-# --- PANEL PROSTEGO PROFILU (ZAKORZENIENIE) ---
+# --- PANEL PROSTEGO PROFILU (ZAKORZENIENIE KONTA) ---
 with st.expander("🔑 Zarządzanie Twoim Identyfikatorem (Opcje konta)"):
-    st.caption("Twój unikalny identyfikator jest zapisany w pamięci przeglądarki. Chroni przed utratą opcji usuwania komentarzy po odświeżeniu.")
-    st.text_input("Twój aktualny klucz konta (skopiuj go na inne urządzenie):", value=st.session_state.user_author_key, disabled=True)
+    st.caption("Twój unikalny identyfikator jest zapisany bezpiecznie na Twoim urządzeniu. Dzięki temu nikt inny nie usunie Twoich komentarzy.")
+    st.text_input("Twój aktualny klucz konta (skopiuj go, by zalogować się na telefonie):", value=st.session_state.user_author_key, disabled=True)
     
-    new_key = st.text_input("Zaloguj na inny klucz (wklej i kliknij Zmień):", placeholder="Wklej klucz tutaj...")
+    new_key = st.text_input("Zaloguj na inny klucz (wklej i kliknij Zmień):", placeholder="Wklej stary klucz...")
     if st.button("Zmień klucz konta"):
         if new_key.strip():
             st.session_state.user_author_key = new_key.strip()
@@ -371,7 +377,7 @@ with st.expander("🔑 Zarządzanie Twoim Identyfikatorem (Opcje konta)"):
             components.html(
                 f"""
                 <script>
-                    localStorage.setItem("koder_author_key", "{new_key.strip()}");
+                    localStorage.setItem("koder_author_key2", "{new_key.strip()}");
                     window.parent.location.href = window.parent.location.pathname + "?ak={new_key.strip()}";
                 </script>
                 """, height=0, width=0
@@ -387,10 +393,9 @@ with st.form("comment_form", clear_on_submit=True):
         podpis = nick.strip() if nick.strip() else "Anonim"
         nowy_komentarz_tekst = f"**{podpis}** ({datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}):\n{komentarz_tekst.strip()}"
         
-        # Wiążemy komentarz z trwałym author_key zamiast sesyjnego session_id
         nowy_komentarz_obj = {
             "text": nowy_komentarz_tekst,
-            "author_key": st.session_state.user_author_key if st.session_state.user_author_key else "anonymous"
+            "author_key": st.session_state.user_author_key
         }
         
         current_data = load_global_data()
@@ -407,7 +412,6 @@ if comments_list:
         with cc1:
             st.info(com["text"])
         with cc2:
-            # Sprawdzamy stały author_key przypisany z LocalStorage
             my_key = st.session_state.user_author_key
             if com.get("author_key") == my_key and my_key not in ["", "anonymous", "legacy"]:
                 if st.button("❌ Usuń", key=f"del_com_{idx}", type="primary", use_container_width=True):
