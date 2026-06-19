@@ -360,13 +360,12 @@ with col_like2:
 
 st.write(" ")
 
-# --- PANEL PROSTEGO PROFILU (ZAKORZENIENIE KONTA - NAPRAWIONY) ---
+# --- PANEL PROSTEGO PROFILU (ZAKORZENIENIE KONTA) ---
 with st.expander("🔑 Zarządzanie Twoim Identyfikatorem (Opcje konta)"):
     st.write("**Twój aktualny klucz konta:**")
     st.code(st.session_state.user_author_key, language="text")
     st.caption("Skopiuj powyższy klucz, jeśli chcesz zalogować się na to samo konto np. na telefonie.")
     
-    # Przebudowany formularz zmiany klucza zapobiegający konfliktom
     with st.form("account_key_form"):
         new_key = st.text_input("Wklej klucz z innego urządzenia, aby zmienić konto:")
         submit_change = st.form_submit_button("Zmień klucz konta")
@@ -384,6 +383,9 @@ with st.expander("🔑 Zarządzanie Twoim Identyfikatorem (Opcje konta)"):
                 """, height=0, width=0
             )
             st.rerun()
+
+# Sprawdzamy status administratora
+is_admin = (st.session_state.user_author_key == "admin")
 
 with st.form("comment_form", clear_on_submit=True):
     nick = st.text_input("Twój podpis/nick:", placeholder="Anonim")
@@ -409,12 +411,24 @@ comments_list = st.session_state.global_store.get("comments", [])
 if comments_list:
     st.write("**Ostatnie komentarze (widoczne dla wszystkich):**")
     for idx, com in enumerate(comments_list):
-        cc1, cc2 = st.columns([5, 1])
+        cc1, cc2 = st.columns([4.8, 1.2])
         with cc1:
             st.info(com["text"])
         with cc2:
             my_key = st.session_state.user_author_key
-            if com.get("author_key") == my_key and my_key not in ["", "anonymous", "legacy"]:
+            
+            # Warunek 1: Użytkownik jest adminem -> może usunąć KAŻDY komentarz
+            if is_admin:
+                if st.button("🗑️ Usuń (ADMIN)", key=f"del_com_{idx}", type="primary", use_container_width=True):
+                    current_data = load_global_data()
+                    if idx < len(current_data["comments"]):
+                        current_data["comments"].pop(idx)
+                        save_global_data(current_data)
+                        st.session_state.global_store = current_data
+                        st.rerun()
+            
+            # Warunek 2: Zwykły użytkownik -> widzi przycisk tylko przy swoim komentarzu
+            elif com.get("author_key") == my_key and my_key not in ["", "anonymous", "legacy"]:
                 if st.button("❌ Usuń", key=f"del_com_{idx}", type="primary", use_container_width=True):
                     current_data = load_global_data()
                     if idx < len(current_data["comments"]):
