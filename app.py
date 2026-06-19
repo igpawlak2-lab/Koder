@@ -17,6 +17,7 @@ def load_global_data():
         "likes": 0, 
         "comments": [], 
         "user_data": {}, 
+        "moderators": [],                       # Nowa lista przechowująca klucze moderatorów
         "announcement": "Brak aktualnych ogłoszeń.",
         "announcement_font": "sans-serif",
         "announcement_size": 16,
@@ -33,6 +34,7 @@ def load_global_data():
                 if "likes" not in data: data["likes"] = 0
                 if "comments" not in data: data["comments"] = []
                 if "user_data" not in data: data["user_data"] = {}
+                if "moderators" not in data: data["moderators"] = []
                 if "announcement" not in data: data["announcement"] = "Brak aktualnych ogłoszeń."
                 if "announcement_font" not in data: data["announcement_font"] = "sans-serif"
                 if "announcement_size" not in data: data["announcement_size"] = 16
@@ -86,9 +88,9 @@ if "user_author_key" not in st.session_state:
 
 current_user = st.session_state.user_author_key
 
-# Rangi i uprawnienia
+# Rangi i uprawnienia (sprawdzanie sztywnego klucza oraz dynamicznej listy z bazy danych)
 is_admin = (current_user == "admin")
-is_moderator = (current_user == "moderator")
+is_moderator = (current_user == "moderator" or current_user in st.session_state.global_store.get("moderators", []))
 is_staff = is_admin or is_moderator  # Wspólna zmienna dla obsługi (Admin + Moderator)
 
 # Upewniamy się, że w strukturze bazy istnieje profil dla aktualnego użytkownika
@@ -150,7 +152,6 @@ main_text_theme = get_contrast_text_color(bg_color)
 # --- STYLOWANIE INTERFEJSU CSS ---
 st.markdown(f"""
     <style>
-        /* Dynamiczny kolor tła całej aplikacji oraz dopasowanie koloru głównych tekstów */
         .stApp {{
             background-color: {bg_color} !important;
         }}
@@ -158,12 +159,10 @@ st.markdown(f"""
             color: {main_text_theme} !important;
         }}
         
-        /* Układ przycisków typu Radio */
         div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div {{
             display: flex; gap: 10px; margin-top: 5px; width: 100%;
         }}
         
-        /* Nieaktywne przyciski wyboru */
         div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label {{
             background-color: {"#262730" if main_text_theme == "#FFFFFF" else "#F0F2F6"} !important; 
             border: 2px solid {"#434654" if main_text_theme == "#FFFFFF" else "#E0E2E6"} !important; 
@@ -178,7 +177,6 @@ st.markdown(f"""
         }}
         div[data-testid="stRadio"] input[type="radio"] {{ display: none; }}
         
-        /* Zaznaczony przycisk wyboru (Główny Kolor Akcentu z 1. kwadratu) */
         div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label:has(input:checked) {{
             background-color: {theme_color} !important; 
             color: {text_color} !important; 
@@ -189,7 +187,6 @@ st.markdown(f"""
             color: {text_color} !important;
         }}
 
-        /* Wymuszenie koloru wybranego w 3. kwadracie dla wszystkich przycisków akcji */
         div.stButton > button[data-testid="stBaseButton-secondary"],
         div.stButton > button[data-testid="stBaseButton-primary"],
         .stApp div.stButton > button {{
@@ -202,14 +199,12 @@ st.markdown(f"""
             transition: all 0.2s ease-in-out !important;
         }}
         
-        /* Kolor napisów wewnątrz przycisków */
         .stApp div.stButton > button p,
         .stApp div.stButton > button div,
         .stApp div.stButton > button span {{
             color: {clear_btn_text_color} !important;
         }}
         
-        /* Efekt najechania myszką dla przycisków akcji */
         div.stButton > button:hover {{
             background-color: {clear_btn_color} !important;
             opacity: 0.85 !important;
@@ -217,7 +212,6 @@ st.markdown(f"""
             transform: scale(1.01);
         }}
         
-        /* Obramowanie bocznych paneli */
         div[data-testid="stVerticalBlockBorderWrapper"] {{
             border-color: {theme_color} !important; border-radius: 12px; 
             background-color: {"#1E1E1E" if main_text_theme == "#FFFFFF" else "#F9FAFB"};
@@ -444,7 +438,6 @@ with c1:
         unsafe_allow_html=True
     )
     
-    # Dostęp ma Admin ORAZ Moderator
     if is_staff:
         st.caption(f"🛠️ Panel zarządzania ogłoszeniem (Widoczny dla roli: {'Admin' if is_admin else 'Moderator'}):")
         
@@ -570,10 +563,59 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
             save_global_data(st.session_state.global_store)
             st.rerun()
 
-    # --- PANEL ADMINA: DOMYŚLNE BARWY STARTOWE (TYLKO DLA ADMINA!) ---
+    # --- PANEL ADMINA: MOTYW STARTOWY ORAZ ZARZĄDZANIE MODERATORAMI ---
     if is_admin:
         st.write("---")
-        st.subheader("👑 Panel Admina: Domyślny motyw startowy dla nowych użytkowników")
+        st.subheader("👑 Panel Admina: Zarządzanie Moderatorami")
+        st.caption("Dodaj lub usuń uprawnienia moderatora dla konkretnych kluczy kont:")
+        
+        current_mods = st.session_state.global_store.get("moderators", [])
+        
+        # Formularz dodawania nowego moderatora
+        with st.form("add_moderator_form", clear_on_submit=True):
+            mod_key_input = st.text_input("Wklej klucz konta, które chcesz awansować na Moderatora:", placeholder="usr_...")
+            submit_mod = st.form_submit_button("➕ Nadaj uprawnienia moderatora")
+            
+            if submit_mod and mod_key_input.strip():
+                target_key = mod_key_input.strip()
+                if target_key == "admin":
+                    st.error("Konto 'admin' ma już najwyższe uprawnienia.")
+                elif target_key in current_mods:
+                    st.warning("To konto jest już moderatorem.")
+                else:
+                    current_data = load_global_data()
+                    if "moderators" not in current_data:
+                        current_data["moderators"] = []
+                    current_data["moderators"].append(target_key)
+                    save_global_data(current_data)
+                    st.session_state.global_store = current_data
+                    st.success(f"Pomyślnie nadano uprawnienia moderatora dla klucza: {target_key}")
+                    st.rerun()
+                    
+        # Wyświetlanie aktualnej listy moderatorów z opcją odebrania uprawnień
+        if current_mods:
+            st.write("**Aktualna lista przypisanych moderatorów:**")
+            for m_idx, m_key in enumerate(current_mods):
+                m_col1, m_col2 = st.columns([4.0, 2.0])
+                with m_col1:
+                    # Wyciągamy nick użytkownika, jeśli istnieje w bazie, dla łatwiejszej identyfikacji
+                    u_nick = st.session_state.global_store["user_data"].get(m_key, {}).get("saved_nick", "")
+                    display_text = f"🔑 `{m_key}`" + (f" (Podpis: **{u_nick}**)" if u_nick else "")
+                    st.markdown(display_text)
+                with m_col2:
+                    if st.button("❌ Odbierz rangę", key=f"remove_mod_{m_idx}", type="primary", use_container_width=True):
+                        current_data = load_global_data()
+                        if m_key in current_data.get("moderators", []):
+                            current_data["moderators"].remove(m_key)
+                            save_global_data(current_data)
+                            st.session_state.global_store = current_data
+                            st.toast(f"Odebrano uprawnienia dla {m_key}")
+                            st.rerun()
+        else:
+            st.caption("Brak przypisanych moderatorów z poziomu panelu (oprócz domyślnego sztywnego klucza 'moderator').")
+
+        st.write("---")
+        st.subheader("🎨 Panel Admina: Domyślny motyw startowy")
         st.caption("Ustaw kolory, z którymi będą automatycznie startować nowo generowane konta:")
         
         adm_cc1, adm_cc2, adm_cc3 = st.columns(3)
@@ -671,7 +713,6 @@ if comments_list:
             with cc2:
                 my_key = st.session_state.user_author_key
                 
-                # Zmieniono logikę: Przycisk usuwania widoczny dla Admina i Moderatora
                 if is_staff:
                     label_btn = "🗑️ Usuń (ADMIN)" if is_admin else "🗑️ Usuń (MOD)"
                     if st.button(label_btn, key=f"del_com_{idx}", type="primary", use_container_width=True):
