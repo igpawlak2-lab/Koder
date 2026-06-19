@@ -13,7 +13,7 @@ st.set_page_config(page_title="Koder", page_icon="📟", layout="wide")
 DATA_FILE = "dane_aplikacji.json"
 
 def load_global_data():
-    default_data = {"likes": 0, "comments": [], "user_data": {}}
+    default_data = {"likes": 0, "comments": [], "user_data": {}, "announcement": "Brak aktualnych ogłoszeń."}
     if os.path.exists(DATA_FILE):
         try:
             with open(DATA_FILE, "r", encoding="utf-8") as f:
@@ -22,6 +22,7 @@ def load_global_data():
                 if "likes" not in data: data["likes"] = 0
                 if "comments" not in data: data["comments"] = []
                 if "user_data" not in data: data["user_data"] = {}
+                if "announcement" not in data: data["announcement"] = "Brak aktualnych ogłoszeń."
                 
                 # Pancerna konwersja starych komentarzy
                 migrated_comments = []
@@ -62,6 +63,7 @@ if "user_author_key" not in st.session_state:
         st.query_params["ak"] = st.session_state.user_author_key
 
 current_user = st.session_state.user_author_key
+is_admin = (current_user == "admin")
 
 # Upewniamy się, że w strukturze bazy istnieje profil dla aktualnego użytkownika
 if "user_data" not in st.session_state.global_store:
@@ -227,7 +229,6 @@ def clean_txt(t):
     z = {'Ą': 'A', 'Ć': 'C', 'Ę': 'E', 'Ł': 'L', 'Ń': 'N', 'Ó': 'O', 'Ś': 'S', 'Ź': 'Z', 'Ż': 'Z'}
     t = t.upper()
     for k, v in z.items(): t = t.replace(k, v)
-    # Automatyczna zamiana J na I
     t = t.replace('J', 'I')
     return re.sub(r'[^A-Z ]', '', t)
 
@@ -378,6 +379,30 @@ with c1:
             save_global_data(st.session_state.global_store)
             st.rerun()
 
+    # --- TABLICA OGŁOSZEŃ (TYLKO POD PANELEM STEROWANIA) ---
+    st.write("---")
+    st.subheader("📢 Tablica Ogłoszeń")
+    
+    # Wyświetlanie aktualnego ogłoszenia dla każdego użytkownika
+    current_announcement = st.session_state.global_store.get("announcement", "Brak aktualnych ogłoszeń.")
+    st.info(current_announcement)
+    
+    # Blok edycji widoczny tylko i wyłącznie dla administratora
+    if is_admin:
+        st.caption("🛠️ Panel zarządzania ogłoszeniem (Widoczny tylko dla Admina):")
+        new_announcement_text = st.text_area(
+            "Zmień treść ogłoszenia globalnego:", 
+            value=current_announcement, 
+            placeholder="Wpisz nowe ogłoszenie..."
+        )
+        if st.button("💾 Zapisz ogłoszenie", key="save_announcement_btn"):
+            current_data = load_global_data()
+            current_data["announcement"] = new_announcement_text.strip()
+            save_global_data(current_data)
+            st.session_state.global_store = current_data
+            st.success("Ogłoszenie zostało pomyślnie zaktualizowane!")
+            st.rerun()
+
 with c2:
     st.subheader("Historia operacji")
     
@@ -505,9 +530,6 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                 """, height=0, width=0
             )
             st.rerun()
-
-# Sprawdzamy status administratora
-is_admin = (st.session_state.user_author_key == "admin")
 
 # --- FORMULARZ DODAWANIA KOMENTARZY ---
 with st.form("comment_form", clear_on_submit=True):
