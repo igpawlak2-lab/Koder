@@ -118,7 +118,7 @@ text_color = get_contrast_text_color(theme_color)
 clear_btn_text_color = get_contrast_text_color(clear_btn_color)
 main_text_theme = get_contrast_text_color(bg_color)
 
-# --- STYLOWANIE INTERFEJSU (ZINTEGROWANE KROPKI I PRZYCISKI AKCJI) ---
+# --- STYLOWANIE INTERFEJSU (ZAAWANSOWANE NADPISYWANIE ZMIENNYCH DLA KROPEK) ---
 st.markdown(f"""
     <style>
         /* Dynamiczny kolor tła całej aplikacji oraz dopasowanie koloru głównych tekstów */
@@ -132,7 +132,11 @@ st.markdown(f"""
         /* Układ przycisków typu Radio */
         div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div {{
             display: flex; gap: 10px; margin-top: 5px; width: 100%;
+            /* NADPISANIE PODSTAWOWYCH ZMIENNYCH STREAMLIT DLA TEGO KONTENERA */
+            --bui-color-primary: {clear_btn_color} !important;
+            --primary-color: {clear_btn_color} !important;
         }}
+        
         /* Nieaktywne przyciski wyboru */
         div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label {{
             background-color: {"#262730" if main_text_theme == "#FFFFFF" else "#F0F2F6"} !important; 
@@ -148,7 +152,7 @@ st.markdown(f"""
         }}
         div[data-testid="stRadio"] input[type="radio"] {{ display: none; }}
         
-        /* Zaznaczony przycisk wyboru (Główny Kolor Akcentu) */
+        /* Zaznaczony przycisk wyboru (Główny Kolor Akcentu z 1. kwadratu) */
         div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label:has(input:checked) {{
             background-color: {theme_color} !important; 
             color: {text_color} !important; 
@@ -159,13 +163,18 @@ st.markdown(f"""
             color: {text_color} !important;
         }}
         
-        /* Zmiana koloru małych wewnętrznych kropek w opcjach wyboru na kolor przycisków akcji (3. kwadrat) */
-        div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label span[data-testid="stRadioButtonToogleChecked"] {{
+        /* CAŁKOWITE PRZECHWYCENIE MAŁEJ KROPKI (Wymuszenie koloru z 3. kwadratu) */
+        div[data-testid="stRadio"] div[role="radiogroup"] label [data-testid="stRadioButtonToogleChecked"] {{
             background-color: {clear_btn_color} !important;
             border-color: {clear_btn_color} !important;
         }}
-        div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label:has(input:checked) span[data-testid="stRadioButtonToogleChecked"]::after {{
+        div[data-testid="stRadio"] div[role="radiogroup"] label:has(input:checked) span[data-testid="stRadioButtonToogleChecked"]::after {{
             background-color: {clear_btn_color} !important;
+        }}
+        div[data-testid="stRadio"] div[role="radiogroup"] svg {{
+            fill: {clear_btn_color} !important;
+            stroke: {clear_btn_color} !important;
+            color: {clear_btn_color} !important;
         }}
 
         /* Wymuszenie koloru wybranego w 3. kwadracie dla wszystkich przycisków akcji */
@@ -464,8 +473,8 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
             st.rerun()
             
     with cc_col3:
-        # Zintegrowany opis informujący o sterowaniu przyciskami i kropkami opcji wyboru
-        chosen_clear_color = st.color_picker("Przyciski akcji & Kropka opcji wyboru:", value=clear_btn_color)
+        # Ten próbnik steruje teraz przyciskami (usuwanie/historii/komentarzy) oraz kropkami
+        chosen_clear_color = st.color_picker("Kropka opcji wyboru & Przyciski akcji:", value=clear_btn_color)
         if chosen_clear_color != clear_btn_color:
             st.session_state.global_store["user_data"][current_user]["clear_btn_color"] = chosen_clear_color
             save_global_data(st.session_state.global_store)
@@ -542,7 +551,6 @@ comments_list = st.session_state.global_store.get("comments", [])
 if comments_list:
     st.write("**Ostatnie komentarze:**")
     for idx, com in enumerate(comments_list):
-        # Sprawdzamy bezpiecznie strukturę słownika przed wyrenderowaniem
         if isinstance(com, dict) and "text" in com:
             cc1, cc2 = st.columns([4.8, 1.2])
             with cc1:
