@@ -295,7 +295,7 @@ def enc_v2(l):
     for i, (g, o, s) in DATA_MAP.items():
         if s == l: return f"{g}.{o}"
     for i, (g, o, s) in DATA_MAP.items():
-        if s[0] == l and len(s) > 1: return f"{g}.{o}1"
+        if s[0] == l Extends len(s) > 1: return f"{g}.{o}1"
         if len(s) > 1 and s[1] == l.lower(): return f"{g}.{o}2"
     return "?"
 
@@ -335,7 +335,12 @@ def dec_v2(s):
     except ValueError: pass
     return "?"
 
-st.title("📟 KODER")
+# --- DYNAMICZNY NAGŁÓWEK Z IDENTYFIKACJĄ ADMINA ---
+if is_admin:
+    st.markdown("<h1 style='margin-bottom: 0;'>📟 KODER <span style='color: #FF4B4B; font-size: 1.2rem; vertical-align: middle; background-color: rgba(255,75,75,0.1); padding: 4px 8px; border-radius: 6px; margin-left: 10px; font-weight: bold;'>Admin</span></h1>", unsafe_allow_html=True)
+else:
+    st.title("📟 KODER")
+
 st.write("Uniwersalny system kodowania i dekodowania tekstu.")
 
 # --- AUTOMATYCZNA TRWAŁOŚĆ KLUCZA W LOCALSTORAGE ---
@@ -410,7 +415,7 @@ with c1:
     current_announcement = st.session_state.global_store.get("announcement", "Brak aktualnych ogłoszeń.")
     ann_font = st.session_state.global_store.get("announcement_font", "sans-serif")
     ann_size = st.session_state.global_store.get("announcement_size", 16)
-    ann_bg = st.session_state.global_store.get("announcement_bg_color", "#e7f3fe") # Pobranie koloru z bazy
+    ann_bg = st.session_state.global_store.get("announcement_bg_color", "#e7f3fe")
     
     # Automatyczny kontrast dla tekstu na tablicy ogłoszeń
     ann_text_color = "#0c5460" if get_contrast_text_color(ann_bg) == "#000000" else "#FFFFFF"
@@ -461,7 +466,6 @@ with c1:
             selected_size_value = st.slider("Wielkość tekstu (px):", min_value=12, max_value=36, value=int(ann_size), step=1)
             
         with f_col3:
-            # NOWOŚĆ: Wybór koloru tła tablicy bezpośrednio w panelu edycji
             selected_ann_bg = st.color_picker("Tło tablicy:", value=ann_bg, key="admin_ann_bg_picker")
             
         if st.button("💾 Zapisz ogłoszenie i wygląd", key="save_announcement_btn"):
