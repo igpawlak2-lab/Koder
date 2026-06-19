@@ -68,7 +68,12 @@ if "user_data" not in st.session_state.global_store:
     st.session_state.global_store["user_data"] = {}
 
 if current_user not in st.session_state.global_store["user_data"]:
-    st.session_state.global_store["user_data"][current_user] = {"history": [], "notepad": "", "has_liked": False}
+    st.session_state.global_store["user_data"][current_user] = {"history": [], "notepad": "", "has_liked": False, "saved_nick": ""}
+    save_global_data(st.session_state.global_store)
+
+# Zapewnienie kompatybilności wstecznej dla pola saved_nick w istniejących profilach
+if "saved_nick" not in st.session_state.global_store["user_data"][current_user]:
+    st.session_state.global_store["user_data"][current_user]["saved_nick"] = ""
     save_global_data(st.session_state.global_store)
 
 # --- STYLOWANIE INTERFEJSU (CSS) ---
@@ -233,6 +238,7 @@ components.html(
 user_history = st.session_state.global_store["user_data"][current_user].get("history", [])
 user_notepad_content = st.session_state.global_store["user_data"][current_user].get("notepad", "")
 user_has_liked = st.session_state.global_store["user_data"][current_user].get("has_liked", False)
+user_saved_nick = st.session_state.global_store["user_data"][current_user].get("saved_nick", "")
 
 c1, c2 = st.columns([1.6, 1.4])
 with c1:
@@ -317,7 +323,6 @@ with col_like1:
     if not user_has_liked:
         if st.button("👍 Polub stronę", key="btn_like_page"):
             st.session_state.global_store["user_data"][current_user]["has_liked"] = True
-            # Przeliczenie całkowitej sumy polubień na podstawie aktywnych profili
             total_likes = sum(1 for u in st.session_state.global_store["user_data"].values() if u.get("has_liked", False))
             st.session_state.global_store["likes"] = total_likes
             save_global_data(st.session_state.global_store)
@@ -340,6 +345,15 @@ with st.expander("🔑 Zarządzanie Twoim Identyfikatorem"):
     st.write("**Twój aktualny klucz konta:**")
     st.code(st.session_state.user_author_key, language="text")
     
+    # Dodanie pola do ustawienia stałego nicku
+    current_nick_val = st.session_state.global_store["user_data"][current_user].get("saved_nick", "")
+    new_nick = st.text_input("Ustaw swój stały podpis (nick):", value=current_nick_val, placeholder="Wpisz stały nick...")
+    if new_nick != current_nick_val:
+        st.session_state.global_store["user_data"][current_user]["saved_nick"] = new_nick.strip()
+        save_global_data(st.session_state.global_store)
+        st.rerun()
+        
+    st.write("---")
     with st.form("account_key_form"):
         new_key = st.text_input("Zmień konto na inne:")
         submit_change = st.form_submit_button("Zmień klucz konta")
@@ -350,7 +364,7 @@ with st.expander("🔑 Zarządzanie Twoim Identyfikatorem"):
             st.query_params["ak"] = clean_key
             
             if clean_key not in st.session_state.global_store["user_data"]:
-                st.session_state.global_store["user_data"][clean_key] = {"history": [], "notepad": "", "has_liked": False}
+                st.session_state.global_store["user_data"][clean_key] = {"history": [], "notepad": "", "has_liked": False, "saved_nick": ""}
                 save_global_data(st.session_state.global_store)
                 
             components.html(
@@ -367,7 +381,9 @@ with st.expander("🔑 Zarządzanie Twoim Identyfikatorem"):
 is_admin = (st.session_state.user_author_key == "admin")
 
 with st.form("comment_form", clear_on_submit=True):
-    nick = st.text_input("Twój podpis/nick:", placeholder="Anonim")
+    # Automatycznie wstawiamy zapisany nick jako domyślną wartość pola
+    default_author = user_saved_nick if user_saved_nick else ""
+    nick = st.text_input("Twój podpis/nick:", value=default_author, placeholder="Anonim")
     komentarz_tekst = st.text_area("Napisz komentarz o stronie:", placeholder="Wpisz swoją opinię tutaj...")
     wyslij = st.form_submit_button("Dodaj komentarz")
     
