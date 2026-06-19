@@ -73,11 +73,13 @@ if current_user not in st.session_state.global_store["user_data"]:
         "notepad": "", 
         "has_liked": False, 
         "saved_nick": "",
-        "theme_color": "#1E90FF"
+        "theme_color": "#1E90FF",      # Domyślny niebieski dla opcji aktywnej
+        "bg_color": "#FFFFFF",         # Domyślne jasne tło aplikacji
+        "clear_btn_color": "#5cb85c"   # Domyślny zielony dla przycisku czyszczenia
     }
     save_global_data(st.session_state.global_store)
 
-# Zapewnienie kompatybilności wstecznej dla nowych pól w istniejących profilach
+# Zapewnienie kompatybilności wstecznej dla nowych pól kolorów w istniejących profilach
 user_profile = st.session_state.global_store["user_data"][current_user]
 updated_profile = False
 
@@ -87,53 +89,93 @@ if "saved_nick" not in user_profile:
 if "theme_color" not in user_profile:
     user_profile["theme_color"] = "#1E90FF"
     updated_profile = True
+if "bg_color" not in user_profile:
+    user_profile["bg_color"] = "#FFFFFF"
+    updated_profile = True
+if "clear_btn_color" not in user_profile:
+    user_profile["clear_btn_color"] = "#5cb85c"
+    updated_profile = True
 
 if updated_profile:
     save_global_data(st.session_state.global_store)
 
-# Wyciągamy kolor motywu użytkownika
+# Wyciągamy spersonalizowane kolory motywu użytkownika
 theme_color = user_profile.get("theme_color", "#1E90FF")
+bg_color = user_profile.get("bg_color", "#FFFFFF")
+clear_btn_color = user_profile.get("clear_btn_color", "#5cb85c")
 
-# Funkcja pomocnicza do obliczania jasności koloru
+# Funkcja pomocnicza do obliczania kontrastu tekstu (czarny lub biały)
 def get_contrast_text_color(hex_color):
     hex_color = hex_color.lstrip('#')
     try:
         r, g, b = int(hex_color[0:2], 16), int(hex_color[2:4], 16), int(hex_color[4:6], 16)
         brightness = (r * 299 + g * 587 + b * 114) / 1000
-        return "#000000" if brightness > 128 else "#FFFFFF"
+        return "#000000" if brightness > 135 else "#FFFFFF"
     except:
         return "#FFFFFF"
 
 text_color = get_contrast_text_color(theme_color)
+clear_btn_text_color = get_contrast_text_color(clear_btn_color)
+main_text_theme = get_contrast_text_color(bg_color)
 
-# --- STYLOWANIE INTERFEJSU (POPRAWIONE KLAMRY DLA ZMIENNYCH CSS) ---
+# --- STYLOWANIE INTERFEJSU (ZAAWANSOWANE CSS DLA WSZYSTKICH KOLORÓW) ---
 st.markdown(f"""
     <style>
+        /* Dynamiczny kolor tła całej aplikacji oraz dopasowanie koloru głównych tekstów */
+        .stApp {{
+            background-color: {bg_color} !important;
+        }}
+        .stApp h1, .stApp h2, .stApp h3, .stApp p, .stApp span, .stApp label {{
+            color: {main_text_theme} !important;
+        }}
+        
+        /* Układ przycisków typu Radio */
         div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div {{
             display: flex; gap: 10px; margin-top: 5px; width: 100%;
         }}
+        /* Nieaktywne przyciski wyboru */
         div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label {{
-            background-color: #F0F2F6; border: 2px solid #E0E2E6; padding: 12px 10px !important;
+            background-color: {"#262730" if main_text_theme == "#FFFFFF" else "#F0F2F6"} !important; 
+            border: 2px solid {"#434654" if main_text_theme == "#FFFFFF" else "#E0E2E6"} !important; 
+            padding: 12px 10px !important;
             border-radius: 10px; cursor: pointer; transition: all 0.2s ease-in-out;
             display: flex; align-items: center; justify-content: center; flex: 1;
             min-width: 140px; font-size: 16px !important; font-weight: bold !important; white-space: nowrap !important;
-            color: #31333F !important;
+            color: {main_text_theme} !important;
         }}
         div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label div[data-testid="stMarkdownContainer"]::before {{
             display: none !important;
         }}
         div[data-testid="stRadio"] input[type="radio"] {{ display: none; }}
+        
+        /* Zaznaczony przycisk wyboru (Główny Kolor Akcentu) */
         div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label:has(input:checked) {{
             background-color: {theme_color} !important; 
             color: {text_color} !important; 
             border-color: {theme_color} !important;
-            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.15);
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
         }}
         div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label:has(input:checked) div[data-testid="stMarkdownContainer"] {{
             color: {text_color} !important;
         }}
+        
+        /* Personalizacja przycisku Usuwania/Czyszczenia historii */
+        button[id^="wyczyść-historię-operacji"], div.stButton > button[type="primary"] {{
+            background-color: {clear_btn_color} !important;
+            color: {clear_btn_text_color} !important;
+            border: none !important;
+            border-radius: 8px !important;
+            font-weight: bold !important;
+            transition: opacity 0.2s;
+        }}
+        button[id^="wyczyść-historię-operacji"]:hover, div.stButton > button[type="primary"]:hover {{
+            opacity: 0.9 !important;
+        }}
+        
+        /* Obramowanie kontenerów bocznych */
         div[data-testid="stVerticalBlockBorderWrapper"] {{
-            border-color: {theme_color} !important; border-radius: 12px; background-color: #F9FAFB;
+            border-color: {theme_color} !important; border-radius: 12px; 
+            background-color: {"#1E1E1E" if main_text_theme == "#FFFFFF" else "#F9FAFB"};
         }}
     </style>
 """, unsafe_allow_html=True)
@@ -270,7 +312,7 @@ components.html(
     """, height=0, width=0
 )
 
-# Pobieranie spersonalizowanych danych użytkownika z globalnej bazy JSON
+# Pobieranie spersonalizowanych danych użytkownika z bazy JSON
 user_history = user_profile.get("history", [])
 user_notepad_content = user_profile.get("notepad", "")
 user_has_liked = user_profile.get("has_liked", False)
@@ -303,7 +345,7 @@ with c1:
                 decoded_words.append("".join(word_chars))
             res_display = " ".join(decoded_words)
 
-        st.markdown(f"**Wynik:** <div style='font-size:1.4rem; font-weight:bold; background-color:#F0F2F6; padding:12px; border-radius:8px; margin-bottom:10px;'>{res_display}</div>", unsafe_allow_html=True)
+        st.markdown(f"**Wynik:** <div style='font-size:1.4rem; font-weight:bold; background-color:#F0F2F6; color:#1E1E1E; padding:12px; border-radius:8px; margin-bottom:10px;'>{res_display}</div>", unsafe_allow_html=True)
         if mode == "Koduj":
             st.caption("📋 Kliknij ikonę po prawej stronie bloku, aby skopiować kod wraz z indeksami:")
             st.code(res_display, language="text")
@@ -350,7 +392,7 @@ with c2:
         on_change=save_notepad_instantly
     )
 
-# --- SEKCJA GLOBALNYCH POLUBIEŃ I KOMENTARZY (PRZYPISANE DO KONT) ---
+# --- SEKCJA GLOBALNYCH POLUBIEŃ I KOMENTARZY ---
 st.write("---")
 st.subheader("💬 Opinie użytkowników")
 
@@ -376,12 +418,36 @@ with col_like2:
 
 st.write(" ")
 
-# --- PANEL PROSTEGO PROFILU (ZAKORZENIENIE KONTA) ---
-with st.expander("🔑 Zarządzanie Twoim Identyfikatorem"):
-    st.write("**Twój aktualny klucz konta:**")
+# --- ROZBUDOWANY PANEL PERSONALIZACJI WYGLĄDU (ZAKORZENIENIE KONTA) ---
+with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
+    st.subheader("Ustawienia kolorów aplikacji")
+    
+    cc_col1, cc_col2, cc_col3 = st.columns(3)
+    with cc_col1:
+        chosen_color = st.color_picker("Aktywny przycisk wyboru:", value=theme_color)
+        if chosen_color != theme_color:
+            st.session_state.global_store["user_data"][current_user]["theme_color"] = chosen_color
+            save_global_data(st.session_state.global_store)
+            st.rerun()
+            
+    with cc_col2:
+        chosen_bg = st.color_picker("Tło całej aplikacji:", value=bg_color)
+        if chosen_bg != bg_color:
+            st.session_state.global_store["user_data"][current_user]["bg_color"] = chosen_bg
+            save_global_data(st.session_state.global_store)
+            st.rerun()
+            
+    with cc_col3:
+        chosen_clear_color = st.color_picker("Przycisk czyszczenia historii:", value=clear_btn_color)
+        if chosen_clear_color != clear_btn_color:
+            st.session_state.global_store["user_data"][current_user]["clear_btn_color"] = chosen_clear_color
+            save_global_data(st.session_state.global_store)
+            st.rerun()
+
+    st.write("---")
+    st.write("**Twój unikalny klucz konta:**")
     st.code(st.session_state.user_author_key, language="text")
     
-    # 1. Pole wyboru stałego nicku
     current_nick_val = st.session_state.global_store["user_data"][current_user].get("saved_nick", "")
     new_nick = st.text_input("Ustaw swój stały podpis (nick):", value=current_nick_val, placeholder="Wpisz stały nick...")
     if new_nick != current_nick_val:
@@ -389,16 +455,9 @@ with st.expander("🔑 Zarządzanie Twoim Identyfikatorem"):
         save_global_data(st.session_state.global_store)
         st.rerun()
         
-    # 2. Próbnik kolorów przycisków (Color Picker)
-    chosen_color = st.color_picker("Wybierz kolor przycisków wyboru:", value=theme_color)
-    if chosen_color != theme_color:
-        st.session_state.global_store["user_data"][current_user]["theme_color"] = chosen_color
-        save_global_data(st.session_state.global_store)
-        st.rerun()
-        
     st.write("---")
     with st.form("account_key_form"):
-        new_key = st.text_input("Zmień konto na inne:")
+        new_key = st.text_input("Zmień konto na inne (wklej klucz):")
         submit_change = st.form_submit_button("Zmień klucz konta")
         
         if submit_change and new_key.strip():
@@ -412,7 +471,9 @@ with st.expander("🔑 Zarządzanie Twoim Identyfikatorem"):
                     "notepad": "", 
                     "has_liked": False, 
                     "saved_nick": "",
-                    "theme_color": "#1E90FF"
+                    "theme_color": "#1E90FF",
+                    "bg_color": "#FFFFFF",
+                    "clear_btn_color": "#5cb85c"
                 }
                 save_global_data(st.session_state.global_store)
                 
