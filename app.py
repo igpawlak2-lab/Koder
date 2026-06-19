@@ -168,7 +168,8 @@ st.markdown(f"""
 
         /* Dynamiczny kolor dla pól do wpisywania tekstu oraz bezwzględne usunięcie niebieskiej ramki (focus/active) */
         div[data-testid="stTextInput"] input, 
-        div[data-testid="stTextArea"] textarea {{
+        div[data-testid="stTextArea"] textarea,
+        div[data-testid="stInputInstructions"] {{
             background-color: {input_bg_color} !important;
             color: {input_text_color} !important;
             border: 1px solid {theme_color} !important;
@@ -176,14 +177,25 @@ st.markdown(f"""
             box-shadow: none !important;
         }}
         
-        /* Usunięcie niebieskiej obwódki w stanie aktywnym i najechania dla pól tekstowych */
+        /* Usunięcie niebieskiej obwódki w stanie aktywnym i najechania dla pól tekstowych i ich kontenerów nadrzędnych */
         div[data-testid="stTextInput"] input:focus, 
         div[data-testid="stTextArea"] textarea:focus,
         div[data-testid="stTextInput"] input:active, 
-        div[data-testid="stTextArea"] textarea:active {{
-            border: 1px solid {theme_color} !important;
+        div[data-testid="stTextArea"] textarea:active,
+        div[data-testid="stTextInput"]:focus-within,
+        div[data-testid="stTextArea"]:focus-within,
+        div[data-component-name="stTextInput"] > div,
+        div[data-component-name="stTextArea"] > div {{
+            border-color: {theme_color} !important;
             outline: none !important;
             box-shadow: none !important;
+        }}
+        
+        /* Całkowite wyczyszczenie natywnych stylów fokusujących we frameworku */
+        .stApp :focus, .stApp :focus-within, .stApp :focus-visible {{
+            outline: none !important;
+            box-shadow: none !important;
+            border-color: {theme_color} !important;
         }}
 
         /* Wymuszenie koloru wybranego w 3. kwadracie dla wszystkich przycisków akcji */
