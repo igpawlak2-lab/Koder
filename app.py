@@ -23,7 +23,7 @@ def load_global_data():
                 if "comments" not in data: data["comments"] = []
                 if "user_data" not in data: data["user_data"] = {}
                 
-                # Pancerna konwersja starych komentarzy
+                # Konwersja starych komentarzy
                 migrated_comments = []
                 for c in data["comments"]:
                     if isinstance(c, dict) and "text" in c:
@@ -63,7 +63,6 @@ if "user_author_key" not in st.session_state:
 
 current_user = st.session_state.user_author_key
 
-# Upewniamy się, że w strukturze bazy istnieje profil dla aktualnego użytkownika
 if "user_data" not in st.session_state.global_store:
     st.session_state.global_store["user_data"] = {}
 
@@ -79,7 +78,6 @@ if current_user not in st.session_state.global_store["user_data"]:
     }
     save_global_data(st.session_state.global_store)
 
-# Zapewnienie kompatybilności wstecznej dla pól kolorów
 user_profile = st.session_state.global_store["user_data"][current_user]
 updated_profile = False
 
@@ -99,12 +97,10 @@ if "clear_btn_color" not in user_profile:
 if updated_profile:
     save_global_data(st.session_state.global_store)
 
-# Wyciągamy spersonalizowane kolory motywu użytkownika
 theme_color = user_profile.get("theme_color", "#1E90FF")
 bg_color = user_profile.get("bg_color", "#FFFFFF")
 clear_btn_color = user_profile.get("clear_btn_color", "#5cb85c")
 
-# Funkcja pomocnicza do obliczania kontrastu tekstu (czarny lub biały)
 def get_contrast_text_color(hex_color):
     hex_color = hex_color.lstrip('#')
     try:
@@ -118,10 +114,15 @@ text_color = get_contrast_text_color(theme_color)
 clear_btn_text_color = get_contrast_text_color(clear_btn_color)
 main_text_theme = get_contrast_text_color(bg_color)
 
-# --- STYLOWANIE INTERFEJSU (ZAAWANSOWANE NADPISYWANIE ZMIENNYCH DLA KROPEK) ---
+# --- NOWE, SYSTEMOWE STYLOWANIE DLA UPARTYCH KROPEK ---
 st.markdown(f"""
     <style>
-        /* Dynamiczny kolor tła całej aplikacji oraz dopasowanie koloru głównych tekstów */
+        /* Nadpisanie zmiennych na poziomie korzenia, aby zmusić kropki w radio do posłuszeństwa */
+        :root, [data-testid="stAppViewRoot"] {{
+            --bui-color-primary: {clear_btn_color} !important;
+            --primary-color: {clear_btn_color} !important;
+        }}
+
         .stApp {{
             background-color: {bg_color} !important;
         }}
@@ -129,12 +130,9 @@ st.markdown(f"""
             color: {main_text_theme} !important;
         }}
         
-        /* Układ przycisków typu Radio */
+        /* Układ kontenera przycisków wyboru */
         div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div {{
             display: flex; gap: 10px; margin-top: 5px; width: 100%;
-            /* NADPISANIE PODSTAWOWYCH ZMIENNYCH STREAMLIT DLA TEGO KONTENERA */
-            --bui-color-primary: {clear_btn_color} !important;
-            --primary-color: {clear_btn_color} !important;
         }}
         
         /* Nieaktywne przyciski wyboru */
@@ -152,7 +150,7 @@ st.markdown(f"""
         }}
         div[data-testid="stRadio"] input[type="radio"] {{ display: none; }}
         
-        /* Zaznaczony przycisk wyboru (Główny Kolor Akcentu z 1. kwadratu) */
+        /* Zaznaczony przycisk wyboru (kolor z 1. próbnika) */
         div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label:has(input:checked) {{
             background-color: {theme_color} !important; 
             color: {text_color} !important; 
@@ -163,21 +161,25 @@ st.markdown(f"""
             color: {text_color} !important;
         }}
         
-        /* CAŁKOWITE PRZECHWYCENIE MAŁEJ KROPKI (Wymuszenie koloru z 3. kwadratu) */
-        div[data-testid="stRadio"] div[role="radiogroup"] label [data-testid="stRadioButtonToogleChecked"] {{
+        /* Agresywne wymuszenie koloru z 3. próbnika na samą wewnętrzną kropkę (stan checked i pseudo-elementy) */
+        div[data-testid="stRadio"] div[role="radiogroup"] label span {{
+            background-color: transparent !important;
+        }}
+        div[data-testid="stRadio"] div[role="radiogroup"] label:has(input:checked) div[class*="st-"]::after,
+        div[data-testid="stRadio"] div[role="radiogroup"] label:has(input:checked) span::after,
+        div[data-testid="stRadio"] div[role="radiogroup"] [data-testid="stRadioButtonToogleChecked"] {{
             background-color: {clear_btn_color} !important;
             border-color: {clear_btn_color} !important;
+            fill: {clear_btn_color} !important;
         }}
-        div[data-testid="stRadio"] div[role="radiogroup"] label:has(input:checked) span[data-testid="stRadioButtonToogleChecked"]::after {{
-            background-color: {clear_btn_color} !important;
-        }}
-        div[data-testid="stRadio"] div[role="radiogroup"] svg {{
+        div[data-testid="stRadio"] div[role="radiogroup"] svg,
+        div[data-testid="stRadio"] div[role="radiogroup"] svg * {{
             fill: {clear_btn_color} !important;
             stroke: {clear_btn_color} !important;
             color: {clear_btn_color} !important;
         }}
 
-        /* Wymuszenie koloru wybranego w 3. kwadracie dla wszystkich przycisków akcji */
+        /* Wymuszenie koloru z 3. próbnika dla wszystkich przycisków akcji */
         div.stButton > button[data-testid="stBaseButton-secondary"],
         div.stButton > button[data-testid="stBaseButton-primary"],
         .stApp div.stButton > button {{
@@ -190,24 +192,19 @@ st.markdown(f"""
             transition: all 0.2s ease-in-out !important;
         }}
         
-        /* Kolor napisów wewnątrz przycisków */
         .stApp div.stButton > button p,
         .stApp div.stButton > button div,
         .stApp div.stButton > button span {{
             color: {clear_btn_text_color} !important;
         }}
         
-        /* Efekt najechania myszką dla przycisków akcji */
-        div.stButton > button[data-testid="stBaseButton-secondary"]:hover,
-        div.stButton > button[data-testid="stBaseButton-primary"]:hover,
-        .stApp div.stButton > button:hover {{
+        div.stButton > button:hover {{
             background-color: {clear_btn_color} !important;
             opacity: 0.85 !important;
             border-color: {clear_btn_color} !important;
             transform: scale(1.01);
         }}
         
-        /* Obramowanie bocznych paneli */
         div[data-testid="stVerticalBlockBorderWrapper"] {{
             border-color: {theme_color} !important; border-radius: 12px; 
             background-color: {"#1E1E1E" if main_text_theme == "#FFFFFF" else "#F9FAFB"};
@@ -347,7 +344,6 @@ components.html(
     """, height=0, width=0
 )
 
-# Pobieranie spersonalizowanych danych użytkownika z bazy JSON
 user_history = user_profile.get("history", [])
 user_notepad_content = user_profile.get("notepad", "")
 user_has_liked = user_profile.get("has_liked", False)
@@ -453,13 +449,13 @@ with col_like2:
 
 st.write(" ")
 
-# --- ROZBUDOWANY PANEL PERSONALIZACJI WYGLĄDU (ZAKORZENIENIE KONTA) ---
+# --- PANEL PERSONALIZACJI WYGLĄDU ---
 with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
     st.subheader("Ustawienia kolorów aplikacji")
     
     cc_col1, cc_col2, cc_col3 = st.columns(3)
     with cc_col1:
-        chosen_color = st.color_picker("Aktywny przycisk wyboru & obramowania:", value=theme_color)
+        chosen_color = st.color_picker("Aktywny przycisk wyboru:", value=theme_color)
         if chosen_color != theme_color:
             st.session_state.global_store["user_data"][current_user]["theme_color"] = chosen_color
             save_global_data(st.session_state.global_store)
@@ -473,7 +469,6 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
             st.rerun()
             
     with cc_col3:
-        # Ten próbnik steruje teraz przyciskami (usuwanie/historii/komentarzy) oraz kropkami
         chosen_clear_color = st.color_picker("Kropka opcji wyboru & Przyciski akcji:", value=clear_btn_color)
         if chosen_clear_color != clear_btn_color:
             st.session_state.global_store["user_data"][current_user]["clear_btn_color"] = chosen_clear_color
@@ -523,7 +518,6 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
             )
             st.rerun()
 
-# Sprawdzamy status administratora
 is_admin = (st.session_state.user_author_key == "admin")
 
 with st.form("comment_form", clear_on_submit=True):
