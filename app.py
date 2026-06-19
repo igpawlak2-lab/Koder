@@ -64,12 +64,10 @@ if "personal_notepad" not in st.session_state:
 
 # --- BEZPIECZNE GENEROWANIE I SYNCHRONIZACJA KLUCZA KONTA ---
 if "user_author_key" not in st.session_state:
-    # 1. Sprawdzamy pasek URL
     url_key = params.get("ak", "")
     if url_key:
         st.session_state.user_author_key = url_key
     else:
-        # 2. Jeśli brak w URL, generujemy nowy unikalny klucz natychmiast w Pythonie
         st.session_state.user_author_key = f"usr_{uuid.uuid4().hex[:16]}"
         st.query_params["ak"] = st.session_state.user_author_key
 
@@ -224,11 +222,9 @@ components.html(
         var urlKey = currentUrl.searchParams.get("ak");
         
         if (savedKey && savedKey !== urlKey) {{
-            // Jeśli mamy zapisany klucz w przeglądarce, a nie ma go w URL -> przywracamy
             currentUrl.searchParams.set("ak", savedKey);
             window.parent.location.href = currentUrl.href;
         }} else if (!savedKey && urlKey) {{
-            // Jeśli klucz wygenerował się w Pythonie -> zapisujemy go trwale w przeglądarce
             localStorage.setItem("koder_author_key2", urlKey);
         }}
     </script>
@@ -364,21 +360,26 @@ with col_like2:
 
 st.write(" ")
 
-# --- PANEL PROSTEGO PROFILU (ZAKORZENIENIE KONTA) ---
+# --- PANEL PROSTEGO PROFILU (ZAKORZENIENIE KONTA - NAPRAWIONY) ---
 with st.expander("🔑 Zarządzanie Twoim Identyfikatorem (Opcje konta)"):
-    st.caption("Twój unikalny identyfikator jest zapisany bezpiecznie na Twoim urządzeniu. Dzięki temu nikt inny nie usunie Twoich komentarzy.")
-    st.text_input("Twój aktualny klucz konta (skopiuj go, by zalogować się na telefonie):", value=st.session_state.user_author_key, disabled=True)
+    st.write("**Twój aktualny klucz konta:**")
+    st.code(st.session_state.user_author_key, language="text")
+    st.caption("Skopiuj powyższy klucz, jeśli chcesz zalogować się na to samo konto np. na telefonie.")
     
-    new_key = st.text_input("Zaloguj na inny klucz (wklej i kliknij Zmień):", placeholder="Wklej stary klucz...")
-    if st.button("Zmień klucz konta"):
-        if new_key.strip():
-            st.session_state.user_author_key = new_key.strip()
-            st.query_params["ak"] = new_key.strip()
+    # Przebudowany formularz zmiany klucza zapobiegający konfliktom
+    with st.form("account_key_form"):
+        new_key = st.text_input("Wklej klucz z innego urządzenia, aby zmienić konto:")
+        submit_change = st.form_submit_button("Zmień klucz konta")
+        
+        if submit_change and new_key.strip():
+            clean_key = new_key.strip()
+            st.session_state.user_author_key = clean_key
+            st.query_params["ak"] = clean_key
             components.html(
                 f"""
                 <script>
-                    localStorage.setItem("koder_author_key2", "{new_key.strip()}");
-                    window.parent.location.href = window.parent.location.pathname + "?ak={new_key.strip()}";
+                    localStorage.setItem("koder_author_key2", "{clean_key}");
+                    window.parent.location.href = window.parent.location.pathname + "?ak={clean_key}";
                 </script>
                 """, height=0, width=0
             )
