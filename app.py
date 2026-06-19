@@ -18,6 +18,7 @@ def load_global_data():
         "comments": [], 
         "user_data": {}, 
         "moderators": [],                       
+        "admins": [], # NOWOŚĆ: Lista kluczy z rangą dodatkowego administratora                      
         "staff_chat": [],                       
         "announcement": "Brak aktualnych ogłoszeń.",
         "announcement_font": "sans-serif",
@@ -36,6 +37,7 @@ def load_global_data():
                 if "comments" not in data: data["comments"] = []
                 if "user_data" not in data: data["user_data"] = {}
                 if "moderators" not in data: data["moderators"] = []
+                if "admins" not in data: data["admins"] = []
                 if "staff_chat" not in data: data["staff_chat"] = [] 
                 if "announcement" not in data: data["announcement"] = "Brak aktualnych ogłoszeń."
                 if "announcement_font" not in data: data["announcement_font"] = "sans-serif"
@@ -91,7 +93,10 @@ if "user_author_key" not in st.session_state:
 current_user = st.session_state.user_author_key
 
 # --- LOGIKA RANGI ---
-is_admin = (current_user == "admin")
+is_root_admin = (current_user == "admin")
+is_promoted_admin = (current_user in st.session_state.global_store.get("admins", []))
+is_admin = is_root_admin or is_promoted_admin
+
 is_moderator = (current_user in st.session_state.global_store.get("moderators", []))
 is_staff = is_admin or is_moderator  
 
@@ -109,7 +114,7 @@ if current_user not in st.session_state.global_store["user_data"]:
         "theme_color": def_theme,      
         "bg_color": def_bg,         
         "clear_btn_color": def_clear,
-        "staff_bar_color": "#FF4B4B" if is_admin else "#FFA500" # Domyślny startowy kolor paska wiadomości
+        "staff_bar_color": "#FF4B4B" if is_admin else "#FFA500" 
     }
     save_global_data(st.session_state.global_store)
 
@@ -632,53 +637,105 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                 save_global_data(st.session_state.global_store)
                 st.rerun()
 
-    # --- PANEL ADMINA ---
+    # --- PANEL ZAANSOWANYCH UPRAWNIEŃ (WIDOCZNY DLA ADMINÓW) ---
     if is_admin:
         st.write("---")
-        st.subheader("👑 Panel Admina: Zarządzanie Moderatorami")
-        st.caption("Dodaj lub usuń uprawnienia moderatora dla konkretnych kluczy kont:")
+        st.subheader("👑 Panel Admina: Zarządzanie uprawnieniami")
         
-        current_mods = st.session_state.global_store.get("moderators", [])
+        adm_tab1, adm_tab2 = st.tabs(["👥 Zarządzanie Moderatorami", "🛡️ Zarządzanie Administratorami"])
         
-        with st.form("add_moderator_form", clear_on_submit=True):
-            mod_key_input = st.text_input("Wklej klucz konta, które chcesz awansować na Moderatora:", placeholder="usr_...")
-            submit_mod = st.form_submit_button("➕ Nadaj uprawnienia moderatora")
+        with adm_tab1:
+            st.caption("Dodaj lub usuń uprawnienia moderatora dla konkretnych kluczy kont:")
+            current_mods = st.session_state.global_store.get("moderators", [])
             
-            if submit_mod and mod_key_input.strip():
-                target_key = mod_key_input.strip()
-                if target_key == "admin":
-                    st.error("Konto 'admin' ma już najwyższe uprawnienia.")
-                elif target_key in current_mods:
-                    st.warning("To konto jest już moderatorem.")
-                else:
-                    current_data = load_global_data()
-                    if "moderators" not in current_data:
-                        current_data["moderators"] = []
-                    current_data["moderators"].append(target_key)
-                    save_global_data(current_data)
-                    st.session_state.global_store = current_data
-                    st.success(f"Pomyślnie nadano uprawnienia moderatora dla klucza: {target_key}")
-                    st.rerun()
-                    
-        if current_mods:
-            st.write("**Aktualna lista przypisanych moderatorów:**")
-            for m_idx, m_key in enumerate(current_mods):
-                m_col1, m_col2 = st.columns([4.0, 2.0])
-                with m_col1:
-                    u_nick = st.session_state.global_store["user_data"].get(m_key, {}).get("saved_nick", "")
-                    display_text = f"🔑 `{m_key}`" + (f" (Podpis: **{u_nick}**)" if u_nick else "")
-                    st.markdown(display_text)
-                with m_col2:
-                    if st.button("❌ Odbierz rangę", key=f"remove_mod_{m_idx}", type="primary", use_container_width=True):
+            with st.form("add_moderator_form", clear_on_submit=True):
+                mod_key_input = st.text_input("Wklej klucz konta, które chcesz awansować na Moderatora:", placeholder="usr_...")
+                submit_mod = st.form_submit_button("➕ Nadaj uprawnienia moderatora")
+                
+                if submit_mod and mod_key_input.strip():
+                    target_key = mod_key_input.strip()
+                    if target_key == "admin" or target_key in st.session_state.global_store.get("admins", []):
+                        st.error("To konto ma już wyższą rangę (Admin).")
+                    elif target_key in current_mods:
+                        st.warning("To konto jest już moderatorem.")
+                    else:
                         current_data = load_global_data()
-                        if m_key in current_data.get("moderators", []):
-                            current_data["moderators"].remove(m_key)
-                            save_global_data(current_data)
-                            st.session_state.global_store = current_data
-                            st.toast(f"Odebrano uprawnienia dla {m_key}")
-                            st.rerun()
-        else:
-            st.caption("Brak przypisanych moderatorów.")
+                        if "moderators" not in current_data:
+                            current_data["moderators"] = []
+                        current_data["moderators"].append(target_key)
+                        save_global_data(current_data)
+                        st.session_state.global_store = current_data
+                        st.success(f"Pomyślnie nadano uprawnienia moderatora dla klucza: {target_key}")
+                        st.rerun()
+                        
+            if current_mods:
+                st.write("**Aktualna lista moderatorów:**")
+                for m_idx, m_key in enumerate(current_mods):
+                    m_col1, m_col2 = st.columns([4.0, 2.0])
+                    with m_col1:
+                        u_nick = st.session_state.global_store["user_data"].get(m_key, {}).get("saved_nick", "")
+                        display_text = f"🔑 `{m_key}`" + (f" (Podpis: **{u_nick}**)" if u_nick else "")
+                        st.markdown(display_text)
+                    with m_col2:
+                        if st.button("❌ Odbierz rangę MOD", key=f"remove_mod_{m_idx}", type="primary", use_container_width=True):
+                            current_data = load_global_data()
+                            if m_key in current_data.get("moderators", []):
+                                current_data["moderators"].remove(m_key)
+                                save_global_data(current_data)
+                                st.session_state.global_store = current_data
+                                st.toast(f"Odebrano uprawnienia dla {m_key}")
+                                st.rerun()
+            else:
+                st.caption("Brak przypisanych moderatorów.")
+                
+        with adm_tab2:
+            st.caption("Dodaj lub usuń uprawnienia dodatkowego administratora:")
+            current_admins = st.session_state.global_store.get("admins", [])
+            
+            with st.form("add_admin_form", clear_on_submit=True):
+                adm_key_input = st.text_input("Wklej klucz konta, które chcesz awansować na Administratora:", placeholder="usr_...")
+                submit_adm = st.form_submit_button("👑 Nadaj uprawnienia administratora")
+                
+                if submit_adm and adm_key_input.strip():
+                    target_key = adm_key_input.strip()
+                    if target_key == "admin":
+                        st.error("Konto główne 'admin' posiada niezbywalne prawa Root-Admina.")
+                    elif target_key in current_admins:
+                        st.warning("To konto jest już administratorem.")
+                    else:
+                        current_data = load_global_data()
+                        if "admins" not in current_data:
+                            current_data["admins"] = []
+                        current_data["admins"].append(target_key)
+                        
+                        # Jeśli awansowany użytkownik był moderatorem, usuwamy go z listy modów
+                        if "moderators" in current_data and target_key in current_data["moderators"]:
+                            current_data["moderators"].remove(target_key)
+                            
+                        save_global_data(current_data)
+                        st.session_state.global_store = current_data
+                        st.success(f"Pomyślnie nadano uprawnienia administratora dla klucza: {target_key}")
+                        st.rerun()
+                        
+            if current_admins:
+                st.write("**Lista dodatkowych administratorów:**")
+                for a_idx, a_key in enumerate(current_admins):
+                    a_col1, a_col2 = st.columns([4.0, 2.0])
+                    with a_col1:
+                        u_nick = st.session_state.global_store["user_data"].get(a_key, {}).get("saved_nick", "")
+                        display_text = f"🛡️ `{a_key}`" + (f" (Podpis: **{u_nick}**)" if u_nick else "")
+                        st.markdown(display_text)
+                    with a_col2:
+                        if st.button("❌ Odbierz rangę ADMIN", key=f"remove_adm_{a_idx}", type="primary", use_container_width=True):
+                            current_data = load_global_data()
+                            if a_key in current_data.get("admins", []):
+                                current_data["admins"].remove(a_key)
+                                save_global_data(current_data)
+                                st.session_state.global_store = current_data
+                                st.toast(f"Odebrano uprawnienia administratora dla {a_key}")
+                                st.rerun()
+            else:
+                st.caption("Brak dodatkowych administratorów (poza kontem głównym).")
 
         st.write("---")
         st.subheader("🎨 Panel Admina: Domyślny motyw startowy")
@@ -732,7 +789,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                     "theme_color": def_theme,
                     "bg_color": def_bg,
                     "clear_btn_color": def_clear,
-                    "staff_bar_color": "#FF4B4B" if clean_key == "admin" else "#FFA500"
+                    "staff_bar_color": "#FF4B4B" if (clean_key == "admin" or clean_key in st.session_state.global_store.get("admins", [])) else "#FFA500"
                 }
                 save_global_data(st.session_state.global_store)
                 
