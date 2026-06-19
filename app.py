@@ -79,7 +79,7 @@ if current_user not in st.session_state.global_store["user_data"]:
     }
     save_global_data(st.session_state.global_store)
 
-# Zapewnienie kompatybilności wstecznej dla nowych pól kolorów w istniejących profilach
+# Zapewnienie kompatybilności wstecznej dla pól kolorów
 user_profile = st.session_state.global_store["user_data"][current_user]
 updated_profile = False
 
@@ -118,7 +118,7 @@ text_color = get_contrast_text_color(theme_color)
 clear_btn_text_color = get_contrast_text_color(clear_btn_color)
 main_text_theme = get_contrast_text_color(bg_color)
 
-# --- STYLOWANIE INTERFEJSU (PANCERNE, BEZPOŚREDNIE SELEKTORY) ---
+# --- STYLOWANIE INTERFEJSU (ZINTEGROWANE KROPKI I PRZYCISKI AKCJI) ---
 st.markdown(f"""
     <style>
         /* Dynamiczny kolor tła całej aplikacji oraz dopasowanie koloru głównych tekstów */
@@ -159,16 +159,16 @@ st.markdown(f"""
             color: {text_color} !important;
         }}
         
-        /* Kolor małych zielonych/niebieskich kropek wewnątrz zaznaczonych elementów radiowych */
-        div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label:has(input:checked) span[data-testid="stRadioButtonToogleChecked"] {{
-            background-color: {text_color} !important;
-            border-color: {text_color} !important;
+        /* Zmiana koloru małych wewnętrznych kropek w opcjach wyboru na kolor przycisków akcji (3. kwadrat) */
+        div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label span[data-testid="stRadioButtonToogleChecked"] {{
+            background-color: {clear_btn_color} !important;
+            border-color: {clear_btn_color} !important;
         }}
-        div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label span[data-testid="stRadioButtonToogleChecked"]::after {{
-            background-color: {theme_color} !important;
+        div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label:has(input:checked) span[data-testid="stRadioButtonToogleChecked"]::after {{
+            background-color: {clear_btn_color} !important;
         }}
 
-        /* CAŁKOWITA REFORMACJA: Przechwycenie wszystkich przycisków akcji (wtórnych i głównych) i narzucenie wybranego koloru */
+        /* Wymuszenie koloru wybranego w 3. kwadracie dla wszystkich przycisków akcji */
         div.stButton > button[data-testid="stBaseButton-secondary"],
         div.stButton > button[data-testid="stBaseButton-primary"],
         .stApp div.stButton > button {{
@@ -181,14 +181,14 @@ st.markdown(f"""
             transition: all 0.2s ease-in-out !important;
         }}
         
-        /* Teksty wewnątrz przycisków również muszą słuchać wybranego koloru kontrastowego */
+        /* Kolor napisów wewnątrz przycisków */
         .stApp div.stButton > button p,
         .stApp div.stButton > button div,
         .stApp div.stButton > button span {{
             color: {clear_btn_text_color} !important;
         }}
         
-        /* Efekt najechania (hover) */
+        /* Efekt najechania myszką dla przycisków akcji */
         div.stButton > button[data-testid="stBaseButton-secondary"]:hover,
         div.stButton > button[data-testid="stBaseButton-primary"]:hover,
         .stApp div.stButton > button:hover {{
@@ -198,7 +198,7 @@ st.markdown(f"""
             transform: scale(1.01);
         }}
         
-        /* Obramowanie kontenerów bocznych */
+        /* Obramowanie bocznych paneli */
         div[data-testid="stVerticalBlockBorderWrapper"] {{
             border-color: {theme_color} !important; border-radius: 12px; 
             background-color: {"#1E1E1E" if main_text_theme == "#FFFFFF" else "#F9FAFB"};
@@ -450,7 +450,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
     
     cc_col1, cc_col2, cc_col3 = st.columns(3)
     with cc_col1:
-        chosen_color = st.color_picker("Aktywny przycisk wyboru & kropka:", value=theme_color)
+        chosen_color = st.color_picker("Aktywny przycisk wyboru & obramowania:", value=theme_color)
         if chosen_color != theme_color:
             st.session_state.global_store["user_data"][current_user]["theme_color"] = chosen_color
             save_global_data(st.session_state.global_store)
@@ -464,7 +464,8 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
             st.rerun()
             
     with cc_col3:
-        chosen_clear_color = st.color_picker("Przyciski usuwania i cofnij polubienie:", value=clear_btn_color)
+        # Zintegrowany opis informujący o sterowaniu przyciskami i kropkami opcji wyboru
+        chosen_clear_color = st.color_picker("Przyciski akcji & Kropka opcji wyboru:", value=clear_btn_color)
         if chosen_clear_color != clear_btn_color:
             st.session_state.global_store["user_data"][current_user]["clear_btn_color"] = chosen_clear_color
             save_global_data(st.session_state.global_store)
@@ -541,28 +542,30 @@ comments_list = st.session_state.global_store.get("comments", [])
 if comments_list:
     st.write("**Ostatnie komentarze:**")
     for idx, com in enumerate(comments_list):
-        cc1, cc2 = st.columns([4.8, 1.2])
-        with cc1:
-            st.info(com["text"])
-        with cc2:
-            my_key = st.session_state.user_author_key
-            
-            if is_admin:
-                if st.button("🗑️ Usuń (ADMIN)", key=f"del_com_{idx}", type="primary", use_container_width=True):
-                    current_data = load_global_data()
-                    if idx < len(current_data["comments"]):
-                        current_data["comments"].pop(idx)
-                        save_global_data(current_data)
-                        st.session_state.global_store = current_data
-                        st.rerun()
-            
-            elif com.get("author_key") == my_key and my_key not in ["", "anonymous", "legacy"]:
-                if st.button("❌ Usuń", key=f"del_com_{idx}", type="primary", use_container_width=True):
-                    current_data = load_global_data()
-                    if idx < len(current_data["comments"]):
-                        current_data["comments"].pop(idx)
-                        save_global_data(current_data)
-                        st.session_state.global_store = current_data
-                        st.rerun()
+        # Sprawdzamy bezpiecznie strukturę słownika przed wyrenderowaniem
+        if isinstance(com, dict) and "text" in com:
+            cc1, cc2 = st.columns([4.8, 1.2])
+            with cc1:
+                st.info(com["text"])
+            with cc2:
+                my_key = st.session_state.user_author_key
+                
+                if is_admin:
+                    if st.button("🗑️ Usuń (ADMIN)", key=f"del_com_{idx}", type="primary", use_container_width=True):
+                        current_data = load_global_data()
+                        if idx < len(current_data["comments"]):
+                            current_data["comments"].pop(idx)
+                            save_global_data(current_data)
+                            st.session_state.global_store = current_data
+                            st.rerun()
+                
+                elif com.get("author_key") == my_key and my_key not in ["", "anonymous", "legacy"]:
+                    if st.button("❌ Usuń", key=f"del_com_{idx}", type="primary", use_container_width=True):
+                        current_data = load_global_data()
+                        if idx < len(current_data["comments"]):
+                            current_data["comments"].pop(idx)
+                            save_global_data(current_data)
+                            st.session_state.global_store = current_data
+                            st.rerun()
 else:
     st.caption("Brak komentarzy. Bądź pierwszy!")
