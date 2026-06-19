@@ -18,7 +18,7 @@ def load_global_data():
         "comments": [], 
         "user_data": {}, 
         "moderators": [],                       
-        "staff_chat": [],                       # Nowa lista na prywatne wiadomości Admin <-> Moderatorzy
+        "staff_chat": [],                       
         "announcement": "Brak aktualnych ogłoszeń.",
         "announcement_font": "sans-serif",
         "announcement_size": 16,
@@ -36,7 +36,7 @@ def load_global_data():
                 if "comments" not in data: data["comments"] = []
                 if "user_data" not in data: data["user_data"] = {}
                 if "moderators" not in data: data["moderators"] = []
-                if "staff_chat" not in data: data["staff_chat"] = [] # Inicjalizacja czatu staffu
+                if "staff_chat" not in data: data["staff_chat"] = [] 
                 if "announcement" not in data: data["announcement"] = "Brak aktualnych ogłoszeń."
                 if "announcement_font" not in data: data["announcement_font"] = "sans-serif"
                 if "announcement_size" not in data: data["announcement_size"] = 16
@@ -108,7 +108,8 @@ if current_user not in st.session_state.global_store["user_data"]:
         "saved_nick": "",
         "theme_color": def_theme,      
         "bg_color": def_bg,         
-        "clear_btn_color": def_clear
+        "clear_btn_color": def_clear,
+        "staff_bar_color": "#FF4B4B" if is_admin else "#FFA500" # Domyślny startowy kolor paska wiadomości
     }
     save_global_data(st.session_state.global_store)
 
@@ -128,6 +129,9 @@ if "bg_color" not in user_profile:
 if "clear_btn_color" not in user_profile:
     user_profile["clear_btn_color"] = "#5cb85c"
     updated_profile = True
+if "staff_bar_color" not in user_profile:
+    user_profile["staff_bar_color"] = "#FF4B4B" if is_admin else "#FFA500"
+    updated_profile = True
 
 if updated_profile:
     save_global_data(st.session_state.global_store)
@@ -136,6 +140,7 @@ if updated_profile:
 theme_color = user_profile.get("theme_color", "#1E90FF")
 bg_color = user_profile.get("bg_color", "#FFFFFF")
 clear_btn_color = user_profile.get("clear_btn_color", "#5cb85c")
+staff_bar_color = user_profile.get("staff_bar_color", "#FF4B4B" if is_admin else "#FFA500")
 
 # Funkcja pomocnicza do obliczania kontrastu tekstu (czarny lub biały)
 def get_contrast_text_color(hex_color):
@@ -221,7 +226,7 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
-# --- PEŁNA MAPA UKŁADU OKRESOWEGO ---
+# --- MAPA UKŁADU OKRESOWEGO I FUNKCJE POMOCNICZE ---
 DATA_MAP = {
     1: (1, 1, "H"), 2: (18, 1, "He"), 3: (1, 2, "Li"), 4: (2, 2, "Be"), 5: (13, 2, "B"), 6: (14, 2, "C"), 
     7: (15, 2, "N"), 8: (16, 2, "O"), 9: (17, 2, "F"), 10: (18, 2, "Ne"), 11: (1, 3, "Na"), 12: (2, 3, "Mg"),
@@ -334,7 +339,7 @@ def dec_v2(s):
     except ValueError: pass
     return "?"
 
-# --- DYNAMICZNY NAGŁÓWEK Z IDENTYFIKACJĄ RANGI ---
+# --- DYNAMICZNY NAGŁÓWEK ---
 if is_admin:
     st.markdown("<h1 style='margin-bottom: 0;'>📟 KODER <span style='color: #FF4B4B; font-size: 1.2rem; vertical-align: middle; background-color: rgba(255,75,75,0.1); padding: 4px 8px; border-radius: 6px; margin-left: 10px; font-weight: bold;'>Admin</span></h1>", unsafe_allow_html=True)
 elif is_moderator:
@@ -344,7 +349,6 @@ else:
 
 st.write("Uniwersalny system kodowania i dekodowania tekstu.")
 
-# --- AUTOMATYCZNA TRWAŁOŚĆ KLUCZA W LOCALSTORAGE ---
 components.html(
     f"""
     <script>
@@ -362,7 +366,6 @@ components.html(
     """, height=0, width=0
 )
 
-# Pobieranie spersonalizowanych danych użytkownika z bazy JSON
 user_history = user_profile.get("history", [])
 user_notepad_content = user_profile.get("notepad", "")
 user_has_liked = user_profile.get("has_liked", False)
@@ -370,7 +373,6 @@ user_saved_nick = user_profile.get("saved_nick", "")
 
 c1, c2 = st.columns([1.6, 1.4])
 with c1:
-    # Definiowanie zakładek panelu sterowania - jeśli użytkownik to staff (Admin/Mod), dodaje się karta prywatnego czatu
     if is_staff:
         tab_main, tab_chat = st.tabs(["🎛️ Panel Sterowania", "🔒 Prywatny Chat Staffu"])
     else:
@@ -418,13 +420,12 @@ with c1:
                 save_global_data(st.session_state.global_store)
                 st.rerun()
 
-    # --- NOWA SEKCJA: PRYWATNY CZAT DLA ADMINA I MODERATORÓW ---
+    # --- PRYWATNY CZAT DLA ADMINA I MODERATORÓW ---
     if is_staff:
         with tab_chat:
             st.subheader("🕵️ Prywatny kanał komunikacji")
             st.caption("Ten czat jest widoczny wyłącznie dla Administratora oraz zatwierdzonych Moderatorów.")
             
-            # Formularz wysyłania wiadomości na czacie staffu
             with st.form("staff_chat_form", clear_on_submit=True):
                 role_label = "Admin" if is_admin else "Moderator"
                 staff_nick = user_saved_nick if user_saved_nick else f"User_{current_user[:6]}"
@@ -438,7 +439,8 @@ with c1:
                         "sender_nick": staff_nick,
                         "sender_role": role_label,
                         "time": time_stamp,
-                        "text": chat_msg.strip()
+                        "text": chat_msg.strip(),
+                        "bar_color": staff_bar_color # Zapisujemy unikalny kolor paska nadawcy wraz z nowym wpisem
                     }
                     current_data = load_global_data()
                     if "staff_chat" not in current_data:
@@ -448,7 +450,6 @@ with c1:
                     st.session_state.global_store = current_data
                     st.rerun()
             
-            # Przycisk czyszczenia czatu dedykowany tylko dla Admina
             if is_admin:
                 if st.button("🗑️ Wyczyść cały Chat Staffu", type="primary", key="clear_staff_chat_btn"):
                     current_data = load_global_data()
@@ -458,7 +459,6 @@ with c1:
                     st.toast("Wyczyszczono historię czatu ekipy.")
                     st.rerun()
 
-            # Wyświetlanie wiadomości z czatu w dedykowanym kontenerze
             staff_messages = st.session_state.global_store.get("staff_chat", [])
             st.write(" ")
             with st.container(height=300):
@@ -466,11 +466,14 @@ with c1:
                     st.caption("Brak wiadomości na kanale staffu. Napisz coś powyżej!")
                 else:
                     for msg in reversed(staff_messages):
-                        color_role = "#FF4B4B" if msg.get("sender_role") == "Admin" else "#FFA500"
+                        # Jeśli stara wiadomość w bazie nie ma jeszcze przypisanego koloru paska, nadajemy domyślny
+                        fallback_color = "#FF4B4B" if msg.get("sender_role") == "Admin" else "#FFA500"
+                        current_bar_color = msg.get("bar_color", fallback_color)
+                        
                         st.markdown(
                             f"""
-                            <div style="background-color: rgba(255,255,255,0.05); padding: 8px 12px; border-radius: 6px; margin-bottom: 8px; border-left: 4px solid {color_role};">
-                                <span style="color: {color_role}; font-weight: bold;">[{msg.get('sender_role')}] {msg.get('sender_nick')}</span> 
+                            <div style="background-color: rgba(255,255,255,0.05); padding: 8px 12px; border-radius: 6px; margin-bottom: 8px; border-left: 4px solid {current_bar_color};">
+                                <span style="color: {current_bar_color}; font-weight: bold;">[{msg.get('sender_role')}] {msg.get('sender_nick')}</span> 
                                 <span style="font-size: 0.8rem; opacity: 0.6; float: right;">{msg.get('time')}</span>
                                 <p style="margin: 4px 0 0 0; font-size: 1rem;">{msg.get('text')}</p>
                             </div>
@@ -492,17 +495,7 @@ with c1:
     
     st.markdown(
         f"""
-        <div style="
-            background-color: {ann_bg}; 
-            border-left: 6px solid {ann_border_color}; 
-            padding: 15px; 
-            border-radius: 6px; 
-            margin-bottom: 15px;
-            font-family: {ann_font}, Arial, sans-serif; 
-            font-size: {ann_size}px; 
-            color: {ann_text_color};
-            line-height: 1.5;
-        ">
+        <div style="background-color: {ann_bg}; border-left: 6px solid {ann_border_color}; padding: 15px; border-radius: 6px; margin-bottom: 15px; font-family: {ann_font}, Arial, sans-serif; font-size: {ann_size}px; color: {ann_text_color}; line-height: 1.5;">
             {current_announcement}
         </div>
         """, 
@@ -511,12 +504,7 @@ with c1:
     
     if is_staff:
         st.caption(f"🛠️ Panel zarządzania ogłoszeniem (Widoczny dla roli: {'Admin' if is_admin else 'Moderator'}):")
-        
-        new_announcement_text = st.text_area(
-            "Zmień treść ogłoszenia globalnego:", 
-            value=current_announcement, 
-            placeholder="Wpisz nowe ogłoszenie..."
-        )
+        new_announcement_text = st.text_area("Zmień treść ogłoszenia globalnego:", value=current_announcement, placeholder="Wpisz nowe ogłoszenie...")
         
         f_col1, f_col2, f_col3 = st.columns([1.5, 1.5, 1.0])
         with f_col1:
@@ -551,7 +539,6 @@ with c1:
 
 with c2:
     st.subheader("Historia operacji")
-    
     if st.button("🗑️ Wyczyść historię operacji", type="primary"):
         st.session_state.global_store["user_data"][current_user]["history"] = []
         save_global_data(st.session_state.global_store)
@@ -561,8 +548,7 @@ with c2:
         if not user_history:
             st.caption("Brak Twoich ostatnich operacji. Wpisz coś po lewej stronie.")
         else:
-            for item in user_history: 
-                st.code(item, language="text")
+            for item in user_history: st.code(item, language="text")
 
     st.write(" ")
     st.subheader("📝 Twój Prywatny Notatnik")
@@ -582,7 +568,7 @@ with c2:
         on_change=save_notepad_instantly
     )
 
-# --- SEKCJA GLOBALNYCH POLUBIEŃ I KOMENTARZY ---
+# --- GLOBALNE POLUBIENIA I KOMENTARZE ---
 st.write("---")
 st.subheader("💬 Opinie użytkowników")
 
@@ -612,7 +598,13 @@ st.write(" ")
 with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
     st.subheader("Twoje własne ustawienia kolorów")
     
-    cc_col1, cc_col2, cc_col3 = st.columns(3)
+    # Dynamiczny podział na 3 lub 4 kolumny w zależności od tego, czy użytkownik jest staffem i potrzebuje wyboru paska czatu
+    if is_staff:
+        cc_col1, cc_col2, cc_col3, cc_col4 = st.columns(4)
+    else:
+        cc_col1, cc_col2, cc_col3 = st.columns(3)
+        cc_col4 = None
+        
     with cc_col1:
         chosen_color = st.color_picker("Aktywny przycisk wyboru:", value=theme_color, key="user_theme_picker")
         if chosen_color != theme_color:
@@ -633,6 +625,15 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
             st.session_state.global_store["user_data"][current_user]["clear_btn_color"] = chosen_clear_color
             save_global_data(st.session_state.global_store)
             st.rerun()
+            
+    # NOWOŚĆ: Wybór koloru paska dla zalogowanego Administratora lub Moderatora
+    if cc_col4 and is_staff:
+        with cc_col4:
+            chosen_bar_color = st.color_picker("Twój pasek na czacie:", value=staff_bar_color, key="user_staff_bar_picker")
+            if chosen_bar_color != staff_bar_color:
+                st.session_state.global_store["user_data"][current_user]["staff_bar_color"] = chosen_bar_color
+                save_global_data(st.session_state.global_store)
+                st.rerun()
 
     # --- PANEL ADMINA ---
     if is_admin:
@@ -733,7 +734,8 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                     "saved_nick": "",
                     "theme_color": def_theme,
                     "bg_color": def_bg,
-                    "clear_btn_color": def_clear
+                    "clear_btn_color": def_clear,
+                    "staff_bar_color": "#FF4B4B" if clean_key == "admin" else "#FFA500"
                 }
                 save_global_data(st.session_state.global_store)
                 
