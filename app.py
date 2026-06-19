@@ -2,6 +2,7 @@ import re
 import datetime
 import os
 import json
+import uuid
 import streamlit as st
 import streamlit.components.v1 as components
 
@@ -25,12 +26,14 @@ def load_global_data():
                 migrated_comments = []
                 for c in data["comments"]:
                     if isinstance(c, dict) and "text" in c:
+                        # Jeśli stary komentarz nie miał author_key, przypisujemy mu legacy
+                        if "author_key" not in c:
+                            c["author_key"] = c.get("session_id", "legacy")
                         migrated_comments.append(c)
                     elif isinstance(c, str):
-                        migrated_comments.append({"text": c, "session_id": "legacy"})
+                        migrated_comments.append({"text": c, "author_key": "legacy"})
                     else:
-                        # Awaryjne zabezpieczenie na wypadek dziwnych struktur danych
-                        migrated_comments.append({"text": str(c), "session_id": "legacy"})
+                        migrated_comments.append({"text": str(c), "author_key": "legacy"})
                 data["comments"] = migrated_comments
                 return data
         except:
@@ -47,14 +50,6 @@ def save_global_data(data):
 if "global_store" not in st.session_state:
     st.session_state.global_store = load_global_data()
 
-# Pobranie ID aktualnej sesji użytkownika do weryfikacji autorstwa komentarzy
-try:
-    from streamlit.runtime.scriptrunner import get_script_run_ctx
-    ctx = get_script_run_ctx()
-    current_session_id = ctx.session_id if ctx else "unknown"
-except:
-    current_session_id = "unknown"
-
 # --- PRYWATNE WCZYTYWANIE Z PARAMS URL ---
 params = st.query_params
 
@@ -67,6 +62,10 @@ if "personal_history" not in st.session_state:
 
 if "personal_notepad" not in st.session_state:
     st.session_state.personal_notepad = params.get("n", "")
+
+# Zarządzanie Kluczem Autora przez Query Params / Session State
+if "user_author_key" not in st.session_state:
+    st.session_state.user_author_key = params.get("ak", "")
 
 # --- STYLOWANIE INTERFEJSU (CSS) ---
 st.markdown("""
@@ -210,6 +209,26 @@ if "has_liked" not in st.session_state: st.session_state.has_liked = False
 st.title("📟 KODER")
 st.write("Uniwersalny system kodowania i dekodowania tekstu.")
 
+# --- SKRYPT LOCALSTORAGE DLA TOŻSAMOŚCI AUTORA (ZAKORZENIENIE KONTA) ---
+if not st.session_state.user_author_key:
+    components.html(
+        """
+        <script>
+            var key = localStorage.getItem("koder_author_key");
+            if (!key) {
+                // Jeśli brak klucza, generujemy losowy unikalny identyfikator
+                key = 'usr_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+                localStorage.setItem("koder_author_key", key);
+            }
+            var currentUrl = new URL(window.parent.location.href);
+            if (!currentUrl.searchParams.get("ak")) {
+                currentUrl.searchParams.set("ak", key);
+                window.parent.location.href = currentUrl.href;
+            }
+        </script>
+        """, height=0, width=0
+    )
+
 c1, c2 = st.columns([1.6, 1.4])
 with c1:
     st.subheader("Panel Sterowania")
@@ -249,9 +268,9 @@ with c1:
             st.query_params["h"] = json.dumps(st.session_state.personal_history)
 
 with c2:
-    st.subheader("Historia operacji ")
+    st.subheader("Historia operacji (Tylko Twoja)")
     
-    if st.button("🗑️ Wyczyść historię ", type="primary"):
+    if st.button("🗑️ Wyczyść historię operacji", type="primary"):
         st.session_state.personal_history = []
         st.query_params["h"] = json.dumps([])
         st.rerun()
@@ -264,7 +283,7 @@ with c2:
                 st.code(item, language="text")
 
     st.write(" ")
-    st.subheader("📝 Twój Notatnik")
+    st.subheader("📝 Twój Prywatny Notatnik")
     
     if not st.session_state.personal_notepad:
         components.html(
@@ -289,7 +308,7 @@ with c2:
             st.query_params["n"] = val
 
     note_input = st.text_area(
-        "Zapisz swoje uwagi:",
+        "Zapisz swoje uwagi (Tekst zapisuje się automatycznie w pamięci przeglądarki):",
         value=st.session_state.personal_notepad,
         placeholder="Wpisz notatki, kody lub sekwencje...",
         height=180,
@@ -339,6 +358,26 @@ with col_like2:
 
 st.write(" ")
 
+# --- PANEL PROSTEGO PROFILU (ZAKORZENIENIE) ---
+with st.expander("🔑 Zarządzanie Twoim Identyfikatorem (Opcje konta)"):
+    st.caption("Twój unikalny identyfikator jest zapisany w pamięci przeglądarki. Chroni przed utratą opcji usuwania komentarzy po odświeżeniu.")
+    st.text_input("Twój aktualny klucz konta (skopiuj go na inne urządzenie):", value=st.session_state.user_author_key, disabled=True)
+    
+    new_key = st.text_input("Zaloguj na inny klucz (wklej i kliknij Zmień):", placeholder="Wklej klucz tutaj...")
+    if st.button("Zmień klucz konta"):
+        if new_key.strip():
+            st.session_state.user_author_key = new_key.strip()
+            st.query_params["ak"] = new_key.strip()
+            components.html(
+                f"""
+                <script>
+                    localStorage.setItem("koder_author_key", "{new_key.strip()}");
+                    window.parent.location.href = window.parent.location.pathname + "?ak={new_key.strip()}";
+                </script>
+                """, height=0, width=0
+            )
+            st.rerun()
+
 with st.form("comment_form", clear_on_submit=True):
     nick = st.text_input("Twój podpis/nick:", placeholder="Anonim")
     komentarz_tekst = st.text_area("Napisz komentarz o stronie:", placeholder="Wpisz swoją opinię tutaj...")
@@ -348,9 +387,10 @@ with st.form("comment_form", clear_on_submit=True):
         podpis = nick.strip() if nick.strip() else "Anonim"
         nowy_komentarz_tekst = f"**{podpis}** ({datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}):\n{komentarz_tekst.strip()}"
         
+        # Wiążemy komentarz z trwałym author_key zamiast sesyjnego session_id
         nowy_komentarz_obj = {
             "text": nowy_komentarz_tekst,
-            "session_id": current_session_id
+            "author_key": st.session_state.user_author_key if st.session_state.user_author_key else "anonymous"
         }
         
         current_data = load_global_data()
@@ -367,7 +407,9 @@ if comments_list:
         with cc1:
             st.info(com["text"])
         with cc2:
-            if com.get("session_id") == current_session_id and current_session_id != "unknown":
+            # Sprawdzamy stały author_key przypisany z LocalStorage
+            my_key = st.session_state.user_author_key
+            if com.get("author_key") == my_key and my_key not in ["", "anonymous", "legacy"]:
                 if st.button("❌ Usuń", key=f"del_com_{idx}", type="primary", use_container_width=True):
                     current_data = load_global_data()
                     if idx < len(current_data["comments"]):
