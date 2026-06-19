@@ -17,7 +17,8 @@ def load_global_data():
         "likes": 0, 
         "comments": [], 
         "user_data": {}, 
-        "moderators": [],                       # Lista przechowująca klucze moderatorów nadanych przez Admina
+        "moderators": [],                       
+        "staff_chat": [],                       # Nowa lista na prywatne wiadomości Admin <-> Moderatorzy
         "announcement": "Brak aktualnych ogłoszeń.",
         "announcement_font": "sans-serif",
         "announcement_size": 16,
@@ -35,6 +36,7 @@ def load_global_data():
                 if "comments" not in data: data["comments"] = []
                 if "user_data" not in data: data["user_data"] = {}
                 if "moderators" not in data: data["moderators"] = []
+                if "staff_chat" not in data: data["staff_chat"] = [] # Inicjalizacja czatu staffu
                 if "announcement" not in data: data["announcement"] = "Brak aktualnych ogłoszeń."
                 if "announcement_font" not in data: data["announcement_font"] = "sans-serif"
                 if "announcement_size" not in data: data["announcement_size"] = 16
@@ -88,7 +90,7 @@ if "user_author_key" not in st.session_state:
 
 current_user = st.session_state.user_author_key
 
-# --- POPRAWIONA LOGIKA RANGI (Klucz "moderator" nie jest już uprzywilejowany) ---
+# --- LOGIKA RANGI ---
 is_admin = (current_user == "admin")
 is_moderator = (current_user in st.session_state.global_store.get("moderators", []))
 is_staff = is_admin or is_moderator  
@@ -368,44 +370,113 @@ user_saved_nick = user_profile.get("saved_nick", "")
 
 c1, c2 = st.columns([1.6, 1.4])
 with c1:
-    st.subheader("Panel Sterowania")
-    proto = st.radio("Wybierz system kodu:", ["Kod 1", "Kod 2"], horizontal=True)
-    mode = st.radio("Wybierz operację:", ["Koduj", "Odkoduj"], horizontal=True)
-    
-    st.write(" ")
-    txt = st.text_input("Wprowadź dane i zatwierdź Enterem:", placeholder="Wpisz dane tutaj...")
-    
-    if txt:
-        res_display = ""
-        if mode == "Koduj":
-            words = clean_txt(txt).split(' ')
-            raw_words = [[enc_v1(l) if "Kod 1" in proto else enc_v2(l) for l in w] for w in words]
-            if "Kod 1" in proto:
-                res_display = "   ".join([" ".join([format_v1_unicode(l) for l in w]) for w in raw_words])
+    # Definiowanie zakładek panelu sterowania - jeśli użytkownik to staff (Admin/Mod), dodaje się karta prywatnego czatu
+    if is_staff:
+        tab_main, tab_chat = st.tabs(["🎛️ Panel Sterowania", "🔒 Prywatny Chat Staffu"])
+    else:
+        tab_main = st.tabs(["🎛️ Panel Sterowania"])[0]
+        
+    with tab_main:
+        st.radio("Wybierz system kodu:", ["Kod 1", "Kod 2"], horizontal=True, key="proto_selection")
+        st.radio("Wybierz operację:", ["Koduj", "Odkoduj"], horizontal=True, key="mode_selection")
+        
+        proto = st.session_state.proto_selection
+        mode = st.session_state.mode_selection
+        
+        st.write(" ")
+        txt = st.text_input("Wprowadź dane i zatwierdź Enterem:", placeholder="Wpisz dane tutaj...")
+        
+        if txt:
+            res_display = ""
+            if mode == "Koduj":
+                words = clean_txt(txt).split(' ')
+                raw_words = [[enc_v1(l) if "Kod 1" in proto else enc_v2(l) for l in w] for w in words]
+                if "Kod 1" in proto:
+                    res_display = "   ".join([" ".join([format_v1_unicode(l) for l in w]) for w in raw_words])
+                else:
+                    res_display = "   ".join([" ".join([format_v2_unicode(l) for l in w]) for w in raw_words])
             else:
-                res_display = "   ".join([" ".join([format_v2_unicode(l) for l in w]) for w in raw_words])
-        else:
-            decoded_words = []
-            for w in txt.split("   "):
-                word_chars = []
-                for s in w.strip().split(" "):
-                    if s: word_chars.append(dec_v1(s) if "Kod 1" in proto else dec_v2(s))
-                decoded_words.append("".join(word_chars))
-            res_display = " ".join(decoded_words)
+                decoded_words = []
+                for w in txt.split("   "):
+                    word_chars = []
+                    for s in w.strip().split(" "):
+                        if s: word_chars.append(dec_v1(s) if "Kod 1" in proto else dec_v2(s))
+                    decoded_words.append("".join(word_chars))
+                res_display = " ".join(decoded_words)
 
-        st.markdown(f"**Wynik:** <div style='font-size:1.4rem; font-weight:bold; background-color:#F0F2F6; color:#1E1E1E; padding:12px; border-radius:8px; margin-bottom:10px;'>{res_display}</div>", unsafe_allow_html=True)
-        if mode == "Koduj":
-            st.caption("📋 Kliknij ikonę po prawej stronie bloku, aby skopiować kod wraz z indeksami:")
-            st.code(res_display, language="text")
-        
-        h_time = datetime.datetime.now().strftime('%H:%M:%S')
-        entry = f"{h_time} | {proto} | {mode}: {txt} -> {res_display}"
-        
-        if not user_history or user_history[0] != entry:
-            user_history.insert(0, entry)
-            st.session_state.global_store["user_data"][current_user]["history"] = user_history
-            save_global_data(st.session_state.global_store)
-            st.rerun()
+            st.markdown(f"**Wynik:** <div style='font-size:1.4rem; font-weight:bold; background-color:#F0F2F6; color:#1E1E1E; padding:12px; border-radius:8px; margin-bottom:10px;'>{res_display}</div>", unsafe_allow_html=True)
+            if mode == "Koduj":
+                st.caption("📋 Kliknij ikonę po prawej stronie bloku, aby skopiować kod wraz z indeksami:")
+                st.code(res_display, language="text")
+            
+            h_time = datetime.datetime.now().strftime('%H:%M:%S')
+            entry = f"{h_time} | {proto} | {mode}: {txt} -> {res_display}"
+            
+            if not user_history or user_history[0] != entry:
+                user_history.insert(0, entry)
+                st.session_state.global_store["user_data"][current_user]["history"] = user_history
+                save_global_data(st.session_state.global_store)
+                st.rerun()
+
+    # --- NOWA SEKCJA: PRYWATNY CZAT DLA ADMINA I MODERATORÓW ---
+    if is_staff:
+        with tab_chat:
+            st.subheader("🕵️ Prywatny kanał komunikacji")
+            st.caption("Ten czat jest widoczny wyłącznie dla Administratora oraz zatwierdzonych Moderatorów.")
+            
+            # Formularz wysyłania wiadomości na czacie staffu
+            with st.form("staff_chat_form", clear_on_submit=True):
+                role_label = "Admin" if is_admin else "Moderator"
+                staff_nick = user_saved_nick if user_saved_nick else f"User_{current_user[:6]}"
+                
+                chat_msg = st.text_input(f"Wiadomość jako **{staff_nick} ({role_label})**:", placeholder="Wpisz tajną wiadomość do ekipy...")
+                send_chat = st.form_submit_button("🚀 Wyślij do Staffu")
+                
+                if send_chat and chat_msg.strip():
+                    time_stamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
+                    formatted_msg = {
+                        "sender_nick": staff_nick,
+                        "sender_role": role_label,
+                        "time": time_stamp,
+                        "text": chat_msg.strip()
+                    }
+                    current_data = load_global_data()
+                    if "staff_chat" not in current_data:
+                        current_data["staff_chat"] = []
+                    current_data["staff_chat"].append(formatted_msg)
+                    save_global_data(current_data)
+                    st.session_state.global_store = current_data
+                    st.rerun()
+            
+            # Przycisk czyszczenia czatu dedykowany tylko dla Admina
+            if is_admin:
+                if st.button("🗑️ Wyczyść cały Chat Staffu", type="primary", key="clear_staff_chat_btn"):
+                    current_data = load_global_data()
+                    current_data["staff_chat"] = []
+                    save_global_data(current_data)
+                    st.session_state.global_store = current_data
+                    st.toast("Wyczyszczono historię czatu ekipy.")
+                    st.rerun()
+
+            # Wyświetlanie wiadomości z czatu w dedykowanym kontenerze
+            staff_messages = st.session_state.global_store.get("staff_chat", [])
+            st.write(" ")
+            with st.container(height=300):
+                if not staff_messages:
+                    st.caption("Brak wiadomości na kanale staffu. Napisz coś powyżej!")
+                else:
+                    for msg in reversed(staff_messages):
+                        color_role = "#FF4B4B" if msg.get("sender_role") == "Admin" else "#FFA500"
+                        st.markdown(
+                            f"""
+                            <div style="background-color: rgba(255,255,255,0.05); padding: 8px 12px; border-radius: 6px; margin-bottom: 8px; border-left: 4px solid {color_role};">
+                                <span style="color: {color_role}; font-weight: bold;">[{msg.get('sender_role')}] {msg.get('sender_nick')}</span> 
+                                <span style="font-size: 0.8rem; opacity: 0.6; float: right;">{msg.get('time')}</span>
+                                <p style="margin: 4px 0 0 0; font-size: 1rem;">{msg.get('text')}</p>
+                            </div>
+                            """, 
+                            unsafe_allow_html=True
+                        )
 
     # --- TABLICA OGŁOSZEŃ ---
     st.write("---")
@@ -537,7 +608,7 @@ with col_like2:
 
 st.write(" ")
 
-# --- PANEL PERSONALIZACJI WYGLĄDU (3 KWADRATY) ---
+# --- PANEL PERSONALIZACJI WYGLĄDU ---
 with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
     st.subheader("Twoje własne ustawienia kolorów")
     
