@@ -227,6 +227,8 @@ def clean_txt(t):
     z = {'Ą': 'A', 'Ć': 'C', 'Ę': 'E', 'Ł': 'L', 'Ń': 'N', 'Ó': 'O', 'Ś': 'S', 'Ź': 'Z', 'Ż': 'Z'}
     t = t.upper()
     for k, v in z.items(): t = t.replace(k, v)
+    # Automatyczna zamiana J na I
+    t = t.replace('J', 'I')
     return re.sub(r'[^A-Z ]', '', t)
 
 def enc_v1(l):
