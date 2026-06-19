@@ -448,7 +448,7 @@ with c1:
                         "time": time_stamp,
                         "text": chat_msg.strip(),
                         "bar_color": staff_bar_color,
-                        "author_key": current_user  # Zapisujemy, kto wysłał wiadomość na czacie
+                        "author_key": current_user  
                     }
                     current_data = load_global_data()
                     if "staff_chat" not in current_data:
@@ -464,15 +464,11 @@ with c1:
                 if not staff_messages:
                     st.caption("Brak wiadomości na kanale staffu. Napisz coś powyżej!")
                 else:
-                    # Wyświetlamy wiadomości od najnowszych na górze
                     for idx_reversed, msg in enumerate(reversed(staff_messages)):
-                        # Wyliczamy oryginalny indeks z listy w pliku JSON
                         original_idx = len(staff_messages) - 1 - idx_reversed
                         
                         fallback_color = "#FF4B4B" if msg.get("sender_role") == "Admin" else "#FFA500"
                         current_bar_color = msg.get("bar_color", fallback_color)
-                        
-                        # Sprawdzamy, czy aktualnie zalogowany użytkownik jest twórcą wiadomości
                         is_my_own_message = (msg.get("author_key") == current_user)
                         
                         ch_col1, ch_col2 = st.columns([4.6, 1.4])
@@ -488,7 +484,6 @@ with c1:
                                 unsafe_allow_html=True
                             )
                         with ch_col2:
-                            # Przycisk usuwania pojawia się TYLKO dla autora wiadomości
                             if is_my_own_message:
                                 if st.button("❌ Usuń własną", key=f"del_staff_msg_{original_idx}", type="primary", use_container_width=True):
                                     current_data = load_global_data()
@@ -708,7 +703,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                 
         if is_root_admin:
             with adm_tabs[1]:
-                st.caption("Dodaj lub usuń uprawnienia dodatkowego administratora (Opcja dostępna wyłącznie dla Właściciela):")
+                st.caption("Dodaj lub usuń uprawnienia dodatkowego administratora (Opcja dostępna wyłącznie dla Właścineila):")
                 current_admins = st.session_state.global_store.get("admins", [])
                 
                 with st.form("add_admin_form", clear_on_submit=True):
@@ -830,7 +825,18 @@ with st.form("comment_form", clear_on_submit=True):
     
     if wyslij and komentarz_tekst.strip():
         podpis = nick.strip() if nick.strip() else "Anonim"
-        nowy_komentarz_tekst = f"**{podpis}** | {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}:\n{komentarz_tekst.strip()}"
+        
+        # Ustalamy tekstową etykietę rangi bazując wyłącznie na zalogowanym identyfikatorze (author_key)
+        ranga_label = ""
+        if st.session_state.user_author_key == "admin":
+            ranga_label = " Właściciel"
+        elif st.session_state.user_author_key in st.session_state.global_store.get("admins", []):
+            ranga_label = " Admin"
+        elif st.session_state.user_author_key in st.session_state.global_store.get("moderators", []):
+            ranga_label = " Moderator"
+            
+        # Zapisujemy sformatowaną treść komentarza z jawną etykietą bez nawiasów
+        nowy_komentarz_tekst = f"**{podpis}{ranga_label}** | {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}:\n{komentarz_tekst.strip()}"
         
         nowy_komentarz_obj = {
             "text": nowy_komentarz_tekst,
