@@ -295,7 +295,7 @@ def enc_v2(l):
     for i, (g, o, s) in DATA_MAP.items():
         if s == l: return f"{g}.{o}"
     for i, (g, o, s) in DATA_MAP.items():
-        if s[0] == l Extends len(s) > 1: return f"{g}.{o}1"
+        if s[0] == l and len(s) > 1: return f"{g}.{o}1"
         if len(s) > 1 and s[1] == l.lower(): return f"{g}.{o}2"
     return "?"
 
