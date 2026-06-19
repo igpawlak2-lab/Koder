@@ -92,9 +92,9 @@ if "user_author_key" not in st.session_state:
 
 current_user = st.session_state.user_author_key
 
-# --- LOGIKA RANGI (ROZDZIELENIE UPRAWNIEŃ) ---
-is_root_admin = (current_user == "admin")  # Główny założyciel
-is_promoted_admin = (current_user in st.session_state.global_store.get("admins", [])) # Admin z nadania
+# --- LOGIKA RANGI ---
+is_root_admin = (current_user == "admin")  
+is_promoted_admin = (current_user in st.session_state.global_store.get("admins", [])) 
 is_admin = is_root_admin or is_promoted_admin
 
 is_moderator = (current_user in st.session_state.global_store.get("moderators", []))
@@ -447,7 +447,8 @@ with c1:
                         "sender_role": role_label,
                         "time": time_stamp,
                         "text": chat_msg.strip(),
-                        "bar_color": staff_bar_color
+                        "bar_color": staff_bar_color,
+                        "author_key": current_user  # Zapisujemy, kto wysłał wiadomość na czacie
                     }
                     current_data = load_global_data()
                     if "staff_chat" not in current_data:
@@ -456,36 +457,46 @@ with c1:
                     save_global_data(current_data)
                     st.session_state.global_store = current_data
                     st.rerun()
-            
-            if is_admin:
-                if st.button("🗑️ Wyczyść cały Chat Staffu", type="primary", key="clear_staff_chat_btn"):
-                    current_data = load_global_data()
-                    current_data["staff_chat"] = []
-                    save_global_data(current_data)
-                    st.session_state.global_store = current_data
-                    st.toast("Wyczyszczono historię czatu ekipy.")
-                    st.rerun()
 
             staff_messages = st.session_state.global_store.get("staff_chat", [])
             st.write(" ")
-            with st.container(height=300):
+            with st.container(height=320):
                 if not staff_messages:
                     st.caption("Brak wiadomości na kanale staffu. Napisz coś powyżej!")
                 else:
-                    for msg in reversed(staff_messages):
+                    # Wyświetlamy wiadomości od najnowszych na górze
+                    for idx_reversed, msg in enumerate(reversed(staff_messages)):
+                        # Wyliczamy oryginalny indeks z listy w pliku JSON
+                        original_idx = len(staff_messages) - 1 - idx_reversed
+                        
                         fallback_color = "#FF4B4B" if msg.get("sender_role") == "Admin" else "#FFA500"
                         current_bar_color = msg.get("bar_color", fallback_color)
                         
-                        st.markdown(
-                            f"""
-                            <div style="background-color: rgba(255,255,255,0.05); padding: 8px 12px; border-radius: 6px; margin-bottom: 8px; border-left: 4px solid {current_bar_color};">
-                                <span style="color: {current_bar_color}; font-weight: bold;">[{msg.get('sender_role')}] {msg.get('sender_nick')}</span> 
-                                <span style="font-size: 0.8rem; opacity: 0.6; float: right;">{msg.get('time')}</span>
-                                <p style="margin: 4px 0 0 0; font-size: 1rem;">{msg.get('text')}</p>
-                            </div>
-                            """, 
-                            unsafe_allow_html=True
-                        )
+                        # Sprawdzamy, czy aktualnie zalogowany użytkownik jest twórcą wiadomości
+                        is_my_own_message = (msg.get("author_key") == current_user)
+                        
+                        ch_col1, ch_col2 = st.columns([4.6, 1.4])
+                        with ch_col1:
+                            st.markdown(
+                                f"""
+                                <div style="background-color: rgba(255,255,255,0.05); padding: 8px 12px; border-radius: 6px; margin-bottom: 8px; border-left: 4px solid {current_bar_color};">
+                                    <span style="color: {current_bar_color}; font-weight: bold;">[{msg.get('sender_role')}] {msg.get('sender_nick')}</span> 
+                                    <span style="font-size: 0.8rem; opacity: 0.6; float: right;">{msg.get('time')}</span>
+                                    <p style="margin: 4px 0 0 0; font-size: 1rem;">{msg.get('text')}</p>
+                                </div>
+                                """, 
+                                unsafe_allow_html=True
+                            )
+                        with ch_col2:
+                            # Przycisk usuwania pojawia się TYLKO dla autora wiadomości
+                            if is_my_own_message:
+                                if st.button("❌ Usuń własną", key=f"del_staff_msg_{original_idx}", type="primary", use_container_width=True):
+                                    current_data = load_global_data()
+                                    if original_idx < len(current_data["staff_chat"]):
+                                        current_data["staff_chat"].pop(original_idx)
+                                        save_global_data(current_data)
+                                        st.session_state.global_store = current_data
+                                        st.rerun()
 
     # --- TABLICA OGŁOSZEŃ ---
     st.write("---")
@@ -639,18 +650,16 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                 save_global_data(st.session_state.global_store)
                 st.rerun()
 
-    # --- PANEL UPRAWNIEŃ (ROZDZIELENIE WŁADZY) ---
+    # --- PANEL UPRAWNIEŃ ---
     if is_admin:
         st.write("---")
         st.subheader("👑 Panel Admina: Zarządzanie uprawnieniami")
         
-        # Warunkowe generowanie zakładek: Tylko Root widzi zakładkę zarządzania adminami
         if is_root_admin:
             adm_tabs = st.tabs(["👥 Zarządzanie Moderatorami", "🛡️ Zarządzanie Administratorami"])
         else:
-            adm_tabs = [st.container()] # Zwykły admin ma tylko kontener / dostęp bezpośredni do moderatorów
+            adm_tabs = [st.container()] 
             
-        # ZAKŁADKA 1: Zarządzanie Moderatorami (Dostępna dla Root Admina ORAZ Adminów z nadania)
         with adm_tabs[0]:
             if not is_root_admin:
                 st.markdown("### 👥 Zarządzanie Moderatorami")
@@ -697,7 +706,6 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
             else:
                 st.caption("Brak przypisanych moderatorów.")
                 
-        # ZAKŁADKA 2: Zarządzanie Administratorami (Widoczna i dostępna TYLKO dla Root Admina)
         if is_root_admin:
             with adm_tabs[1]:
                 st.caption("Dodaj lub usuń uprawnienia dodatkowego administratora (Opcja dostępna wyłącznie dla Właściciela):")
