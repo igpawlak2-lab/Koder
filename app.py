@@ -75,7 +75,7 @@ if current_user not in st.session_state.global_store["user_data"]:
         "saved_nick": "",
         "theme_color": "#1E90FF",      # Domyślny niebieski dla opcji aktywnej
         "bg_color": "#FFFFFF",         # Domyślne jasne tło aplikacji
-        "clear_btn_color": "#5cb85c"   # Domyślny zielony dla przycisku czyszczenia
+        "clear_btn_color": "#5cb85c"   # Domyślny zielony dla przycisku czyszczenia i akcji destrukcyjnych
     }
     save_global_data(st.session_state.global_store)
 
@@ -159,8 +159,19 @@ st.markdown(f"""
             color: {text_color} !important;
         }}
         
-        /* Personalizacja przycisku Usuwania/Czyszczenia historii */
-        button[id^="wyczyść-historię-operacji"], div.stButton > button[type="primary"] {{
+        /* NAPRAWA: Zmiana koloru małych kropek radiowych wewnątrz zaznaczonych elementów */
+        div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label:has(input:checked) span[data-testid="stRadioButtonToogleChecked"] {{
+            background-color: {text_color} !important;
+            border-color: {text_color} !important;
+        }}
+        div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label span[data-testid="stRadioButtonToogleChecked"]::after {{
+            background-color: {theme_color} !important;
+        }}
+
+        /* Personalizacja przycisku Usuwania, Czyszczenia historii oraz Cofnięcia Polubienia */
+        button[id^="wyczyść-historię-operacji"], 
+        div.stButton > button[type="primary"],
+        button[key="btn_unlike_page"] {{
             background-color: {clear_btn_color} !important;
             color: {clear_btn_text_color} !important;
             border: none !important;
@@ -168,7 +179,9 @@ st.markdown(f"""
             font-weight: bold !important;
             transition: opacity 0.2s;
         }}
-        button[id^="wyczyść-historię-operacji"]:hover, div.stButton > button[type="primary"]:hover {{
+        button[id^="wyczyść-historię-operacji"]:hover, 
+        div.stButton > button[type="primary"]:hover,
+        button[key="btn_unlike_page"]:hover {{
             opacity: 0.9 !important;
         }}
         
@@ -424,7 +437,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
     
     cc_col1, cc_col2, cc_col3 = st.columns(3)
     with cc_col1:
-        chosen_color = st.color_picker("Aktywny przycisk wyboru:", value=theme_color)
+        chosen_color = st.color_picker("Aktywny przycisk wyboru & kropka:", value=theme_color)
         if chosen_color != theme_color:
             st.session_state.global_store["user_data"][current_user]["theme_color"] = chosen_color
             save_global_data(st.session_state.global_store)
@@ -438,14 +451,14 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
             st.rerun()
             
     with cc_col3:
-        chosen_clear_color = st.color_picker("Przycisk czyszczenia historii:", value=clear_btn_color)
+        chosen_clear_color = st.color_picker("Przyciski usuwania i cofnij polubienie:", value=clear_btn_color)
         if chosen_clear_color != clear_btn_color:
             st.session_state.global_store["user_data"][current_user]["clear_btn_color"] = chosen_clear_color
             save_global_data(st.session_state.global_store)
             st.rerun()
 
     st.write("---")
-    st.write("**Twój unikalny klucz konta:**")
+    st.write("**Twój unikalny klucz konto:**")
     st.code(st.session_state.user_author_key, language="text")
     
     current_nick_val = st.session_state.global_store["user_data"][current_user].get("saved_nick", "")
