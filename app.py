@@ -73,9 +73,9 @@ if current_user not in st.session_state.global_store["user_data"]:
         "notepad": "", 
         "has_liked": False, 
         "saved_nick": "",
-        "theme_color": "#1E90FF",      # Domyślny niebieski dla opcji aktywnej
-        "bg_color": "#FFFFFF",         # Domyślne jasne tło aplikacji
-        "clear_btn_color": "#5cb85c"   # Domyślny zielony dla przycisku czyszczenia i akcji destrukcyjnych
+        "theme_color": "#1E90FF",      
+        "bg_color": "#FFFFFF",         
+        "clear_btn_color": "#5cb85c"   
     }
     save_global_data(st.session_state.global_store)
 
@@ -118,7 +118,7 @@ text_color = get_contrast_text_color(theme_color)
 clear_btn_text_color = get_contrast_text_color(clear_btn_color)
 main_text_theme = get_contrast_text_color(bg_color)
 
-# --- STYLOWANIE INTERFEJSU (ZAAWANSOWANE CSS DLA WSZYSTKICH KOLORÓW) ---
+# --- STYLOWANIE INTERFEJSU (PANCERNE NAPRAWIONE SELEKTORY CSS) ---
 st.markdown(f"""
     <style>
         /* Dynamiczny kolor tła całej aplikacji oraz dopasowanie koloru głównych tekstów */
@@ -159,7 +159,7 @@ st.markdown(f"""
             color: {text_color} !important;
         }}
         
-        /* NAPRAWA: Zmiana koloru małych kropek radiowych wewnątrz zaznaczonych elementów */
+        /* Zmiana koloru małych kropek radiowych wewnątrz zaznaczonych elementów */
         div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label:has(input:checked) span[data-testid="stRadioButtonToogleChecked"] {{
             background-color: {text_color} !important;
             border-color: {text_color} !important;
@@ -168,21 +168,29 @@ st.markdown(f"""
             background-color: {theme_color} !important;
         }}
 
-        /* Personalizacja przycisku Usuwania, Czyszczenia historii oraz Cofnięcia Polubienia */
-        button[id^="wyczyść-historię-operacji"], 
-        div.stButton > button[type="primary"],
-        button[key="btn_unlike_page"] {{
+        /* NAPRAWA: Całkowite wymuszenie koloru dla przycisku Historii, Cofnięcia polubienia oraz Usuwania komentarzy */
+        div.stButton > button[type="primary"], 
+        div[data-testid="stColumn"] + div.stButton > button,
+        .stApp button:has(div:contains("Cofnij polubienie")),
+        .stApp button:has(div:contains("Wyczyść historię")),
+        .stApp button:has(div:contains("Usuń")) {{
             background-color: {clear_btn_color} !important;
             color: {clear_btn_text_color} !important;
-            border: none !important;
+            border: 2px solid {clear_btn_color} !important;
             border-radius: 8px !important;
             font-weight: bold !important;
-            transition: opacity 0.2s;
+            box-shadow: 0px 2px 5px rgba(0,0,0,0.1);
+            transition: all 0.2s ease-in-out;
         }}
-        button[id^="wyczyść-historię-operacji"]:hover, 
-        div.stButton > button[type="primary"]:hover,
-        button[key="btn_unlike_page"]:hover {{
-            opacity: 0.9 !important;
+        
+        /* Efekt najechania i aktywacji przycisków akcji */
+        .stApp button:has(div:contains("Cofnij polubienie")):hover,
+        .stApp button:has(div:contains("Wyczyść historię")):hover,
+        .stApp button:has(div:contains("Usuń")):hover,
+        div.stButton > button[type="primary"]:hover {{
+            opacity: 0.85 !important;
+            transform: scale(1.01);
+            border-color: {clear_btn_color} !important;
         }}
         
         /* Obramowanie kontenerów bocznych */
@@ -458,7 +466,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
             st.rerun()
 
     st.write("---")
-    st.write("**Twój unikalny klucz konto:**")
+    st.write("**Twój unikalny klucz konta:**")
     st.code(st.session_state.user_author_key, language="text")
     
     current_nick_val = st.session_state.global_store["user_data"][current_user].get("saved_nick", "")
