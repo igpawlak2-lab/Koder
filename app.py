@@ -17,14 +17,14 @@ def load_global_data():
         "likes": 0, 
         "comments": [], 
         "user_data": {}, 
-        "moderators": [],                       # Nowa lista przechowująca klucze moderatorów
+        "moderators": [],                       # Lista przechowująca klucze moderatorów nadanych przez Admina
         "announcement": "Brak aktualnych ogłoszeń.",
         "announcement_font": "sans-serif",
         "announcement_size": 16,
-        "announcement_bg_color": "#e7f3fe",     # Globalny domyślny kolor tła tablicy
-        "default_theme_color": "#1E90FF",      # Globalny domyślny kolor wyboru
-        "default_bg_color": "#FFFFFF",         # Globalny domyślny kolor tła
-        "default_clear_btn_color": "#5cb85c"   # Globalny domyślny kolor akcji
+        "announcement_bg_color": "#e7f3fe",     
+        "default_theme_color": "#1E90FF",      
+        "default_bg_color": "#FFFFFF",         
+        "default_clear_btn_color": "#5cb85c"   
     }
     if os.path.exists(DATA_FILE):
         try:
@@ -88,10 +88,10 @@ if "user_author_key" not in st.session_state:
 
 current_user = st.session_state.user_author_key
 
-# Rangi i uprawnienia (sprawdzanie sztywnego klucza oraz dynamicznej listy z bazy danych)
+# --- POPRAWIONA LOGIKA RANGI (Klucz "moderator" nie jest już uprzywilejowany) ---
 is_admin = (current_user == "admin")
-is_moderator = (current_user == "moderator" or current_user in st.session_state.global_store.get("moderators", []))
-is_staff = is_admin or is_moderator  # Wspólna zmienna dla obsługi (Admin + Moderator)
+is_moderator = (current_user in st.session_state.global_store.get("moderators", []))
+is_staff = is_admin or is_moderator  
 
 # Upewniamy się, że w strukturze bazy istnieje profil dla aktualnego użytkownika
 if "user_data" not in st.session_state.global_store:
@@ -407,7 +407,7 @@ with c1:
             save_global_data(st.session_state.global_store)
             st.rerun()
 
-    # --- TABLICA OGŁOSZEŃ (Z PERSONALIZACJĄ TEKSTU I TŁA) ---
+    # --- TABLICA OGŁOSZEŃ ---
     st.write("---")
     st.subheader("📢 Tablica Ogłoszeń")
     
@@ -563,7 +563,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
             save_global_data(st.session_state.global_store)
             st.rerun()
 
-    # --- PANEL ADMINA: MOTYW STARTOWY ORAZ ZARZĄDZANIE MODERATORAMI ---
+    # --- PANEL ADMINA ---
     if is_admin:
         st.write("---")
         st.subheader("👑 Panel Admina: Zarządzanie Moderatorami")
@@ -571,7 +571,6 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
         
         current_mods = st.session_state.global_store.get("moderators", [])
         
-        # Formularz dodawania nowego moderatora
         with st.form("add_moderator_form", clear_on_submit=True):
             mod_key_input = st.text_input("Wklej klucz konta, które chcesz awansować na Moderatora:", placeholder="usr_...")
             submit_mod = st.form_submit_button("➕ Nadaj uprawnienia moderatora")
@@ -592,13 +591,11 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                     st.success(f"Pomyślnie nadano uprawnienia moderatora dla klucza: {target_key}")
                     st.rerun()
                     
-        # Wyświetlanie aktualnej listy moderatorów z opcją odebrania uprawnień
         if current_mods:
             st.write("**Aktualna lista przypisanych moderatorów:**")
             for m_idx, m_key in enumerate(current_mods):
                 m_col1, m_col2 = st.columns([4.0, 2.0])
                 with m_col1:
-                    # Wyciągamy nick użytkownika, jeśli istnieje w bazie, dla łatwiejszej identyfikacji
                     u_nick = st.session_state.global_store["user_data"].get(m_key, {}).get("saved_nick", "")
                     display_text = f"🔑 `{m_key}`" + (f" (Podpis: **{u_nick}**)" if u_nick else "")
                     st.markdown(display_text)
@@ -612,7 +609,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                             st.toast(f"Odebrano uprawnienia dla {m_key}")
                             st.rerun()
         else:
-            st.caption("Brak przypisanych moderatorów z poziomu panelu (oprócz domyślnego sztywnego klucza 'moderator').")
+            st.caption("Brak przypisanych moderatorów.")
 
         st.write("---")
         st.subheader("🎨 Panel Admina: Domyślny motyw startowy")
