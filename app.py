@@ -45,7 +45,7 @@ def load_global_data():
                 if "default_bg_color" not in data: data["default_bg_color"] = "#FFFFFF"
                 if "default_clear_btn_color" not in data: data["default_clear_btn_color"] = "#5cb85c"
                 
-                # Pancerna konwersja starych komentarzy
+                # Konwersja starych komentarzy
                 migrated_comments = []
                 for c in data["comments"]:
                     if isinstance(c, dict) and "text" in c:
@@ -73,7 +73,7 @@ def save_global_data(data):
 if "global_store" not in st.session_state:
     st.session_state.global_store = load_global_data()
 
-# Pobieranie domyślnych kolorów startowych z pliku JSON (dla nowych kont)
+# Pobieranie domyślnych kolorów startowych z pliku JSON
 def_theme = st.session_state.global_store.get("default_theme_color", "#1E90FF")
 def_bg = st.session_state.global_store.get("default_bg_color", "#FFFFFF")
 def_clear = st.session_state.global_store.get("default_clear_btn_color", "#5cb85c")
@@ -136,13 +136,13 @@ if "staff_bar_color" not in user_profile:
 if updated_profile:
     save_global_data(st.session_state.global_store)
 
-# Wyciągamy spersonalizowane kolory przypisane do danego profilu (wczytane z bazy)
+# Wyciągamy spersonalizowane kolory przypisane do danego profilu
 theme_color = user_profile.get("theme_color", "#1E90FF")
 bg_color = user_profile.get("bg_color", "#FFFFFF")
 clear_btn_color = user_profile.get("clear_btn_color", "#5cb85c")
 staff_bar_color = user_profile.get("staff_bar_color", "#FF4B4B" if is_admin else "#FFA500")
 
-# Funkcja pomocnicza do obliczania kontrastu tekstu (czarny lub biały)
+# Funkcja pomocnicza do obliczania kontrastu tekstu
 def get_contrast_text_color(hex_color):
     hex_color = hex_color.lstrip('#')
     try:
@@ -440,7 +440,7 @@ with c1:
                         "sender_role": role_label,
                         "time": time_stamp,
                         "text": chat_msg.strip(),
-                        "bar_color": staff_bar_color # Zapisujemy unikalny kolor paska nadawcy wraz z nowym wpisem
+                        "bar_color": staff_bar_color
                     }
                     current_data = load_global_data()
                     if "staff_chat" not in current_data:
@@ -466,7 +466,6 @@ with c1:
                     st.caption("Brak wiadomości na kanale staffu. Napisz coś powyżej!")
                 else:
                     for msg in reversed(staff_messages):
-                        # Jeśli stara wiadomość w bazie nie ma jeszcze przypisanego koloru paska, nadajemy domyślny
                         fallback_color = "#FF4B4B" if msg.get("sender_role") == "Admin" else "#FFA500"
                         current_bar_color = msg.get("bar_color", fallback_color)
                         
@@ -598,7 +597,6 @@ st.write(" ")
 with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
     st.subheader("Twoje własne ustawienia kolorów")
     
-    # Dynamiczny podział na 3 lub 4 kolumny w zależności od tego, czy użytkownik jest staffem i potrzebuje wyboru paska czatu
     if is_staff:
         cc_col1, cc_col2, cc_col3, cc_col4 = st.columns(4)
     else:
@@ -626,7 +624,6 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
             save_global_data(st.session_state.global_store)
             st.rerun()
             
-    # NOWOŚĆ: Wybór koloru paska dla zalogowanego Administratora lub Moderatora
     if cc_col4 and is_staff:
         with cc_col4:
             chosen_bar_color = st.color_picker("Twój pasek na czacie:", value=staff_bar_color, key="user_staff_bar_picker")
