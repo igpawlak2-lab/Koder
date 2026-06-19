@@ -9,11 +9,12 @@ import streamlit.components.v1 as components
 # Czysty interfejs aplikacji
 st.set_page_config(page_title="Koder", page_icon="📟", layout="wide")
 
-# --- GLOBALNY PLIK JSON (POLUBIENIA I KOMENTARZE STRUKTURALNE) ---
+# --- GLOBALNY PLIK JSON (STRUKTURA DANYCH DLA WSZYSTKICH KONT) ---
 DATA_FILE = "dane_aplikacji.json"
 
 def load_global_data():
-    default_data = {"likes": 0, "comments": []}
+    # Rozbudowana domyślna struktura bazy danych
+    default_data = {"likes": 0, "comments": [], "user_data": {}}
     if os.path.exists(DATA_FILE):
         try:
             with open(DATA_FILE, "r", encoding="utf-8") as f:
@@ -21,8 +22,9 @@ def load_global_data():
                 if not isinstance(data, dict): return default_data
                 if "likes" not in data: data["likes"] = 0
                 if "comments" not in data: data["comments"] = []
+                if "user_data" not in data: data["user_data"] = {}
                 
-                # Pancerna konwersja starych komentarzy na format słownikowy
+                # Pancerna konwersja starych komentarzy
                 migrated_comments = []
                 for c in data["comments"]:
                     if isinstance(c, dict) and "text" in c:
@@ -46,23 +48,12 @@ def save_global_data(data):
     except:
         pass
 
+# Inicjalizacja głównego magazynu w stanie sesji
 if "global_store" not in st.session_state:
     st.session_state.global_store = load_global_data()
 
-# --- PRYWATNE WCZYTYWANIE Z PARAMS URL ---
-params = st.query_params
-
-if "personal_history" not in st.session_state:
-    if "h" in params:
-        try: st.session_state.personal_history = json.loads(params["h"])
-        except: st.session_state.personal_history = []
-    else:
-        st.session_state.personal_history = []
-
-if "personal_notepad" not in st.session_state:
-    st.session_state.personal_notepad = params.get("n", "")
-
 # --- BEZPIECZNE GENEROWANIE I SYNCHRONIZACJA KLUCZA KONTA ---
+params = st.query_params
 if "user_author_key" not in st.session_state:
     url_key = params.get("ak", "")
     if url_key:
@@ -70,6 +61,16 @@ if "user_author_key" not in st.session_state:
     else:
         st.session_state.user_author_key = f"usr_{uuid.uuid4().hex[:16]}"
         st.query_params["ak"] = st.session_state.user_author_key
+
+current_user = st.session_state.user_author_key
+
+# Upewniamy się, że w strukturze bazy istnieje profil dla aktualnego użytkownika
+if "user_data" not in st.session_state.global_store:
+    st.session_state.global_store["user_data"] = {}
+
+if current_user not in st.session_state.global_store["user_data"]:
+    st.session_state.global_store["user_data"][current_user] = {"history": [], "notepad": ""}
+    save_global_data(st.session_state.global_store)
 
 # --- STYLOWANIE INTERFEJSU (CSS) ---
 st.markdown("""
@@ -231,6 +232,10 @@ components.html(
     """, height=0, width=0
 )
 
+# Pobieranie historii i notatnika przypisanych do bieżącego konta z bazy JSON
+user_history = st.session_state.global_store["user_data"][current_user].get("history", [])
+user_notepad_content = st.session_state.global_store["user_data"][current_user].get("notepad", "")
+
 c1, c2 = st.columns([1.6, 1.4])
 with c1:
     st.subheader("Panel Sterowania")
@@ -263,73 +268,46 @@ with c1:
             st.caption("📋 Kliknij ikonę po prawej stronie bloku, aby skopiować kod wraz z indeksami:")
             st.code(res_display, language="text")
         
-        entry = f"[{datetime.datetime.now().strftime('%H:%M:%S')}] {proto} ({mode}): {txt} -> {res_display}"
+        h_time = datetime.datetime.now().strftime('%H:%M:%S')
+        entry = f"{h_time} | {proto} | {mode}: {txt} -> {res_display}"
         
-        if not st.session_state.personal_history or st.session_state.personal_history[0] != entry:
-            st.session_state.personal_history.insert(0, entry)
-            st.query_params["h"] = json.dumps(st.session_state.personal_history)
+        if not user_history or user_history[0] != entry:
+            user_history.insert(0, entry)
+            st.session_state.global_store["user_data"][current_user]["history"] = user_history
+            save_global_data(st.session_state.global_store)
+            st.rerun()
 
 with c2:
-    st.subheader("Historia operacji (Tylko Twoja)")
+    st.subheader("Historia operacji")
     
     if st.button("🗑️ Wyczyść historię operacji", type="primary"):
-        st.session_state.personal_history = []
-        st.query_params["h"] = json.dumps([])
+        st.session_state.global_store["user_data"][current_user]["history"] = []
+        save_global_data(st.session_state.global_store)
         st.rerun()
     
     with st.container(height=240):
-        if not st.session_state.personal_history:
+        if not user_history:
             st.caption("Brak Twoich ostatnich operacji. Wpisz coś po lewej stronie.")
         else:
-            for item in st.session_state.personal_history: 
+            for item in user_history: 
                 st.code(item, language="text")
 
     st.write(" ")
     st.subheader("📝 Twój Prywatny Notatnik")
     
-    if not st.session_state.personal_notepad:
-        components.html(
-            """
-            <script>
-                var savedNote = localStorage.getItem("koder_notepad_backup");
-                if (savedNote && savedNote !== "null") {
-                    var currentUrl = new URL(window.parent.location.href);
-                    if (!currentUrl.searchParams.get("n")) {
-                        currentUrl.searchParams.set("n", savedNote);
-                        window.parent.location.href = currentUrl.href;
-                    }
-                }
-            </script>
-            """, height=0, width=0
-        )
-
     def save_notepad_instantly():
         if "local_notepad_field" in st.session_state:
             val = st.session_state.local_notepad_field
-            st.session_state.personal_notepad = val
-            st.query_params["n"] = val
+            st.session_state.global_store["user_data"][current_user]["notepad"] = val
+            save_global_data(st.session_state.global_store)
 
     note_input = st.text_area(
-        "Zapisz swoje uwagi (Tekst zapisuje się automatycznie w pamięci przeglądarki):",
-        value=st.session_state.personal_notepad,
+        "Zapisz swoje uwagi:",
+        value=user_notepad_content,
         placeholder="Wpisz notatki, kody lub sekwencje...",
         height=180,
         key="local_notepad_field",
         on_change=save_notepad_instantly
-    )
-    
-    components.html(
-        f"""
-        <script>
-            var textareas = window.parent.document.querySelectorAll("textarea");
-            if(textareas.length > 0) {{
-                var ta = textareas[0];
-                ta.addEventListener('input', function(e) {{
-                    localStorage.setItem("koder_notepad_backup", e.target.value);
-                }});
-            }}
-        </script>
-        """, height=0, width=0
     )
 
 # --- SEKCJA GLOBALNYCH POLUBIEŃ I KOMENTARZY (DLA WSZYSTKICH) ---
@@ -361,19 +339,24 @@ with col_like2:
 st.write(" ")
 
 # --- PANEL PROSTEGO PROFILU (ZAKORZENIENIE KONTA) ---
-with st.expander("🔑 Zarządzanie Twoim Identyfikatorem (Opcje konta)"):
+with st.expander("🔑 Zarządzanie Twoim Identyfikatorem"):
     st.write("**Twój aktualny klucz konta:**")
     st.code(st.session_state.user_author_key, language="text")
-    st.caption("Skopiuj powyższy klucz, jeśli chcesz zalogować się na to samo konto np. na telefonie.")
     
     with st.form("account_key_form"):
-        new_key = st.text_input("Wklej klucz z innego urządzenia, aby zmienić konto:")
+        new_key = st.text_input("Zmień konto na inne:")
         submit_change = st.form_submit_button("Zmień klucz konta")
         
         if submit_change and new_key.strip():
             clean_key = new_key.strip()
             st.session_state.user_author_key = clean_key
             st.query_params["ak"] = clean_key
+            
+            # Tworzymy czysty profil w bazie, jeśli klucz logowania pojawia się po raz pierwszy
+            if clean_key not in st.session_state.global_store["user_data"]:
+                st.session_state.global_store["user_data"][clean_key] = {"history": [], "notepad": ""}
+                save_global_data(st.session_state.global_store)
+                
             components.html(
                 f"""
                 <script>
@@ -394,7 +377,7 @@ with st.form("comment_form", clear_on_submit=True):
     
     if wyslij and komentarz_tekst.strip():
         podpis = nick.strip() if nick.strip() else "Anonim"
-        nowy_komentarz_tekst = f"**{podpis}** ({datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}):\n{komentarz_tekst.strip()}"
+        nowy_komentarz_tekst = f"**{podpis}** | {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}:\n{komentarz_tekst.strip()}"
         
         nowy_komentarz_obj = {
             "text": nowy_komentarz_tekst,
@@ -409,7 +392,7 @@ with st.form("comment_form", clear_on_submit=True):
 
 comments_list = st.session_state.global_store.get("comments", [])
 if comments_list:
-    st.write("**Ostatnie komentarze (widoczne dla wszystkich):**")
+    st.write("**Ostatnie komentarze:**")
     for idx, com in enumerate(comments_list):
         cc1, cc2 = st.columns([4.8, 1.2])
         with cc1:
@@ -417,7 +400,6 @@ if comments_list:
         with cc2:
             my_key = st.session_state.user_author_key
             
-            # Warunek 1: Użytkownik jest adminem -> może usunąć KAŻDY komentarz
             if is_admin:
                 if st.button("🗑️ Usuń (ADMIN)", key=f"del_com_{idx}", type="primary", use_container_width=True):
                     current_data = load_global_data()
@@ -427,7 +409,6 @@ if comments_list:
                         st.session_state.global_store = current_data
                         st.rerun()
             
-            # Warunek 2: Zwykły użytkownik -> widzi przycisk tylko przy swoim komentarzu
             elif com.get("author_key") == my_key and my_key not in ["", "anonymous", "legacy"]:
                 if st.button("❌ Usuń", key=f"del_com_{idx}", type="primary", use_container_width=True):
                     current_data = load_global_data()
