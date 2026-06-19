@@ -13,7 +13,6 @@ st.set_page_config(page_title="Koder", page_icon="📟", layout="wide")
 DATA_FILE = "dane_aplikacji.json"
 
 def load_global_data():
-    # Rozbudowana domyślna struktura bazy danych
     default_data = {"likes": 0, "comments": [], "user_data": {}}
     if os.path.exists(DATA_FILE):
         try:
@@ -69,7 +68,7 @@ if "user_data" not in st.session_state.global_store:
     st.session_state.global_store["user_data"] = {}
 
 if current_user not in st.session_state.global_store["user_data"]:
-    st.session_state.global_store["user_data"][current_user] = {"history": [], "notepad": ""}
+    st.session_state.global_store["user_data"][current_user] = {"history": [], "notepad": "", "has_liked": False}
     save_global_data(st.session_state.global_store)
 
 # --- STYLOWANIE INTERFEJSU (CSS) ---
@@ -209,8 +208,6 @@ def dec_v2(s):
     except ValueError: pass
     return "?"
 
-if "has_liked" not in st.session_state: st.session_state.has_liked = False
-
 st.title("📟 KODER")
 st.write("Uniwersalny system kodowania i dekodowania tekstu.")
 
@@ -232,9 +229,10 @@ components.html(
     """, height=0, width=0
 )
 
-# Pobieranie historii i notatnika przypisanych do bieżącego konta z bazy JSON
+# Pobieranie spersonalizowanych danych użytkownika z globalnej bazy JSON
 user_history = st.session_state.global_store["user_data"][current_user].get("history", [])
 user_notepad_content = st.session_state.global_store["user_data"][current_user].get("notepad", "")
+user_has_liked = st.session_state.global_store["user_data"][current_user].get("has_liked", False)
 
 c1, c2 = st.columns([1.6, 1.4])
 with c1:
@@ -310,27 +308,26 @@ with c2:
         on_change=save_notepad_instantly
     )
 
-# --- SEKCJA GLOBALNYCH POLUBIEŃ I KOMENTARZY (DLA WSZYSTKICH) ---
+# --- SEKCJA GLOBALNYCH POLUBIEŃ I KOMENTARZY (PRZYPISANE DO KONT) ---
 st.write("---")
 st.subheader("💬 Opinie użytkowników")
 
 col_like1, col_like2 = st.columns([1.5, 5])
 with col_like1:
-    if not st.session_state.has_liked:
+    if not user_has_liked:
         if st.button("👍 Polub stronę", key="btn_like_page"):
-            current_data = load_global_data()
-            current_data["likes"] += 1
-            save_global_data(current_data)
-            st.session_state.global_store = current_data
-            st.session_state.has_liked = True
+            st.session_state.global_store["user_data"][current_user]["has_liked"] = True
+            # Przeliczenie całkowitej sumy polubień na podstawie aktywnych profili
+            total_likes = sum(1 for u in st.session_state.global_store["user_data"].values() if u.get("has_liked", False))
+            st.session_state.global_store["likes"] = total_likes
+            save_global_data(st.session_state.global_store)
             st.rerun()
     else:
         if st.button("❌ Cofnij polubienie", type="primary", key="btn_unlike_page"):
-            current_data = load_global_data()
-            current_data["likes"] = max(0, current_data["likes"] - 1)
-            save_global_data(current_data)
-            st.session_state.global_store = current_data
-            st.session_state.has_liked = False
+            st.session_state.global_store["user_data"][current_user]["has_liked"] = False
+            total_likes = sum(1 for u in st.session_state.global_store["user_data"].values() if u.get("has_liked", False))
+            st.session_state.global_store["likes"] = total_likes
+            save_global_data(st.session_state.global_store)
             st.rerun()
 
 with col_like2:
@@ -352,9 +349,8 @@ with st.expander("🔑 Zarządzanie Twoim Identyfikatorem"):
             st.session_state.user_author_key = clean_key
             st.query_params["ak"] = clean_key
             
-            # Tworzymy czysty profil w bazie, jeśli klucz logowania pojawia się po raz pierwszy
             if clean_key not in st.session_state.global_store["user_data"]:
-                st.session_state.global_store["user_data"][clean_key] = {"history": [], "notepad": ""}
+                st.session_state.global_store["user_data"][clean_key] = {"history": [], "notepad": "", "has_liked": False}
                 save_global_data(st.session_state.global_store)
                 
             components.html(
