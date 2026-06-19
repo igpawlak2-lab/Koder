@@ -19,7 +19,10 @@ def load_global_data():
         "user_data": {}, 
         "announcement": "Brak aktualnych ogłoszeń.",
         "announcement_font": "sans-serif",
-        "announcement_size": 16
+        "announcement_size": 16,
+        "default_theme_color": "#1E90FF",      # Globalny domyślny kolor wyboru
+        "default_bg_color": "#FFFFFF",         # Globalny domyślny kolor tła
+        "default_clear_btn_color": "#5cb85c"   # Globalny domyślny kolor akcji
     }
     if os.path.exists(DATA_FILE):
         try:
@@ -32,6 +35,9 @@ def load_global_data():
                 if "announcement" not in data: data["announcement"] = "Brak aktualnych ogłoszeń."
                 if "announcement_font" not in data: data["announcement_font"] = "sans-serif"
                 if "announcement_size" not in data: data["announcement_size"] = 16
+                if "default_theme_color" not in data: data["default_theme_color"] = "#1E90FF"
+                if "default_bg_color" not in data: data["default_bg_color"] = "#FFFFFF"
+                if "default_clear_btn_color" not in data: data["default_clear_btn_color"] = "#5cb85c"
                 
                 # Pancerna konwersja starych komentarzy
                 migrated_comments = []
@@ -61,6 +67,11 @@ def save_global_data(data):
 if "global_store" not in st.session_state:
     st.session_state.global_store = load_global_data()
 
+# Pobieranie domyślnych kolorów startowych z pliku JSON
+def_theme = st.session_state.global_store.get("default_theme_color", "#1E90FF")
+def_bg = st.session_state.global_store.get("default_bg_color", "#FFFFFF")
+def_clear = st.session_state.global_store.get("default_clear_btn_color", "#5cb85c")
+
 # --- BEZPIECZNE GENEROWANIE I SYNCHRONIZACJA KLUCZA KONTA ---
 params = st.query_params
 if "user_author_key" not in st.session_state:
@@ -78,19 +89,20 @@ is_admin = (current_user == "admin")
 if "user_data" not in st.session_state.global_store:
     st.session_state.global_store["user_data"] = {}
 
+# Jeśli użytkownik wchodzi pierwszy raz – pobiera aktualne dynamiczne wartości od admina
 if current_user not in st.session_state.global_store["user_data"]:
     st.session_state.global_store["user_data"][current_user] = {
         "history": [], 
         "notepad": "", 
         "has_liked": False, 
         "saved_nick": "",
-        "theme_color": "#1E90FF",      
-        "bg_color": "#FFFFFF",         
-        "clear_btn_color": "#5cb85c"
+        "theme_color": def_theme,      
+        "bg_color": def_bg,         
+        "clear_btn_color": def_clear
     }
     save_global_data(st.session_state.global_store)
 
-# Zapewnienie kompatybilności wstecznej dla pól kolorów
+# Zapewnienie kompatybilności wstecznej dla pól kolorów u istniejących użytkowników
 user_profile = st.session_state.global_store["user_data"][current_user]
 updated_profile = False
 
@@ -98,22 +110,22 @@ if "saved_nick" not in user_profile:
     user_profile["saved_nick"] = ""
     updated_profile = True
 if "theme_color" not in user_profile:
-    user_profile["theme_color"] = "#1E90FF"
+    user_profile["theme_color"] = def_theme
     updated_profile = True
 if "bg_color" not in user_profile:
-    user_profile["bg_color"] = "#FFFFFF"
+    user_profile["bg_color"] = def_bg
     updated_profile = True
 if "clear_btn_color" not in user_profile:
-    user_profile["clear_btn_color"] = "#5cb85c"
+    user_profile["clear_btn_color"] = def_clear
     updated_profile = True
 
 if updated_profile:
     save_global_data(st.session_state.global_store)
 
 # Wyciągamy spersonalizowane kolory motywu użytkownika
-theme_color = user_profile.get("theme_color", "#1E90FF")
-bg_color = user_profile.get("bg_color", "#FFFFFF")
-clear_btn_color = user_profile.get("clear_btn_color", "#5cb85c")
+theme_color = user_profile.get("theme_color", def_theme)
+bg_color = user_profile.get("bg_color", def_bg)
+clear_btn_color = user_profile.get("clear_btn_color", def_clear)
 
 # Funkcja pomocnicza do obliczania kontrastu tekstu (czarny lub biały)
 def get_contrast_text_color(hex_color):
@@ -392,12 +404,10 @@ with c1:
     st.write("---")
     st.subheader("📢 Tablica Ogłoszeń")
     
-    # Wyciąganie globalnych parametrów ogłoszenia
     current_announcement = st.session_state.global_store.get("announcement", "Brak aktualnych ogłoszeń.")
     ann_font = st.session_state.global_store.get("announcement_font", "sans-serif")
     ann_size = st.session_state.global_store.get("announcement_size", 16)
     
-    # Wyświetlanie ogłoszenia w dedykowanym stylizowanym kontenerze HTML
     st.markdown(
         f"""
         <div style="
@@ -417,7 +427,6 @@ with c1:
         unsafe_allow_html=True
     )
     
-    # Blok zarządzania ogłoszeniem – dostępny tylko dla administratora
     if is_admin:
         st.caption("🛠️ Panel zarządzania ogłoszeniem (Widoczny tylko dla Admina):")
         
@@ -427,7 +436,6 @@ with c1:
             placeholder="Wpisz nowe ogłoszenie..."
         )
         
-        # Wybór czcionki i rozmiaru w dwóch kolumnach
         f_col1, f_col2 = st.columns(2)
         with f_col1:
             font_options = {
@@ -437,7 +445,6 @@ with c1:
                 "Comic Sans MS": "'Comic Sans MS', cursive",
                 "Impact (Pogrubiona)": "Impact, Charcoal"
             }
-            # Znajdowanie aktualnego indeksu wyboru
             current_font_index = list(font_options.values()).index(ann_font) if ann_font in font_options.values() else 0
             chosen_font_label = st.selectbox("Wybierz krój czcionki:", list(font_options.keys()), index=current_font_index)
             selected_font_value = font_options[chosen_font_label]
@@ -517,28 +524,52 @@ st.write(" ")
 
 # --- PANEL PERSONALIZACJI WYGLĄDU (3 KWADRATY) ---
 with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
-    st.subheader("Ustawienia kolorów aplikacji")
+    st.subheader("Twoje własne ustawienia kolorów")
     
     cc_col1, cc_col2, cc_col3 = st.columns(3)
     with cc_col1:
-        chosen_color = st.color_picker("Aktywny przycisk wyboru:", value=theme_color)
+        chosen_color = st.color_picker("Aktywny przycisk wyboru:", value=theme_color, key="user_theme_picker")
         if chosen_color != theme_color:
             st.session_state.global_store["user_data"][current_user]["theme_color"] = chosen_color
             save_global_data(st.session_state.global_store)
             st.rerun()
             
     with cc_col2:
-        chosen_bg = st.color_picker("Tło całej aplikacji:", value=bg_color)
+        chosen_bg = st.color_picker("Tło całej aplikacji:", value=bg_color, key="user_bg_picker")
         if chosen_bg != bg_color:
             st.session_state.global_store["user_data"][current_user]["bg_color"] = chosen_bg
             save_global_data(st.session_state.global_store)
             st.rerun()
             
     with cc_col3:
-        chosen_clear_color = st.color_picker("Przyciski akcji:", value=clear_btn_color)
+        chosen_clear_color = st.color_picker("Przyciski akcji:", value=clear_btn_color, key="user_clear_picker")
         if chosen_clear_color != clear_btn_color:
             st.session_state.global_store["user_data"][current_user]["clear_btn_color"] = chosen_clear_color
             save_global_data(st.session_state.global_store)
+            st.rerun()
+
+    # --- PANEL ADMINA: DOMYŚLNE BARWY STARTOWE ---
+    if is_admin:
+        st.write("---")
+        st.subheader("👑 Panel Admina: Domyślny motyw startowy dla nowych użytkowników")
+        st.caption("Ustaw kolory, z którymi będą automatycznie startować nowo generowane konta:")
+        
+        adm_cc1, adm_cc2, adm_cc3 = st.columns(3)
+        with adm_cc1:
+            new_def_theme = st.color_picker("Domyślny przycisk wyboru:", value=def_theme, key="admin_def_theme")
+        with adm_cc2:
+            new_def_bg = st.color_picker("Domyślne tło aplikacji:", value=def_bg, key="admin_def_bg")
+        with adm_cc3:
+            new_def_clear = st.color_picker("Domyślne przyciski akcji:", value=def_clear, key="admin_def_clear")
+            
+        if (new_def_theme != def_theme) or (new_def_bg != def_bg) or (new_def_clear != def_clear):
+            current_data = load_global_data()
+            current_data["default_theme_color"] = new_def_theme
+            current_data["default_bg_color"] = new_def_bg
+            current_data["default_clear_btn_color"] = new_def_clear
+            save_global_data(current_data)
+            st.session_state.global_store = current_data
+            st.success("Zmieniono domyślny szablon startowy!")
             st.rerun()
 
     st.write("---")
@@ -568,9 +599,9 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                     "notepad": "", 
                     "has_liked": False, 
                     "saved_nick": "",
-                    "theme_color": "#1E90FF",
-                    "bg_color": "#FFFFFF",
-                    "clear_btn_color": "#5cb85c"
+                    "theme_color": def_theme,
+                    "bg_color": def_bg,
+                    "clear_btn_color": def_clear
                 }
                 save_global_data(st.session_state.global_store)
                 
