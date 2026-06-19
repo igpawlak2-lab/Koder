@@ -20,6 +20,7 @@ def load_global_data():
         "announcement": "Brak aktualnych ogłoszeń.",
         "announcement_font": "sans-serif",
         "announcement_size": 16,
+        "announcement_bg_color": "#e7f3fe",     # Globalny domyślny kolor tła tablicy
         "default_theme_color": "#1E90FF",      # Globalny domyślny kolor wyboru
         "default_bg_color": "#FFFFFF",         # Globalny domyślny kolor tła
         "default_clear_btn_color": "#5cb85c"   # Globalny domyślny kolor akcji
@@ -35,6 +36,7 @@ def load_global_data():
                 if "announcement" not in data: data["announcement"] = "Brak aktualnych ogłoszeń."
                 if "announcement_font" not in data: data["announcement_font"] = "sans-serif"
                 if "announcement_size" not in data: data["announcement_size"] = 16
+                if "announcement_bg_color" not in data: data["announcement_bg_color"] = "#e7f3fe"
                 if "default_theme_color" not in data: data["default_theme_color"] = "#1E90FF"
                 if "default_bg_color" not in data: data["default_bg_color"] = "#FFFFFF"
                 if "default_clear_btn_color" not in data: data["default_clear_btn_color"] = "#5cb85c"
@@ -401,25 +403,30 @@ with c1:
             save_global_data(st.session_state.global_store)
             st.rerun()
 
-    # --- TABLICA OGŁOSZEŃ (Z PERSONALIZACJĄ TEKSTU) ---
+    # --- TABLICA OGŁOSZEŃ (Z PERSONALIZACJĄ TEKSTU I TŁA) ---
     st.write("---")
     st.subheader("📢 Tablica Ogłoszeń")
     
     current_announcement = st.session_state.global_store.get("announcement", "Brak aktualnych ogłoszeń.")
     ann_font = st.session_state.global_store.get("announcement_font", "sans-serif")
     ann_size = st.session_state.global_store.get("announcement_size", 16)
+    ann_bg = st.session_state.global_store.get("announcement_bg_color", "#e7f3fe") # Pobranie koloru z bazy
+    
+    # Automatyczny kontrast dla tekstu na tablicy ogłoszeń
+    ann_text_color = "#0c5460" if get_contrast_text_color(ann_bg) == "#000000" else "#FFFFFF"
+    ann_border_color = "#2196F3" if ann_text_color == "#0c5460" else ann_bg
     
     st.markdown(
         f"""
         <div style="
-            background-color: #e7f3fe; 
-            border-left: 6px solid #2196F3; 
+            background-color: {ann_bg}; 
+            border-left: 6px solid {ann_border_color}; 
             padding: 15px; 
             border-radius: 6px; 
             margin-bottom: 15px;
             font-family: {ann_font}, Arial, sans-serif; 
             font-size: {ann_size}px; 
-            color: #0c5460;
+            color: {ann_text_color};
             line-height: 1.5;
         ">
             {current_announcement}
@@ -437,7 +444,7 @@ with c1:
             placeholder="Wpisz nowe ogłoszenie..."
         )
         
-        f_col1, f_col2 = st.columns(2)
+        f_col1, f_col2, f_col3 = st.columns([1.5, 1.5, 1.0])
         with f_col1:
             font_options = {
                 "Bezszeryfowa (Modern)": "sans-serif",
@@ -453,11 +460,16 @@ with c1:
         with f_col2:
             selected_size_value = st.slider("Wielkość tekstu (px):", min_value=12, max_value=36, value=int(ann_size), step=1)
             
+        with f_col3:
+            # NOWOŚĆ: Wybór koloru tła tablicy bezpośrednio w panelu edycji
+            selected_ann_bg = st.color_picker("Tło tablicy:", value=ann_bg, key="admin_ann_bg_picker")
+            
         if st.button("💾 Zapisz ogłoszenie i wygląd", key="save_announcement_btn"):
             current_data = load_global_data()
             current_data["announcement"] = new_announcement_text.strip()
             current_data["announcement_font"] = selected_font_value
             current_data["announcement_size"] = selected_size_value
+            current_data["announcement_bg_color"] = selected_ann_bg
             
             save_global_data(current_data)
             st.session_state.global_store = current_data
