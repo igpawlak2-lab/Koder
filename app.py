@@ -20,7 +20,7 @@ def load_global_data():
         "moderators": [],                       
         "admins": [],                       
         "staff_chat": [],    
-        "staff_dms": [],  # Nowa struktura na prywatne wiadomości między rangami                     
+        "staff_dms": [],                       
         "announcement": "Brak aktualnych ogłoszeń.",
         "announcement_font": "sans-serif",
         "announcement_size": 16,
@@ -49,7 +49,7 @@ def load_global_data():
                 if "default_bg_color" not in data: data["default_bg_color"] = "#FFFFFF"
                 if "default_clear_btn_color" not in data: data["default_clear_btn_color"] = "#5cb85c"
                 
-                # Konwersja starych komentarzy
+                # Migracja komentarzy
                 migrated_comments = []
                 for c in data["comments"]:
                     if isinstance(c, dict) and "text" in c:
@@ -106,13 +106,14 @@ is_staff = is_admin or is_moderator
 if "user_data" not in st.session_state.global_store:
     st.session_state.global_store["user_data"] = {}
 
-# NOWE KONTO: Pobiera aktualne wartości ustawione przez admina i zapisuje na stałe w bazie JSON
+# NOWE KONTO: Inicjalizacja profilu
 if current_user not in st.session_state.global_store["user_data"]:
     st.session_state.global_store["user_data"][current_user] = {
         "history": [], 
         "notepad": "", 
         "has_liked": False, 
         "saved_nick": "",
+        "password": "",  # Nowe pole na hasło konta
         "theme_color": def_theme,      
         "bg_color": def_bg,         
         "clear_btn_color": def_clear,
@@ -124,6 +125,9 @@ if current_user not in st.session_state.global_store["user_data"]:
 user_profile = st.session_state.global_store["user_data"][current_user]
 updated_profile = False
 
+if "password" not in user_profile:
+    user_profile["password"] = ""
+    updated_profile = True
 if "saved_nick" not in user_profile:
     user_profile["saved_nick"] = ""
     updated_profile = True
@@ -232,6 +236,47 @@ st.markdown(f"""
         }}
     </style>
 """, unsafe_allow_html=True)
+
+# --- BLOKADA HASŁA (LOGOWANIE) ---
+account_has_password = user_profile.get("password", "").strip() != ""
+authenticated = True
+
+if account_has_password:
+    if "account_authenticated" not in st.session_state:
+        st.session_state.account_authenticated = False
+        
+    if not st.session_state.account_authenticated:
+        authenticated = False
+        st.title("🔒 Konto zabezpieczone hasłem")
+        st.write("Ten klucz konta ma przypisane hasło. Wprowadź je, aby uzyskać dostęp.")
+        
+        with st.form("login_password_form"):
+            input_pass = st.text_input("Podaj hasło do profilu:", type="password", placeholder="Wpisz hasło...")
+            submit_login = st.form_submit_button("🔓 Odblokuj dostęp")
+            
+            if submit_login:
+                if input_pass.strip() == user_profile.get("password"):
+                    st.session_state.account_authenticated = True
+                    st.success("Dostęp przyznany!")
+                    st.rerun()
+                else:
+                    st.error("❌ Nieprawidłowe hasło konta!")
+        
+        # Pozwalamy na przełączenie klucza nawet z ekranu blokady
+        st.write("---")
+        with st.expander("🔄 Chcesz zmienić klucz na inny?"):
+            with st.form("switch_key_locked_form"):
+                fallback_key = st.text_input("Wklej inny klucz konta:")
+                submit_fallback = st.form_submit_button("Zmień klucz konta")
+                if submit_fallback and fallback_key.strip():
+                    clean_k = fallback_key.strip()
+                    st.session_state.user_author_key = clean_k
+                    st.query_params["ak"] = clean_k
+                    if "account_authenticated" in st.session_state:
+                        del st.session_state.account_authenticated
+                    components.html(f"<script>localStorage.setItem('koder_author_key2', '{clean_k}'); window.parent.location.href = window.parent.location.pathname + '?ak={clean_k}';</script>", height=0, width=0)
+                    st.rerun()
+        st.stop()
 
 # --- MAPA UKŁADU OKRESOWEGO I FUNKCJE POMOCNICZE ---
 DATA_MAP = {
@@ -429,7 +474,7 @@ with c1:
                 save_global_data(st.session_state.global_store)
                 st.rerun()
 
-    # --- ZAAWANSOWANY PANEL KOMUNIKACJI DLA STAFFU ---
+    # --- PANEL KOMUNIKACJI STAFFU ---
     if is_staff:
         with tab_chat:
             st.radio("Wybierz rodzaj czatu:", ["👥 Grupa Ogólna Staffu", "💬 Wiadomości Prywatne (DM)"], horizontal=True, key="staff_chat_type")
@@ -438,7 +483,6 @@ with c1:
             role_label = "Admin" if is_admin else "Moderator"
             staff_nick = user_saved_nick if user_saved_nick else f"User_{current_user[:6]}"
             
-            # --- WARIANT 1: GRUPA OGÓLNA STAFFU ---
             if chat_type == "👥 Grupa Ogólna Staffu":
                 st.subheader("👥 Ogólny Kanał Administracji")
                 st.caption("Wiadomości wysłane tutaj są widoczne dla wszystkich członków ekipy.")
@@ -499,29 +543,25 @@ with c1:
                                             st.session_state.global_store = current_data
                                             st.rerun()
 
-            # --- WARIANT 2: CZAT PRYWATNY (DM 1 NA 1) ---
             else:
                 st.subheader("💬 Prywatne Wiadomości 1 na 1")
-                st.caption("Wybierz osobę z ekipy, aby rozpocząć bezpieczną konwersację. Wiadomości będą niewidoczne dla osób trzecich.")
+                st.caption("Wybierz osobę z ekipy, aby rozpocząć bezpieczną konwersację.")
                 
-                # Budujemy dynamiczną listę potencjalnych rozmówców z rangą, którzy mają nick
                 all_users = st.session_state.global_store.get("user_data", {})
                 mod_list = st.session_state.global_store.get("moderators", [])
                 admin_list = st.session_state.global_store.get("admins", [])
                 
                 staff_targets = {}
                 for u_key, u_val in all_users.items():
-                    # Filtrujemy tylko osoby z rangą
                     is_target_staff = (u_key == "admin") or (u_key in admin_list) or (u_key in mod_list)
                     if is_target_staff and u_key != current_user:
                         saved_name = u_val.get("saved_nick", "").strip()
                         if saved_name:
-                            # Ustalanie etykiety pomocniczej roli
                             t_role = "Właściciel" if u_key == "admin" else ("Admin" if u_key in admin_list else "Moderator")
                             staff_targets[f"{saved_name} ({t_role})"] = u_key
                 
                 if not staff_targets:
-                    st.warning("⚠️ Nie znaleziono innych członków ekipy posiadających ustawiony podpis (nick). Poproś drugą osobę o ustawienie nicku w sekcji 'Personalizacja i Zarządzanie Kontem'!")
+                    st.warning("⚠️ Nie znaleziono innych członków ekipy posiadających ustawiony podpis (nick).")
                 else:
                     target_label = st.selectbox("Wybierz odbiorcę prywatnej wiadomości:", list(staff_targets.keys()))
                     target_user_key = staff_targets[target_label]
@@ -549,11 +589,9 @@ with c1:
                             st.session_state.global_store = current_data
                             st.rerun()
                     
-                    # Filtrowanie historii DM tylko dla tej konkretnej pary użytkowników
                     all_dms = st.session_state.global_store.get("staff_dms", [])
                     visible_dms = []
                     for o_idx, dm in enumerate(all_dms):
-                        # Pokazuj tylko jeśli (ja -> on) LUB (on -> ja)
                         if (dm.get("sender_key") == current_user and dm.get("receiver_key") == target_user_key) or \
                            (dm.get("sender_key") == target_user_key and dm.get("receiver_key") == current_user):
                             visible_dms.append((o_idx, dm))
@@ -561,7 +599,7 @@ with c1:
                     st.write(" ")
                     with st.container(height=260):
                         if not visible_dms:
-                            st.caption(f"Brak dotychczasowej historii prywatnej z użytkownikiem {target_label.split(' ')[0]}. Napisz coś powyżej!")
+                            st.caption(f"Brak dotychczasowej historii prywatnej z użytkownikiem {target_label.split(' ')[0]}.")
                         else:
                             for original_dm_idx, dm in reversed(visible_dms):
                                 is_my_own_dm = (dm.get("sender_key") == current_user)
@@ -613,8 +651,8 @@ with c1:
     )
     
     if is_staff:
-        st.caption(f"🛠️ Panel zarządzania ogłoszeniem (Widoczny dla roli: Admin / Moderator):")
-        new_announcement_text = st.text_area("Zmień treść ogłoszenia globalnego:", value=current_announcement, placeholder="Wpisz nowe ogłoszenie...")
+        st.caption(f"🛠️ Panel zarządzania ogłoszeniem:")
+        new_announcement_text = st.text_area("Zmień treść ogłoszenia globalnego:", value=current_announcement)
         
         f_col1, f_col2, f_col3 = st.columns([1.5, 1.5, 1.0])
         with f_col1:
@@ -644,7 +682,7 @@ with c1:
             
             save_global_data(current_data)
             st.session_state.global_store = current_data
-            st.success("Ogłoszenie oraz jego formatowanie zostały zaktualizowane!")
+            st.success("Ogłoszenie zaktualizowane!")
             st.rerun()
 
 with c2:
@@ -656,7 +694,7 @@ with c2:
     
     with st.container(height=240):
         if not user_history:
-            st.caption("Brak Twoich ostatnich operacji. Wpisz coś po lewej stronie.")
+            st.caption("Brak Twoich ostatnich operacji.")
         else:
             for item in user_history: st.code(item, language="text")
 
@@ -672,7 +710,7 @@ with c2:
     note_input = st.text_area(
         "Zapisz swoje uwagi:",
         value=user_notepad_content,
-        placeholder="Wpisz notatki, kody lub sekwencje...",
+        placeholder="Wpisz notatki...",
         height=180,
         key="local_notepad_field",
         on_change=save_notepad_instantly
@@ -704,10 +742,36 @@ with col_like2:
 
 st.write(" ")
 
-# --- PANEL PERSONALIZACJI WYGLĄDU ---
+# --- PANEL PERSONALIZACJI WYGLĄDU I ZABEZPIECZEŃ ---
 with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
-    st.subheader("Twoje własne ustawienia kolorów")
     
+    # NOWA SEKCJA: ZABEZPIECZENIE HASŁEM
+    st.subheader("🔐 Bezpieczeństwo konta")
+    saved_password = user_profile.get("password", "").strip()
+    
+    if not saved_password:
+        st.info("💡 To konto nie posiada jeszcze hasła. Każdy, kto pozna Twój klucz URL, może wejść na Twój profil.")
+        with st.form("set_password_form"):
+            new_pass = st.text_input("Ustaw nowe hasło do profilu:", type="password", placeholder="Wpisz silne hasło...")
+            submit_pass = st.form_submit_button("🔒 Zapisz i aktywuj hasło")
+            if submit_pass and new_pass.strip():
+                st.session_state.global_store["user_data"][current_user]["password"] = new_pass.strip()
+                save_global_data(st.session_state.global_store)
+                st.session_state.account_authenticated = True
+                st.success("Hasło zostało pomyślnie ustawione! Przy następnej wizycie wymagane będzie logowanie.")
+                st.rerun()
+    else:
+        st.success("🔒 Twoje konto jest chronione hasłem.")
+        if st.button("❌ Usuń hasło z konta (Otwórz profil)", type="primary"):
+            st.session_state.global_store["user_data"][current_user]["password"] = ""
+            save_global_data(st.session_state.global_store)
+            if "account_authenticated" in st.session_state:
+                del st.session_state.account_authenticated
+            st.toast("Hasło profilu zostało usunięte.")
+            st.rerun()
+            
+    st.write("---")
+    st.subheader("Twoje własne ustawienia kolorów")
     if is_staff:
         cc_col1, cc_col2, cc_col3, cc_col4 = st.columns(4)
     else:
@@ -743,7 +807,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                 save_global_data(st.session_state.global_store)
                 st.rerun()
 
-    # --- PANEL UPRAWNIEŃ ---
+    # --- PANEL UPRAWNIEŃ (ADMINISTRACJA) ---
     if is_admin:
         st.write("---")
         st.subheader("👑 Panel Admina: Zarządzanie uprawnieniami")
@@ -756,17 +820,17 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
         with adm_tabs[0]:
             if not is_root_admin:
                 st.markdown("### 👥 Zarządzanie Moderatorami")
-            st.caption("Dodaj lub usuń uprawnienia moderatora dla konkretnych kluczy kont:")
+            st.caption("Dodaj lub usuń uprawnienia moderatora:")
             current_mods = st.session_state.global_store.get("moderators", [])
             
             with st.form("add_moderator_form", clear_on_submit=True):
-                mod_key_input = st.text_input("Wklej klucz konta, które chcesz awansować na Moderatora:", placeholder="usr_...")
+                mod_key_input = st.text_input("Wklej klucz konta, które chcesz awansować na Moderatora:")
                 submit_mod = st.form_submit_button("➕ Nadaj uprawnienia moderatora")
                 
                 if submit_mod and mod_key_input.strip():
                     target_key = mod_key_input.strip()
                     if target_key == "admin" or target_key in st.session_state.global_store.get("admins", []):
-                        st.error("To konto ma już wyższą rangę (Admin).")
+                        st.error("To konto ma już wyższą rangę.")
                     elif target_key in current_mods:
                         st.warning("To konto jest już moderatorem.")
                     else:
@@ -776,7 +840,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                         current_data["moderators"].append(target_key)
                         save_global_data(current_data)
                         st.session_state.global_store = current_data
-                        st.success(f"Pomyślnie nadano uprawnienia moderatora dla klucza: {target_key}")
+                        st.success(f"Dodano moderatora: {target_key}")
                         st.rerun()
                         
             if current_mods:
@@ -794,24 +858,19 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                                 current_data["moderators"].remove(m_key)
                                 save_global_data(current_data)
                                 st.session_state.global_store = current_data
-                                st.toast(f"Odebrano uprawnienia dla {m_key}")
                                 st.rerun()
-            else:
-                st.caption("Brak przypisanych moderatorów.")
-                
+                                
         if is_root_admin:
             with adm_tabs[1]:
-                st.caption("Dodaj lub usuń uprawnienia dodatkowego administratora (Opcja dostępna wyłącznie dla Właściciela):")
                 current_admins = st.session_state.global_store.get("admins", [])
-                
                 with st.form("add_admin_form", clear_on_submit=True):
-                    adm_key_input = st.text_input("Wklej klucz konta, które chcesz awansować na Administratora:", placeholder="usr_...")
+                    adm_key_input = st.text_input("Wklej klucz konta, które chcesz awansować na Administratora:")
                     submit_adm = st.form_submit_button("👑 Nadaj uprawnienia administratora")
                     
                     if submit_adm and adm_key_input.strip():
                         target_key = adm_key_input.strip()
                         if target_key == "admin":
-                            st.error("Konto główne 'admin' posiada niezbywalne prawa Root-Admina.")
+                            st.error("Główne konto posiada niezbywalne prawa.")
                         elif target_key in current_admins:
                             st.warning("To konto jest już administratorem.")
                         else:
@@ -819,13 +878,11 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                             if "admins" not in current_data:
                                 current_data["admins"] = []
                             current_data["admins"].append(target_key)
-                            
                             if "moderators" in current_data and target_key in current_data["moderators"]:
                                 current_data["moderators"].remove(target_key)
-                                
                             save_global_data(current_data)
                             st.session_state.global_store = current_data
-                            st.success(f"Pomyślnie nadano uprawnienia administratora dla klucza: {target_key}")
+                            st.success(f"Dodano administratora: {target_key}")
                             st.rerun()
                             
                 if current_admins:
@@ -843,22 +900,14 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                                     current_data["admins"].remove(a_key)
                                     save_global_data(current_data)
                                     st.session_state.global_store = current_data
-                                    st.toast(f"Odebrano uprawnienia administratora dla {a_key}")
                                     st.rerun()
-                else:
-                    st.caption("Brak dodatkowych administratorów (poza kontem głównym).")
 
         st.write("---")
         st.subheader("🎨 Panel Admina: Domyślny motyw startowy")
-        st.caption("Ustaw kolory, z którymi będą automatycznie startować nowo generowane konta:")
-        
         adm_cc1, adm_cc2, adm_cc3 = st.columns(3)
-        with adm_cc1:
-            new_def_theme = st.color_picker("Domyślny przycisk wyboru:", value=def_theme, key="admin_def_theme")
-        with adm_cc2:
-            new_def_bg = st.color_picker("Domyślne tło aplikacji:", value=def_bg, key="admin_def_bg")
-        with adm_cc3:
-            new_def_clear = st.color_picker("Domyślne przyciski akcji:", value=def_clear, key="admin_def_clear")
+        with adm_cc1: new_def_theme = st.color_picker("Domyślny przycisk wyboru:", value=def_theme, key="admin_def_theme")
+        with adm_cc2: new_def_bg = st.color_picker("Domyślne tło aplikacji:", value=def_bg, key="admin_def_bg")
+        with adm_cc3: new_def_clear = st.color_picker("Domyślne przyciski akcji:", value=def_clear, key="admin_def_clear")
             
         if (new_def_theme != def_theme) or (new_def_bg != def_bg) or (new_def_clear != def_clear):
             current_data = load_global_data()
@@ -867,7 +916,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
             current_data["default_clear_btn_color"] = new_def_clear
             save_global_data(current_data)
             st.session_state.global_store = current_data
-            st.success("Zmieniono domyślny szablon startowy!")
+            st.success("Zmieniono szablon startowy!")
             st.rerun()
 
     st.write("---")
@@ -875,7 +924,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
     st.code(st.session_state.user_author_key, language="text")
     
     current_nick_val = st.session_state.global_store["user_data"][current_user].get("saved_nick", "")
-    new_nick = st.text_input("Ustaw swój stały podpis (nick):", value=current_nick_val, placeholder="Wpisz stały nick...")
+    new_nick = st.text_input("Ustaw swój stały podpis (nick):", value=current_nick_val)
     if new_nick != current_nick_val:
         st.session_state.global_store["user_data"][current_user]["saved_nick"] = new_nick.strip()
         save_global_data(st.session_state.global_store)
@@ -890,73 +939,48 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
             clean_key = new_key.strip()
             st.session_state.user_author_key = clean_key
             st.query_params["ak"] = clean_key
+            if "account_authenticated" in st.session_state:
+                del st.session_state.account_authenticated
             
             if clean_key not in st.session_state.global_store["user_data"]:
                 st.session_state.global_store["user_data"][clean_key] = {
-                    "history": [], 
-                    "notepad": "", 
-                    "has_liked": False, 
-                    "saved_nick": "",
-                    "theme_color": def_theme,
-                    "bg_color": def_bg,
-                    "clear_btn_color": def_clear,
+                    "history": [], "notepad": "", "has_liked": False, "saved_nick": "", "password": "",
+                    "theme_color": def_theme, "bg_color": def_bg, "clear_btn_color": def_clear,
                     "staff_bar_color": "#FF4B4B" if (clean_key == "admin" or clean_key in st.session_state.global_store.get("admins", [])) else "#FFA500"
                 }
                 save_global_data(st.session_state.global_store)
                 
-            components.html(
-                f"""
-                <script>
-                    localStorage.setItem("koder_author_key2", "{clean_key}");
-                    window.parent.location.href = window.parent.location.pathname + "?ak={clean_key}";
-                </script>
-                """, height=0, width=0
-            )
+            components.html(f"<script>localStorage.setItem('koder_author_key2', '{clean_key}'); window.parent.location.href = window.parent.location.pathname + '?ak={clean_key}';</script>", height=0, width=0)
             st.rerun()
 
 # --- FORMULARZ DODAWANIA KOMENTARZY ---
 with st.form("comment_form", clear_on_submit=True):
     default_author = user_saved_nick if user_saved_nick else ""
     nick = st.text_input("Twój podpis/nick:", value=default_author, placeholder="Anonim")
-    komentarz_tekst = st.text_area("Napisz komentarz o stronie:", placeholder="Wpisz swoją opinię tutaj...")
+    komentarz_tekst = st.text_area("Napisz komentarz o stronie:")
     wyslij = st.form_submit_button("Dodaj komentarz")
     
     if wyslij and komentarz_tekst.strip():
         podpis = nick.strip() if nick.strip() else "Anonim"
-        
-        ranga_label = ""
-        if st.session_state.user_author_key == "admin":
-            ranga_label = " Właściciel"
-        elif st.session_state.user_author_key in st.session_state.global_store.get("admins", []):
-            ranga_label = " Admin"
-        elif st.session_state.user_author_key in st.session_state.global_store.get("moderators", []):
-            ranga_label = " Moderator"
-            
+        ranga_label = " Właściciel" if current_user == "admin" else (" Admin" if current_user in st.session_state.global_store.get("admins", []) else (" Moderator" if current_user in st.session_state.global_store.get("moderators", []) else ""))
         nowy_komentarz_tekst = f"**{podpis}{ranga_label}** | {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}:\n{komentarz_tekst.strip()}"
         
-        nowy_komentarz_obj = {
-            "text": nowy_komentarz_tekst,
-            "author_key": st.session_state.user_author_key
-        }
-        
+        nowy_komentarz_obj = {"text": nowy_komentarz_tekst, "author_key": current_user}
         current_data = load_global_data()
         current_data["comments"].insert(0, nowy_komentarz_obj)
         save_global_data(current_data)
         st.session_state.global_store = current_data
         st.rerun()
 
-# --- WYŚWIETLANIE KOMENTARZY WRAZ Z PRZYCISKAMI USUWANIA ---
+# --- WYŚWIETLANIE KOMENTARZY ---
 comments_list = st.session_state.global_store.get("comments", [])
 if comments_list:
     st.write("**Ostatnie komentarze:**")
     for idx, com in enumerate(comments_list):
         if isinstance(com, dict) and "text" in com:
             cc1, cc2 = st.columns([4.8, 1.2])
-            with cc1:
-                st.info(com["text"])
+            with cc1: st.info(com["text"])
             with cc2:
-                my_key = st.session_state.user_author_key
-                
                 if is_staff:
                     label_btn = "🗑️ Usuń (ADMIN)" if is_admin else "🗑️ Usuń (MOD)"
                     if st.button(label_btn, key=f"del_com_{idx}", type="primary", use_container_width=True):
@@ -966,8 +990,7 @@ if comments_list:
                             save_global_data(current_data)
                             st.session_state.global_store = current_data
                             st.rerun()
-                
-                elif com.get("author_key") == my_key and my_key not in ["", "anonymous", "legacy"]:
+                elif com.get("author_key") == current_user and current_user not in ["", "anonymous", "legacy"]:
                     if st.button("❌ Usuń", key=f"del_com_{idx}", type="primary", use_container_width=True):
                         current_data = load_global_data()
                         if idx < len(current_data["comments"]):
