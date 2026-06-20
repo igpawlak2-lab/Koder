@@ -71,15 +71,15 @@ def_theme = st.session_state.global_store.get("default_theme_color", "#1E90FF")
 def_bg = st.session_state.global_store.get("default_bg_color", "#FFFFFF")
 def_clear = st.session_state.global_store.get("default_clear_btn_color", "#5cb85c")
 
-# --- BEZPIECZNE GENEROWANIE I SYNCHRONIZACJA KLUCZA KONTA ---
+# --- SYNC Z URL I LOCALSTORAGE ---
 params = st.query_params
+url_key = params.get("ak", "").strip()
+
 if "user_author_key" not in st.session_state:
-    url_key = params.get("ak", "")
     if url_key:
         st.session_state.user_author_key = url_key
     else:
-        st.session_state.user_author_key = f"usr_{uuid.uuid4().hex[:16]}"
-        st.query_params["ak"] = st.session_state.user_author_key
+        st.session_state.user_author_key = ""
 
 current_user = st.session_state.user_author_key
 
@@ -138,7 +138,6 @@ if current_user == "admin2":
         st.markdown("### 🛠️ Odzyskiwanie uprawnień i zarządzanie kadrami")
         current_data = load_global_data()
         
-        # 1. Zarządzanie głównym kontem admin
         st.markdown("#### 👑 Główny Właściciel (`admin`)")
         admin_profile = current_data["user_data"].get("admin", {})
         has_pass_admin = admin_profile.get("password", "").strip() != ""
@@ -158,7 +157,6 @@ if current_user == "admin2":
                 
         st.write("---")
         
-        # 2. Zarządzanie promowanymi Administratorów oraz usuwanie rangi
         st.markdown("#### 🛡️ Lista dodatkowych Administratorów (`admins`)")
         current_admins_list = current_data.get("admins", [])
         if not current_admins_list:
@@ -190,7 +188,6 @@ if current_user == "admin2":
                         
         st.write("---")
         
-        # 3. Zarządzanie Moderatorami oraz usuwanie rangi
         st.markdown("#### 👥 Lista Moderatorów (`moderators`)")
         current_mods_list = current_data.get("moderators", [])
         if not current_mods_list:
@@ -239,6 +236,97 @@ if current_user == "admin2":
                 st.rerun()
     st.stop()
 
+
+# --- NOWY EKRAN LOGOWANIA I REJESTRACJI (JEŚLI BRAK AKTYWNEGO KLUCZA) ---
+if not current_user:
+    st.title("📟 Witamy w aplikacji Koder")
+    st.write("Aby korzystać z systemu kodowania oraz paneli społecznościowych, musisz posiadać konto.")
+    
+    # Przechwytywanie klucza z pamięci podręcznej przeglądarki (jeśli istnieje)
+    components.html("""
+        <script>
+            var savedKey = localStorage.getItem("koder_author_key2");
+            if (savedKey) {
+                var currentUrl = new URL(window.parent.location.href);
+                currentUrl.searchParams.set("ak", savedKey);
+                window.parent.location.href = currentUrl.href;
+            }
+        </script>
+    """, height=0, width=0)
+
+    tab_login, tab_register = st.tabs(["🔑 Zaloguj się", "📝 Załóż nowe konto"])
+    
+    with tab_register:
+        st.subheader("Utwórz unikalny profil")
+        with st.form("register_form_global"):
+            reg_key = st.text_input("Wybierz swój Klucz Konta (Login):", placeholder="np. mojekonto123").strip()
+            reg_nick = st.text_input("Twój podpis/nick (opcjonalnie):", placeholder="np. Janek")
+            reg_pass = st.text_input("Ustaw hasło (zostaw puste, jeśli nie chcesz hasła):", type="password", placeholder="Opcjonalne...")
+            submit_reg = st.form_submit_button("🚀 Zarejestruj konto")
+            
+            if submit_reg:
+                if not reg_key:
+                    st.error("❌ Klucz konta nie może być pusty!")
+                elif reg_key == "admin2":
+                    st.error("❌ Klucz 'admin2' jest rezerwowany przez system ratunkowy.")
+                elif reg_key in st.session_state.global_store["user_data"]:
+                    st.error("❌ Podany klucz konta jest już zajęty! Wybierz inny.")
+                else:
+                    # Tworzenie nowego konta w bazie
+                    st.session_state.global_store["user_data"][reg_key] = {
+                        "history": [], "notepad": "", "has_liked": False, 
+                        "saved_nick": reg_nick.strip() if reg_nick.strip() else reg_key, 
+                        "password": reg_pass.strip(),  
+                        "theme_color": def_theme, "bg_color": def_bg, "clear_btn_color": def_clear,
+                        "staff_bar_color": "#FF4B4B"
+                    }
+                    save_global_data(st.session_state.global_store)
+                    
+                    st.session_state.user_author_key = reg_key
+                    st.query_params["ak"] = reg_key
+                    if reg_pass.strip():
+                        st.session_state.account_authenticated = True
+                        components.html(f'<script>localStorage.setItem("auth_{reg_key}", "true");</script>', height=0, width=0)
+                    else:
+                        st.session_state.account_authenticated = False
+                        
+                    components.html(f"<script>localStorage.setItem('koder_author_key2', '{reg_key}'); window.parent.location.href = window.parent.location.pathname + '?ak={reg_key}';</script>", height=0, width=0)
+                    st.success("🎉 Konto zostało pomyślnie utworzone!")
+                    st.rerun()
+                    
+    with tab_login:
+        st.subheader("Zaloguj się do swojego profilu")
+        with st.form("login_form_global"):
+            log_key = st.text_input("Wpisz swój Klucz Konta:", placeholder="Twój unikalny login").strip()
+            log_pass = st.text_input("Wpisz hasło (jeśli zostało ustawione):", type="password", placeholder="Hasło...")
+            submit_log = st.form_submit_button("🔓 Zaloguj się")
+            
+            if submit_log:
+                if not log_key:
+                    st.error("❌ Musisz podać klucz konta.")
+                elif log_key not in st.session_state.global_store["user_data"]:
+                    st.error("❌ Takie konto nie istnieje. Załóż je w zakładce obok!")
+                else:
+                    user_db_profile = st.session_state.global_store["user_data"][log_key]
+                    required_password = user_db_profile.get("password", "").strip()
+                    
+                    if required_password and log_pass.strip() != required_password:
+                        st.error("❌ Nieprawidłowe hasło dla tego konta!")
+                    else:
+                        st.session_state.user_author_key = log_key
+                        st.query_params["ak"] = log_key
+                        if required_password:
+                            st.session_state.account_authenticated = True
+                            components.html(f'<script>localStorage.setItem("auth_{log_key}", "true");</script>', height=0, width=0)
+                        else:
+                            st.session_state.account_authenticated = False
+                            
+                        components.html(f"<script>localStorage.setItem('koder_author_key2', '{log_key}'); window.parent.location.href = window.parent.location.pathname + '?ak={log_key}';</script>", height=0, width=0)
+                        st.success("🔓 Zalogowano pomyślnie!")
+                        st.rerun()
+    st.stop()
+
+
 # --- LOGIKA RANGI DLA STANDARDOWYCH KONT ---
 is_root_admin = (current_user == "admin")  
 is_promoted_admin = (current_user in st.session_state.global_store.get("admins", [])) 
@@ -246,9 +334,10 @@ is_admin = is_root_admin or is_promoted_admin
 is_moderator = (current_user in st.session_state.global_store.get("moderators", []))
 is_staff = is_admin or is_moderator  
 
+# Zabezpieczenie integralności profilu
 if current_user not in st.session_state.global_store["user_data"]:
     st.session_state.global_store["user_data"][current_user] = {
-        "history": [], "notepad": "", "has_liked": False, "saved_nick": "", "password": "",  
+        "history": [], "notepad": "", "has_liked": False, "saved_nick": current_user, "password": "",  
         "theme_color": def_theme, "bg_color": def_bg, "clear_btn_color": def_clear,
         "staff_bar_color": "#FF4B4B" if is_admin else "#FFA500" 
     }
@@ -304,7 +393,7 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
-# --- OBSŁUGA TRWAŁEJ SESJI LOGOWANIA Z LOKALNEJ PAMIĘCI PRZEGLĄDARKI ---
+# --- OBSŁUGA ZABEZPIECZENIA HASŁEM W PANELU GŁÓWNYM ---
 url_auth_state = params.get("auth", "")
 if "account_authenticated" not in st.session_state:
     st.session_state.account_authenticated = (url_auth_state == "true")
@@ -386,20 +475,15 @@ if account_has_password:
                         st.success("✅ Prośba została pomyślnie dostarczona do tajnego panelu Właściciela!")
         
         st.write("---")
-        with st.expander("🔄 Chcesz zmienić klucz na inny?"):
-            with st.form("switch_key_locked_form"):
-                fallback_key = st.text_input("Wklej inny klucz konta:")
-                submit_fallback = st.form_submit_button("Zmień klucz konta")
-                if submit_fallback and fallback_key.strip():
-                    clean_k = fallback_key.strip()
-                    st.session_state.user_author_key = clean_k
-                    st.query_params["ak"] = clean_k
-                    if "account_authenticated" in st.session_state: del st.session_state.account_authenticated
-                    components.html(f"<script>localStorage.setItem('koder_author_key2', '{clean_k}'); window.parent.location.href = window.parent.location.pathname + '?ak={clean_k}';</script>", height=0, width=0)
-                    st.rerun()
+        with st.expander("🔄 Chcesz zalogować się na inne konto?"):
+            if st.button("🚪 Przejdź do ekranu wyboru konta"):
+                st.session_state.user_author_key = ""
+                st.query_params.clear()
+                components.html("<script>localStorage.removeItem('koder_author_key2'); window.parent.location.href = window.parent.location.pathname;</script>", height=0, width=0)
+                st.rerun()
         st.stop()
 
-# --- MAPA UKŁADU OKRESOWEGO I FUNKCJE POMOCNICZE ---
+# --- MAPA UKŁADU OKRESOWEGO I FUNKCJE ENKODERA ---
 DATA_MAP = {
     1: (1, 1, "H"), 2: (18, 1, "He"), 3: (1, 2, "Li"), 4: (2, 2, "Be"), 5: (13, 2, "B"), 6: (14, 2, "C"), 
     7: (15, 2, "N"), 8: (16, 2, "O"), 9: (17, 2, "F"), 10: (18, 2, "Ne"), 11: (1, 3, "Na"), 12: (2, 3, "Mg"),
@@ -522,23 +606,6 @@ else:
     st.title("📟 KODER")
 
 st.write("Uniwersalny system kodowania i dekodowania tekstu.")
-
-components.html(
-    f"""
-    <script>
-        var savedKey = localStorage.getItem("koder_author_key2");
-        var currentUrl = new URL(window.parent.location.href);
-        var urlKey = currentUrl.searchParams.get("ak");
-        
-        if (savedKey && savedKey !== urlKey) {{
-            currentUrl.searchParams.set("ak", savedKey);
-            window.parent.location.href = currentUrl.href;
-        }} else if (!savedKey && urlKey) {{
-            localStorage.setItem("koder_author_key2", urlKey);
-        }}
-    </script>
-    """, height=0, width=0
-)
 
 user_history = user_profile.get("history", [])
 user_notepad_content = user_profile.get("notepad", "")
@@ -830,23 +897,25 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
     my_secure_code = generate_account_secure_code(current_user)
     st.markdown(f"ℹ️ Twój osobisty **Kod Bezpieczeństwa Konta:** ` {my_secure_code} `")
     
-    if account_has_password and st.session_state.account_authenticated:
-        if st.button("🔒 Wyloguj się z profilu", type="primary", key="logout_action_button_trigger"):
-            st.session_state.account_authenticated = False
-            st.query_params["auth"] = "false"
-            components.html(f"""
-                <script>
-                    localStorage.removeItem("auth_{current_user}");
-                    window.parent.location.href = window.parent.location.pathname + "?ak={current_user}&auth=false";
-                </script>
-            """, height=0, width=0)
-            st.rerun()
+    # Przycisk wylogowania całkowicie czyści klucz sesyjny i wraca do formularza startowego
+    if st.button("🚪 Wyloguj się całkowicie z aplikacji", type="primary", key="logout_action_button_trigger"):
+        st.session_state.user_author_key = ""
+        st.session_state.account_authenticated = False
+        st.query_params.clear()
+        components.html(f"""
+            <script>
+                localStorage.removeItem("auth_{current_user}");
+                localStorage.removeItem("koder_author_key2");
+                window.parent.location.href = window.parent.location.pathname;
+            </script>
+        """, height=0, width=0)
+        st.rerun()
             
     if not saved_password:
-        st.info("💡 To konto nie posiada jeszcze hasła.")
+        st.info("💡 To konto nie posiada obecnie hasła (dostęp samym kluczem).")
         with st.form("set_password_form"):
-            new_pass = st.text_input("Ustaw nowe hasło do profilu:", type="password", placeholder="Wpisz silne hasło...")
-            submit_pass = st.form_submit_button("🔒 Zapisz i aktywuj hasło")
+            new_pass = st.text_input("Ustaw hasło dla profilu:", type="password", placeholder="Wpisz silne hasło...")
+            submit_pass = st.form_submit_button("🔒 Aktywuj hasło")
             if submit_pass and new_pass.strip():
                 st.session_state.global_store["user_data"][current_user]["password"] = new_pass.strip()
                 save_global_data(st.session_state.global_store)
@@ -856,7 +925,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                 st.rerun()
     else:
         st.success("🔒 Twoje konto jest chronione hasłem.")
-        if st.button("❌ Całkowicie usuń hasło z konta", type="primary", key="delete_password_completely"):
+        if st.button("❌ Usuń hasło (logowanie samym kluczem)", type="primary", key="delete_password_completely"):
             st.session_state.global_store["user_data"][current_user]["password"] = ""
             save_global_data(st.session_state.global_store)
             st.session_state.account_authenticated = False
@@ -904,7 +973,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
         with adm_tabs[0]:
             current_mods = st.session_state.global_store.get("moderators", [])
             with st.form("add_moderator_form", clear_on_submit=True):
-                mod_key_input = st.text_input("Wklej klucz konta, które chcesz awansować na Moderatorami:")
+                mod_key_input = st.text_input("Wklej klucz konta, które chcesz awansować na Moderatora:")
                 submit_mod = st.form_submit_button("➕ Nadaj uprawnienia moderatora")
                 if submit_mod and mod_key_input.strip():
                     target_key = mod_key_input.strip()
@@ -1021,23 +1090,11 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
     st.write("**Twój unikalny klucz konta:**")
     st.code(st.session_state.user_author_key, language="text")
     
-    new_nick = st.text_input("Ustaw swój stały podpis (nick):", value=user_saved_nick)
+    new_nick = st.text_input("Zmień swój stały podpis (nick):", value=user_saved_nick)
     if new_nick != user_saved_nick:
         st.session_state.global_store["user_data"][current_user]["saved_nick"] = new_nick.strip()
         save_global_data(st.session_state.global_store)
         st.rerun()
-        
-    st.write("---")
-    with st.form("account_key_form"):
-        new_key = st.text_input("Zmień konto na inne (wklej klucz):")
-        submit_change = st.form_submit_button("Zmień klucz konta")
-        if submit_change and new_key.strip():
-            clean_key = new_key.strip()
-            st.session_state.user_author_key = clean_key
-            st.query_params["ak"] = clean_key
-            if "account_authenticated" in st.session_state: del st.session_state.account_authenticated
-            components.html(f"<script>localStorage.setItem('koder_author_key2', '{clean_key}'); window.parent.location.href = window.parent.location.pathname + '?ak={clean_key}';</script>", height=0, width=0)
-            st.rerun()
 
 # --- FORMULARZ DODAWANIA KOMENTARZY ---
 with st.form("comment_form", clear_on_submit=True):
