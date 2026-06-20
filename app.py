@@ -89,7 +89,137 @@ def generate_account_secure_code(account_key):
     hashed = hashlib.sha256((account_key + salt).encode('utf-8')).hexdigest()
     return str(int(hashed[:8], 16))[-6:].zfill(6)
 
-# --- LOGIKA RANGI ---
+# --- PANEL AWARYJNEGO KONTA WŁAŚCICIELA (admin2) ---
+if current_user == "admin2":
+    st.markdown("<h1 style='color: #FF0000; margin-bottom: 0;'>🚨 SYSTEM RATUNKOWY (admin2)</h1>", unsafe_allow_html=True)
+    st.write("Uruchomiono niezależny panel awaryjnego resetu haseł kadry zarządzającej.")
+    st.write("---")
+    
+    if "admin2_authenticated" not in st.session_state:
+        st.session_state.admin2_authenticated = (params.get("auth", "") == "true")
+        
+    if not st.session_state.admin2_authenticated:
+        st.subheader("🔒 Weryfikacja tożsamości systemu ratunkowego")
+        with st.form("admin2_login_form"):
+            input_pass_admin2 = st.text_input("Podaj sztywne hasło ratunkowe:", type="password", placeholder="Wpisz hasło...")
+            submit_login_admin2 = st.form_submit_button("🔓 Uzyskaj dostęp awaryjny")
+            
+            if submit_login_admin2:
+                if input_pass_admin2 == "Przyrodnik1":
+                    st.session_state.admin2_authenticated = True
+                    st.query_params["auth"] = "true"
+                    components.html(f"""
+                        <script>
+                            localStorage.setItem("auth_admin2", "true");
+                            window.parent.location.href = window.parent.location.pathname + "?ak=admin2&auth=true";
+                        </script>
+                    """, height=0, width=0)
+                    st.rerun()
+                else:
+                    st.error("❌ Błędne hasło ratunkowe! Odmowa dostępu.")
+                    
+        st.write("---")
+        with st.form("admin2_exit_form_locked"):
+            exit_key = st.text_input("Wróć do standardowego konta (wklej klucz):")
+            if st.form_submit_button("Opuść system ratunkowy") and exit_key.strip():
+                ek = exit_key.strip()
+                st.session_state.user_author_key = ek
+                st.query_params["ak"] = ek
+                if "admin2_authenticated" in st.session_state: del st.session_state.admin2_authenticated
+                components.html(f"<script>localStorage.setItem('koder_author_key2', '{ek}'); window.parent.location.href = window.parent.location.pathname + '?ak={ek}';</script>", height=0, width=0)
+                st.rerun()
+        st.stop()
+
+    # Logika resetowania haseł z poziomu konta admin2
+    st.success("⚙️ Autoryzacja poprawna. Masz bezpośredni dostęp modyfikacyjny do struktur uwierzytelniania.")
+    
+    rc1, rc2 = st.columns([2, 1])
+    with rc1:
+        st.markdown("### 🛠️ Zarządzanie hasłami kadry")
+        
+        # 1. Reset głównego konta admin
+        st.markdown("#### Główny Właściciel (`admin`)")
+        current_data = load_global_data()
+        admin_profile = current_data["user_data"].get("admin", {})
+        has_pass_admin = admin_profile.get("password", "").strip() != ""
+        
+        st.write("Status zabezpieczenia konta `admin`:", "🔒 **Zabezpieczone hasłem**" if has_pass_admin else "🔓 **Brak hasła (Dostęp otwarty)**")
+        if has_pass_admin:
+            if st.button("💥 SKASUJ HASŁO KONTU ADMIN", type="primary", key="admin2_reset_root_admin"):
+                current_data["user_data"]["admin"]["password"] = ""
+                save_global_data(current_data)
+                st.session_state.global_store = current_data
+                st.success("✅ Pomyślnie skasowano hasło dla głównego konta 'admin'!")
+                st.rerun()
+                
+        st.write("---")
+        
+        # 2. Reset promowanych Administratorów
+        st.markdown("#### Lista dodatkowych Administratorów (`admins`)")
+        current_admins_list = current_data.get("admins", [])
+        if not current_admins_list:
+            st.caption("Brak innych zarejestrowanych administratorów w systemie.")
+        else:
+            for adm_idx, adm_k in enumerate(current_admins_list):
+                adm_prof = current_data["user_data"].get(adm_k, {})
+                adm_nick = adm_prof.get("saved_nick", "")
+                has_p = adm_prof.get("password", "").strip() != ""
+                
+                acol1, acol2 = st.columns([3, 1])
+                with acol1:
+                    st.markdown(f"• `{adm_k}`" + (f" (Nick: **{adm_nick}**)" if adm_nick else "") + (" 🔒" if has_p else " 🔓"))
+                with acol2:
+                    if has_p and st.button("Skasuj hasło", key=f"a2_res_adm_{adm_idx}", type="primary", use_container_width=True):
+                        current_data["user_data"][adm_k]["password"] = ""
+                        save_global_data(current_data)
+                        st.session_state.global_store = current_data
+                        st.success(f"Skasowano hasło dla konta {adm_k}!")
+                        st.rerun()
+                        
+        st.write("---")
+        
+        # 3. Reset Moderatorów
+        st.markdown("#### Lista Moderatorów (`moderators`)")
+        current_mods_list = current_data.get("moderators", [])
+        if not current_mods_list:
+            st.caption("Brak zarejestrowanych moderatorów w systemie.")
+        else:
+            for mod_idx, mod_k in enumerate(current_mods_list):
+                mod_prof = current_data["user_data"].get(mod_k, {})
+                mod_nick = mod_prof.get("saved_nick", "")
+                has_p = mod_prof.get("password", "").strip() != ""
+                
+                mcol1, mcol2 = st.columns([3, 1])
+                with mcol1:
+                    st.markdown(f"• `{mod_k}`" + (f" (Nick: **{mod_nick}**)" if mod_nick else "") + (" 🔒" if has_p else " 🔓"))
+                with mcol2:
+                    if has_p and st.button("Skasuj hasło", key=f"a2_res_mod_{mod_idx}", type="primary", use_container_width=True):
+                        current_data["user_data"][mod_k]["password"] = ""
+                        save_global_data(current_data)
+                        st.session_state.global_store = current_data
+                        st.success(f"Skasowano hasło dla konta {mod_k}!")
+                        st.rerun()
+
+    with rc2:
+        st.markdown("### 🚪 Wyjście")
+        with st.form("admin2_exit_form_active"):
+            target_back_key = st.text_input("Wklej klucz konta docelowego:")
+            if st.form_submit_button("Wyloguj i przełącz konto") and target_back_key.strip():
+                tbk = target_back_key.strip()
+                st.session_state.user_author_key = tbk
+                st.query_params["ak"] = tbk
+                if "admin2_authenticated" in st.session_state: del st.session_state.admin2_authenticated
+                components.html(f"""
+                    <script>
+                        localStorage.removeItem("auth_admin2");
+                        localStorage.setItem("koder_author_key2", "{tbk}");
+                        window.parent.location.href = window.parent.location.pathname + "?ak={tbk}";
+                    </script>
+                """, height=0, width=0)
+                st.rerun()
+    st.stop()
+
+# --- LOGIKA RANGI DLA STANDARDOWYCH KONT ---
 is_root_admin = (current_user == "admin")  
 is_promoted_admin = (current_user in st.session_state.global_store.get("admins", [])) 
 is_admin = is_root_admin or is_promoted_admin
@@ -871,7 +1001,6 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
     st.write("**Twój unikalny klucz konta:**")
     st.code(st.session_state.user_author_key, language="text")
     
-    # NAPRAWIONO: Podmiana błędnej zmiennej 'current_nick_val' na prawidłową 'user_saved_nick'
     new_nick = st.text_input("Ustaw swój stały podpis (nick):", value=user_saved_nick)
     if new_nick != user_saved_nick:
         st.session_state.global_store["user_data"][current_user]["saved_nick"] = new_nick.strip()
