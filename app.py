@@ -101,11 +101,12 @@ if current_user == "admin2":
     if not st.session_state.admin2_authenticated:
         st.subheader("🔒 Weryfikacja tożsamości systemu ratunkowego")
         with st.form("admin2_login_form"):
-            input_pass_admin2 = st.text_input("Podaj sztywne hasło ratunkowe:", type="password", placeholder="Wpisz hasło...")
+            input_pass_admin2 = st.text_input("Podaj pierwsze hasło ratunkowe:", type="password", placeholder="Wpisz pierwsze hasło...")
+            input_pass2_admin2 = st.text_input("Podaj drugie hasło ratunkowe:", type="password", placeholder="Wpisz drugie hasło...")
             submit_login_admin2 = st.form_submit_button("🔓 Uzyskaj dostęp awaryjny")
             
             if submit_login_admin2:
-                if input_pass_admin2 == "Przyrodnik1":
+                if input_pass_admin2 == "Przyrodnik1" and input_pass2_admin2 == "Ignacy":
                     st.session_state.admin2_authenticated = True
                     st.query_params["auth"] = "true"
                     components.html(f"""
@@ -116,7 +117,7 @@ if current_user == "admin2":
                     """, height=0, width=0)
                     st.rerun()
                 else:
-                    st.error("❌ Błędne hasło ratunkowe! Odmowa dostępu.")
+                    st.error("❌ Błędne hasła ratunkowe! Odmowa dostępu.")
                     
         st.write("---")
         with st.form("admin2_exit_form_locked"):
@@ -316,15 +317,16 @@ if not current_user:
         st.subheader("Zaloguj się do swojego profilu")
         with st.form("login_form_global"):
             log_key = st.text_input("Wpisz swój Klucz Konta:", placeholder="Twój unikalny login").strip()
-            log_pass = st.text_input("Wpisz hasło (jeśli zostało ustawione):", type="password", placeholder="Hasło...")
+            log_pass = st.text_input("Wpisz hasło (dla admin2 wpisz pierwsze hasło):", type="password", placeholder="Hasło...")
+            log_pass2 = st.text_input("Wpisz drugie hasło (TYLKO dla konta admin2):", type="password", placeholder="Drugie hasło...")
             submit_log = st.form_submit_button("🔓 Zaloguj się")
             
             if submit_log:
                 if not log_key:
                     st.error("❌ Musisz podać klucz konta.")
-                # --- PRZECHWYCENIE LOGOWANIA DLA ADMIN2 BEZ ZMIANY LINKU ---
+                # --- PRZECHWYCENIE LOGOWANIA DLA ADMIN2 Z DWOMA HASŁAMI ---
                 elif log_key == "admin2":
-                    if log_pass.strip() == "Przyrodnik1":
+                    if log_pass.strip() == "Przyrodnik1" and log_pass2.strip() == "Ignacy":
                         st.session_state.user_author_key = "admin2"
                         st.session_state.admin2_authenticated = True
                         st.query_params["ak"] = "admin2"
@@ -338,7 +340,7 @@ if not current_user:
                         """, height=0, width=0)
                         st.rerun()
                     else:
-                        st.error("❌ Błędne hasło ratunkowe dla konta admin2!")
+                        st.error("❌ Błędne hasła ratunkowe dla konta admin2!")
                 elif log_key not in st.session_state.global_store["user_data"]:
                     st.error("❌ Takie konto nie istnieje. Załóż je w zakładce obok!")
                 else:
@@ -1029,14 +1031,23 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                 submit_mod = st.form_submit_button("➕ Nadaj uprawnienia moderatora")
                 if submit_mod and mod_key_input.strip():
                     target_key = mod_key_input.strip()
-                    if target_key == "admin" or target_key in st.session_state.global_store.get("admins", []): st.error("Wyższa ranga.")
-                    elif target_key in current_mods: st.warning("Już jest mod.")
+                    target_user_profile = st.session_state.global_store.get("user_data", {}).get(target_key, {})
+                    target_password = target_user_profile.get("password", "").strip()
+                    
+                    if target_key == "admin" or target_key in st.session_state.global_store.get("admins", []): 
+                        st.error("❌ Wyższa ranga.")
+                    elif target_key in current_mods: 
+                        st.warning("⚠️ Już jest mod.")
+                    # WYMÓG HASŁA DLA NOWEGO MODERATORA
+                    elif not target_password:
+                        st.error("❌ Błąd bezpieczeństwa: Użytkownik musi najpierw ustawić hasło na swoim koncie, aby otrzymać rangę Moderatora!")
                     else:
                         current_data = load_global_data()
                         if "moderators" not in current_data: current_data["moderators"] = []
                         current_data["moderators"].append(target_key)
                         save_global_data(current_data)
                         st.session_state.global_store = current_data
+                        st.success(f"✅ Nadano rangę Moderatora dla `{target_key}`")
                         st.rerun()
                         
             if current_mods:
@@ -1061,14 +1072,22 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                     submit_adm = st.form_submit_button("👑 Nadaj uprawnienia administratora")
                     if submit_adm and adm_key_input.strip():
                         target_key = adm_key_input.strip()
+                        target_user_profile = st.session_state.global_store.get("user_data", {}).get(target_key, {})
+                        target_password = target_user_profile.get("password", "").strip()
+                        
                         if target_key != "admin" and target_key not in current_admins:
-                            current_data = load_global_data()
-                            if "admins" not in current_data: current_data["admins"] = []
-                            current_data["admins"].append(target_key)
-                            if "moderators" in current_data and target_key in current_data["moderators"]: current_data["moderators"].remove(target_key)
-                            save_global_data(current_data)
-                            st.session_state.global_store = current_data
-                            st.rerun()
+                            # WYMÓG HASŁA DLA NOWEGO ADMINISTRATORA
+                            if not target_password:
+                                st.error("❌ Błąd bezpieczeństwa: Użytkownik musi najpierw ustawić hasło na swoim koncie, aby otrzymać rangę Administratora!")
+                            else:
+                                current_data = load_global_data()
+                                if "admins" not in current_data: current_data["admins"] = []
+                                current_data["admins"].append(target_key)
+                                if "moderators" in current_data and target_key in current_data["moderators"]: current_data["moderators"].remove(target_key)
+                                save_global_data(current_data)
+                                st.session_state.global_store = current_data
+                                st.success(f"🛡️ Nadano rangę Administratora dla `{target_key}`")
+                                st.rerun()
                             
                 if current_admins:
                     for a_idx, a_key in enumerate(current_admins):
