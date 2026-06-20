@@ -313,13 +313,19 @@ if not current_user:
                     st.success("🎉 Konto zostało pomyślnie utworzone!")
                     st.rerun()
                     
-    with tab_login:
+        with tab_login:
         st.subheader("Zaloguj się do swojego profilu")
         with st.form("login_form_global"):
-            log_key = st.text_input("Wpisz swój Klucz Konta:", placeholder="Twój unikalny login").strip()
-            log_pass = st.text_input("Wpisz hasło (dla admin2 wpisz pierwsze hasło):", type="password", placeholder="Hasło...")
-            log_pass2 = st.text_input("Wpisz drugie hasło (TYLKO dla konta admin2):", type="password", placeholder="Drugie hasło...")
-            submit_log = st.form_submit_button("🔓 Zaloguj się")
+            log_key = St.text_input("Wpisz swój Klucz Konta:", placeholder="Twój unikalny login").strip()
+            log_pass = St.text_input("Wpisz hasło:", type="password", placeholder="Hasło...")
+            
+            # Dynamiczne sprawdzanie warunku dla admin2 przed pokazaniem drugiego pola
+            if log_key == "admin2" and log_pass == "Przyrodnik1":
+                log_pass2 = St.text_input("Wpisz drugie hasło ratunkowe (Ignacy):", type="password", placeholder="Drugie hasło...")
+            else:
+                log_pass2 = "" # Domyślna wartość, gdy pole jest ukryte
+                
+            submit_log = St.form_submit_button("🔓 Zaloguj się")
             
             if submit_log:
                 if not log_key:
@@ -1157,11 +1163,12 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
             st.session_state.global_store = current_data
             st.rerun()
 
-    st.write("---")
+        st.write("---")
     st.write("**Twój unikalny klucz konta:**")
     st.code(st.session_state.user_author_key, language="text")
     
-    new_nick = st.text_input("Zmień swój stały podpis (nick):", value=user_saved_nick)
+    # Tutaj na końcu musi być zmienna user_saved_nick
+    new_nick = St.text_input("Zmień swój stały podpis (nick):", value=user_saved_nick)
     if new_nick != user_saved_nick:
         st.session_state.global_store["user_data"][current_user]["saved_nick"] = new_nick.strip()
         save_global_data(st.session_state.global_store)
