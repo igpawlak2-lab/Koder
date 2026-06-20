@@ -155,7 +155,6 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # --- OBSŁUGA TRWAŁEJ SESJI LOGOWANIA Z LOKALNEJ PAMIĘCI PRZEGLĄDARKI ---
-# Odczytujemy stan zalogowania przesłany przez JS z localStorage
 url_auth_state = params.get("auth", "")
 if "account_authenticated" not in st.session_state:
     st.session_state.account_authenticated = (url_auth_state == "true")
@@ -169,7 +168,6 @@ if account_has_password:
         st.title("🔒 Konto zabezpieczone hasłem")
         st.write("Ten klucz konta ma przypisane hasło. Wprowadź je, aby uzyskać dostęp.")
         
-        # Blok JS sprawdzający stan w przeglądarce i automatycznie wymuszający zalogowanie, jeśli klucz pasuje
         components.html(f"""
             <script>
                 var localAuthState = localStorage.getItem("auth_{current_user}");
@@ -199,7 +197,6 @@ if account_has_password:
                 else:
                     st.error("❌ Nieprawidłowe hasło konta!")
         
-        # --- SEKCJA AWARYJNA O RESET ---
         st.write("---")
         st.markdown("### 💡 Zapomniałeś hasła?")
         st.write("Aby zapobiec niechcianym zmianom, musisz samodzielnie podać prawidłowy Kod Bezpieczeństwa przypisany do Twojego konta.")
@@ -401,7 +398,7 @@ user_saved_nick = user_profile.get("saved_nick", "")
 c1, c2 = st.columns([1.6, 1.4])
 with c1:
     if is_staff:
-        tab_main, tab_chat = st.tabs(["🎛️ Panel Sterowania", "🔒 Panel Komunikacji Ekipy"])
+        tab_main, tab_chat = st.tabs(["🎛️ Panel Sterowania", "🔒 Prywatny Chat Staffu"])
     else:
         tab_main = st.tabs(["🎛️ Panel Sterowania"])[0]
         
@@ -457,11 +454,12 @@ with c1:
             staff_nick = user_saved_nick if user_saved_nick else f"User_{current_user[:6]}"
             
             if chat_type == "👥 Grupa Ogólna Staffu":
-                st.subheader("👥 Ogólny Kanał Administracji")
+                st.markdown(f"<h3>🕵️‍♂️ Prywatny kanał komunikacji</h3>", unsafe_allow_html=True)
+                st.caption("Ten czat jest widoczny wyłącznie dla Administratora oraz zatwierdzonych Moderatorów.")
                 
                 with st.form("staff_chat_group_form", clear_on_submit=True):
-                    chat_msg = st.text_input(f"Wiadomość jako **{staff_nick} ({role_label})**:", placeholder="Wpisz wiadomość...")
-                    send_chat = st.form_submit_button("🚀 Wyślij do Wszystkich")
+                    chat_msg = st.text_input(f"Wiadomość jako **{staff_nick} ({role_label})**:", placeholder="Wpisz tajną wiadomość do ekipy...")
+                    send_chat = st.form_submit_button("🚀 Wyślij do Staffu")
                     
                     if send_chat and chat_msg.strip():
                         time_stamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
@@ -476,9 +474,16 @@ with c1:
                         st.session_state.global_store = current_data
                         st.rerun()
 
+                if st.button("🗑️ Wyczyść cały Chat Staffu", key="global_clear_staff_chat_btn"):
+                    current_data = load_global_data()
+                    current_data["staff_chat"] = []
+                    save_global_data(current_data)
+                    st.session_state.global_store = current_data
+                    st.rerun()
+
                 staff_messages = st.session_state.global_store.get("staff_chat", [])
                 st.write(" ")
-                with st.container(height=320):
+                with st.container(height=450):
                     if not staff_messages:
                         st.caption("Brak wiadomości.")
                     else:
@@ -491,10 +496,10 @@ with c1:
                             ch_col1, ch_col2 = st.columns([4.5, 1.5])
                             with ch_col1:
                                 st.markdown(f"""
-                                    <div style="background-color: rgba(255,255,255,0.05); padding: 8px 12px; border-radius: 6px; margin-bottom: 8px; border-left: 4px solid {current_bar_color};">
-                                        <span style="color: {current_bar_color}; font-weight: bold;">[{msg.get('sender_role')}] {msg.get('sender_nick')}</span> 
-                                        <span style="font-size: 0.8rem; opacity: 0.6; float: right;">{msg.get('time')}</span>
-                                        <p style="margin: 4px 0 0 0; font-size: 1rem;">{msg.get('text')}</p>
+                                    <div style="background-color: rgba(255,255,255,0.02); padding: 8px 12px; border-radius: 6px; margin-bottom: 8px; border-left: 4px solid {current_bar_color};">
+                                        <span style="font-weight: bold; color: {main_text_theme};">[{msg.get('sender_role')}] {msg.get('sender_nick')}</span> 
+                                        <span style="font-size: 0.8rem; opacity: 0.5; float: right;">{msg.get('time')}</span>
+                                        <p style="margin: 4px 0 0 0; font-size: 1.05rem; color: {main_text_theme};">{msg.get('text')}</p>
                                     </div>
                                 """, unsafe_allow_html=True)
                             with ch_col2:
@@ -514,7 +519,6 @@ with c1:
                 mod_list = st.session_state.global_store.get("moderators", [])
                 admin_list = st.session_state.global_store.get("admins", [])
                 
-                # POPRAWKA LOGIKI: Nowe konta dodane do rang admin_list/mod_list są teraz w 100% poprawnie uwzględniane na liście DM
                 staff_targets = {}
                 for u_key, u_val in all_users.items():
                     is_target_staff = (u_key == "admin") or (u_key in admin_list) or (u_key in mod_list)
@@ -643,7 +647,7 @@ with c2:
             st.session_state.global_store["user_data"][current_user]["notepad"] = val
             save_global_data(st.session_state.global_store)
 
-    note_input = st.text_area("Zapisz swoje uwagi:", value=user_notepad_content, placeholder="Wpisz notatki...", height=180, key="local_notepad_field", on_change=save_notepad_instantly)
+    note_input = st.text_area("Zapisz swoje uwagi:", value=user_notepad_content, placeholder="Wpisz notatki, kody lub sekwencje...", height=180, key="local_notepad_field", on_change=save_notepad_instantly)
 
 # --- GLOBALNE POLUBIENIA ---
 st.write("---")
@@ -676,7 +680,6 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
     my_secure_code = generate_account_secure_code(current_user)
     st.markdown(f"ℹ️ Twój osobisty **Kod Bezpieczeństwa Konta:** ` {my_secure_code} `")
     
-    # NOWOŚĆ: Przycisk wylogowania zapamiętanej sesji (czyszczenie localStorage)
     if account_has_password and st.session_state.account_authenticated:
         if st.button("🔒 Wyloguj się z profilu", type="primary", key="logout_action_button_trigger"):
             st.session_state.account_authenticated = False
@@ -867,8 +870,10 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
     st.write("---")
     st.write("**Twój unikalny klucz konta:**")
     st.code(st.session_state.user_author_key, language="text")
-    new_nick = st.text_input("Ustaw swój stały podpis (nick):", value=current_nick_val)
-    if new_nick != current_nick_val:
+    
+    # NAPRAWIONO: Podmiana błędnej zmiennej 'current_nick_val' na prawidłową 'user_saved_nick'
+    new_nick = st.text_input("Ustaw swój stały podpis (nick):", value=user_saved_nick)
+    if new_nick != user_saved_nick:
         st.session_state.global_store["user_data"][current_user]["saved_nick"] = new_nick.strip()
         save_global_data(st.session_state.global_store)
         st.rerun()
