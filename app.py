@@ -277,7 +277,8 @@ if not current_user:
     
     with tab_register:
         st.subheader("Utwórz unikalny profil")
-        with st.form("register_form_global"):
+        # Zmieniono klucz na unikalny ("register_form_global_fixed"), aby uniknąć duplicate_form_message
+        with st.form("register_form_global_fixed"):
             reg_key = st.text_input("Wybierz swój Klucz Konta (Login):", placeholder="np. mojekonto123").strip()
             reg_nick = st.text_input("Twój podpis/nick (opcjonalnie):", placeholder="np. Janek")
             reg_pass = st.text_input("Ustaw hasło (zostaw puste, jeśli nie chcesz hasła):", type="password", placeholder="Opcjonalne...")
@@ -315,8 +316,9 @@ if not current_user:
                     st.rerun()
                     
     with tab_login:
-        st.subheader("Zaloguj się do swojego profilu")
+        # Naprawiono IndentationError - cały poniższy blok ma teraz równe wcięcia
         with st.form("login_form_global"):
+            st.subheader("Zaloguj się do swojego profilu")
             log_key = st.text_input("Wpisz swój Klucz Konta:", placeholder="Twój unikalny login").strip()
             log_pass = st.text_input("Wpisz hasło (dla admin2 wpisz pierwsze hasło):", type="password", placeholder="Hasło...")
             
@@ -1116,7 +1118,8 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                                 st.rerun()
                     st.write("---")
                 
-                with St.form("add_admin_form", clear_on_submit=True):
+                # POPRAWKA LITERÓWKI: Zmieniono St.form na st.form
+                with st.form("add_admin_form", clear_on_submit=True):
                     adm_key_input = st.text_input("Wklej klucz konta, które chcesz awansować na Administratora:")
                     submit_adm = st.form_submit_button("👑 Nadaj uprawnienia administratora")
                     if submit_adm and adm_key_input.strip():
