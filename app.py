@@ -92,7 +92,7 @@ def generate_account_secure_code(account_key):
 # --- PANEL AWARYJNEGO KONTA WŁAŚCICIELA (admin2) ---
 if current_user == "admin2":
     st.markdown("<h1 style='color: #FF0000; margin-bottom: 0;'>🚨 SYSTEM RATUNKOWY (admin2)</h1>", unsafe_allow_html=True)
-    st.write("Uruchomiono niezależny panel awaryjnego resetu haseł kadry zarządzającej.")
+    st.write("Uruchomiono niezależny panel awaryjnego resetu haseł oraz zarządzania rangami kadry.")
     st.write("---")
     
     if "admin2_authenticated" not in st.session_state:
@@ -130,32 +130,36 @@ if current_user == "admin2":
                 st.rerun()
         st.stop()
 
-    # Logika resetowania haseł z poziomu konta admin2
-    st.success("⚙️ Autoryzacja poprawna. Masz bezpośredni dostęp modyfikacyjny do struktur uwierzytelniania.")
+    # Logika zarządcza z poziomu konta admin2
+    st.success("⚙️ Autoryzacja poprawna. Masz pełną niezależną kontrolę nad hasłami i rangami najwyższego poziomu.")
     
     rc1, rc2 = st.columns([2, 1])
     with rc1:
-        st.markdown("### 🛠️ Zarządzanie hasłami kadry")
-        
-        # 1. Reset głównego konta admin
-        st.markdown("#### Główny Właściciel (`admin`)")
+        st.markdown("### 🛠️ Odzyskiwanie uprawnień i zarządzanie kadrami")
         current_data = load_global_data()
+        
+        # 1. Zarządzanie głównym kontem admin
+        st.markdown("#### 👑 Główny Właściciel (`admin`)")
         admin_profile = current_data["user_data"].get("admin", {})
         has_pass_admin = admin_profile.get("password", "").strip() != ""
+        st.write("Status zabezpieczenia konta:", "🔒 **Zabezpieczone hasłem**" if has_pass_admin else "🔓 **Brak hasła (Dostęp otwarty)**")
         
-        st.write("Status zabezpieczenia konta `admin`:", "🔒 **Zabezpieczone hasłem**" if has_pass_admin else "🔓 **Brak hasła (Dostęp otwarty)**")
-        if has_pass_admin:
-            if st.button("💥 SKASUJ HASŁO KONTU ADMIN", type="primary", key="admin2_reset_root_admin"):
-                current_data["user_data"]["admin"]["password"] = ""
+        with st.form("admin2_change_root_password_form"):
+            new_root_pass_input = st.text_input("Wpisz NOWE hasło dla konta admin (lub zostaw puste, aby usunąć):", type="password", placeholder="Wpisz hasło...")
+            if st.form_submit_button("💾 Zapisz nowe hasło konta admin"):
+                if "user_data" not in current_data: current_data["user_data"] = {}
+                if "admin" not in current_data["user_data"]: current_data["user_data"]["admin"] = {}
+                
+                current_data["user_data"]["admin"]["password"] = new_root_pass_input.strip()
                 save_global_data(current_data)
                 st.session_state.global_store = current_data
-                st.success("✅ Pomyślnie skasowano hasło dla głównego konta 'admin'!")
+                st.success("✅ Pomyślnie zaktualizowano hasło dla głównego konta 'admin'!")
                 st.rerun()
                 
         st.write("---")
         
-        # 2. Reset promowanych Administratorów
-        st.markdown("#### Lista dodatkowych Administratorów (`admins`)")
+        # 2. Zarządzanie promowanymi Administratorów oraz usuwanie rangi
+        st.markdown("#### 🛡️ Lista dodatkowych Administratorów (`admins`)")
         current_admins_list = current_data.get("admins", [])
         if not current_admins_list:
             st.caption("Brak innych zarejestrowanych administratorów w systemie.")
@@ -165,21 +169,29 @@ if current_user == "admin2":
                 adm_nick = adm_prof.get("saved_nick", "")
                 has_p = adm_prof.get("password", "").strip() != ""
                 
-                acol1, acol2 = st.columns([3, 1])
+                acol1, acol2, acol3 = st.columns([2.5, 1.5, 1.5])
                 with acol1:
-                    st.markdown(f"• `{adm_k}`" + (f" (Nick: **{adm_nick}**)" if adm_nick else "") + (" 🔒" if has_p else " 🔓"))
+                    st.markdown(f"• Klucz: `{adm_k}`" + (f" (<span style='color:#FF4B4B;'><b>{adm_nick}</b></span>)" if adm_nick else "") + (" 🔒" if has_p else " 🔓"), unsafe_allow_html=True)
                 with acol2:
-                    if has_p and st.button("Skasuj hasło", key=f"a2_res_adm_{adm_idx}", type="primary", use_container_width=True):
+                    if has_p and st.button("Skasuj hasło", key=f"a2_res_adm_{adm_idx}", type="secondary", use_container_width=True):
                         current_data["user_data"][adm_k]["password"] = ""
                         save_global_data(current_data)
                         st.session_state.global_store = current_data
-                        st.success(f"Skasowano hasło dla konta {adm_k}!")
+                        st.success(f"Skasowano hasło administratora {adm_k}!")
                         st.rerun()
+                with acol3:
+                    if st.button("💥 Usuń rangę", key=f"a2_strip_adm_{adm_idx}", type="primary", use_container_width=True):
+                        if adm_k in current_data.get("admins", []):
+                            current_data["admins"].remove(adm_k)
+                            save_global_data(current_data)
+                            st.session_state.global_store = current_data
+                            st.success(f"Pomyślnie odebrano rangę Administratora dla {adm_k}!")
+                            st.rerun()
                         
         st.write("---")
         
-        # 3. Reset Moderatorów
-        st.markdown("#### Lista Moderatorów (`moderators`)")
+        # 3. Zarządzanie Moderatorami oraz usuwanie rangi
+        st.markdown("#### 👥 Lista Moderatorów (`moderators`)")
         current_mods_list = current_data.get("moderators", [])
         if not current_mods_list:
             st.caption("Brak zarejestrowanych moderatorów w systemie.")
@@ -189,16 +201,24 @@ if current_user == "admin2":
                 mod_nick = mod_prof.get("saved_nick", "")
                 has_p = mod_prof.get("password", "").strip() != ""
                 
-                mcol1, mcol2 = st.columns([3, 1])
+                mcol1, mcol2, mcol3 = st.columns([2.5, 1.5, 1.5])
                 with mcol1:
-                    st.markdown(f"• `{mod_k}`" + (f" (Nick: **{mod_nick}**)" if mod_nick else "") + (" 🔒" if has_p else " 🔓"))
+                    st.markdown(f"• Klucz: `{mod_k}`" + (f" (<span style='color:#FFA500;'><b>{mod_nick}</b></span>)" if mod_nick else "") + (" 🔒" if has_p else " 🔓"), unsafe_allow_html=True)
                 with mcol2:
-                    if has_p and st.button("Skasuj hasło", key=f"a2_res_mod_{mod_idx}", type="primary", use_container_width=True):
+                    if has_p and st.button("Skasuj hasło", key=f"a2_res_mod_{mod_idx}", type="secondary", use_container_width=True):
                         current_data["user_data"][mod_k]["password"] = ""
                         save_global_data(current_data)
                         st.session_state.global_store = current_data
-                        st.success(f"Skasowano hasło dla konta {mod_k}!")
+                        st.success(f"Skasowano hasło moderatora {mod_k}!")
                         st.rerun()
+                with mcol3:
+                    if st.button("💥 Usuń rangę", key=f"a2_strip_mod_{mod_idx}", type="primary", use_container_width=True):
+                        if mod_k in current_data.get("moderators", []):
+                            current_data["moderators"].remove(mod_k)
+                            save_global_data(current_data)
+                            st.session_state.global_store = current_data
+                            st.success(f"Pomyślnie odebrano rangę Moderatora dla {mod_k}!")
+                            st.rerun()
 
     with rc2:
         st.markdown("### 🚪 Wyjście")
