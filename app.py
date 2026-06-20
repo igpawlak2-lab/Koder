@@ -21,7 +21,8 @@ def load_global_data():
         "moderators": [],                       
         "admins": [],                       
         "staff_chat": [],    
-        "staff_dms": [],                       
+        "staff_dms": [],
+        "password_resets": [],  # Nowy dedykowany bezpieczny kanał zgłoszeniowy                     
         "announcement": "Brak aktualnych ogłoszeń.",
         "announcement_font": "sans-serif",
         "announcement_size": 16,
@@ -42,6 +43,7 @@ def load_global_data():
                 if "admins" not in data: data["admins"] = []
                 if "staff_chat" not in data: data["staff_chat"] = [] 
                 if "staff_dms" not in data: data["staff_dms"] = []
+                if "password_resets" not in data: data["password_resets"] = []
                 if "announcement" not in data: data["announcement"] = "Brak aktualnych ogłoszeń."
                 if "announcement_font" not in data: data["announcement_font"] = "sans-serif"
                 if "announcement_size" not in data: data["announcement_size"] = 16
@@ -269,43 +271,50 @@ if account_has_password:
                 else:
                     st.error("❌ Nieprawidłowe hasło konta!")
         
-        # --- SEKCJA AWARYJNA DLA ZAPOMINALSKICH ---
+        # --- SEKCJA AWARYJNA: FORMULARZ ZGŁOSZENIOWY DO WŁAŚCICIELA ---
         st.write("---")
         st.markdown("### 💡 Zapomniałeś hasła?")
-        st.write("Możesz wysłać automatyczne powiadomienie do Właściciela z prośbą o zresetowanie hasła Twojego profilu.")
+        st.write("Aby zapobiec niechcianym zmianom, musisz samodzielnie podać prawidłowy Kod Bezpieczeństwa przypisany do Twojego konta.")
         
-        # Obliczamy kod bezpieczeństwa w tle na ekranie logowania
-        locked_user_secure_code = generate_account_secure_code(current_user)
-        locked_user_nick = user_profile.get("saved_nick", "").strip()
-        display_name_on_request = locked_user_nick if locked_user_nick else f"Konto_{current_user[:6]}"
-        
-        if st.button("📩 Wyślij prośbę o reset hasła do Admina", type="secondary"):
-            time_stamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
+        with st.form("emergency_reset_request_form"):
+            user_entered_code = st.text_input("Wpisz swój 6-cyfrowy Kod Bezpieczeństwa:", type="default", placeholder="np. 123456", max_chars=6)
+            submit_request = st.form_submit_button("📩 Wyślij prośbę o reset hasła do Właściciela")
             
-            # Formułujemy treść powiadomienia, która trafi na czat administracyjny
-            emergency_message = {
-                "sender_nick": f"🆘 POMOC: {display_name_on_request}",
-                "sender_role": "Użytkownik",
-                "time": time_stamp,
-                "text": f"Zapomniałem hasła, proszę o reset. Mój kod bezpieczeństwa to: **{locked_user_secure_code}** (Klucz konta: `{current_user}`)",
-                "bar_color": "#FF0000", # Czerwony pasek dla wyróżnienia zgłoszenia alarmowego
-                "author_key": current_user
-            }
-            
-            current_data = load_global_data()
-            if "staff_chat" not in current_data:
-                current_data["staff_chat"] = []
+            if submit_request:
+                clean_code = user_entered_code.strip()
+                expected_code = generate_account_secure_code(current_user)
                 
-            # Sprawdzamy czy identyczna prośba nie została już wysłana przed momentem
-            already_sent = any(m.get("author_key") == current_user and "Zapomniałem hasła" in m.get("text", "") for m in current_data["staff_chat"])
-            
-            if already_sent:
-                st.warning("⚠️ Zgłoszenie zostało już wysłane na czat ekipy! Poczekaj, aż Admin je odczyta.")
-            else:
-                current_data["staff_chat"].append(emergency_message)
-                save_global_data(current_data)
-                st.session_state.global_store = current_data
-                st.success("✅ Prośba o reset wraz z Twoim kodem bezpieczeństwa i nickiem została pomyślnie wysłana na czat administracji!")
+                if not clean_code:
+                    st.error("❌ Musisz podać swój kod bezpieczeństwa, aby wysłać prośbę!")
+                elif clean_code != expected_code:
+                    st.error("❌ Podany Kod Bezpieczeństwa jest nieprawidłowy! Zgłoszenie nie zostało wysłane.")
+                else:
+                    # Kod jest poprawny - generujemy zgłoszenie
+                    time_stamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
+                    locked_user_nick = user_profile.get("saved_nick", "").strip()
+                    display_name_on_request = locked_user_nick if locked_user_nick else f"Konto_{current_user[:6]}"
+                    
+                    emergency_message = {
+                        "sender_nick": display_name_on_request,
+                        "time": time_stamp,
+                        "text": f"Zapomniałem hasła, proszę o reset (podaje ten 6 cyfrowy kod: **{clean_code}**)",
+                        "author_key": current_user
+                    }
+                    
+                    current_data = load_global_data()
+                    if "password_resets" not in current_data:
+                        current_data["password_resets"] = []
+                        
+                    # Sprawdzamy powielanie zgłoszeń
+                    already_sent = any(m.get("author_key") == current_user for m in current_data["password_resets"])
+                    
+                    if already_sent:
+                        st.warning("⚠️ Prośba o reset oczekuje już w panelu Właściciela. Czekaj cierpliwie.")
+                    else:
+                        current_data["password_resets"].append(emergency_message)
+                        save_global_data(current_data)
+                        st.session_state.global_store = current_data
+                        st.success("✅ Prośba została pomyślnie dostarczona do tajnego panelu Właściciela!")
         
         # Pozwalamy na przełączenie klucza nawet z ekranu blokady
         st.write("---")
@@ -579,7 +588,7 @@ with c1:
                                     unsafe_allow_html=True
                                 )
                             with ch_col2:
-                                if is_my_own_message or is_admin: # Admini oraz autor mogą czyścić wpisy, w tym zgłoszenia SOS
+                                if is_my_own_message or is_admin:
                                     if st.button("❌ Usuń", key=f"del_gmsg_{original_idx}", type="primary", use_container_width=True):
                                         current_data = load_global_data()
                                         if original_idx < len(current_data["staff_chat"]):
@@ -796,7 +805,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
     
     my_secure_code = generate_account_secure_code(current_user)
     st.markdown(f"ℹ️ Twój osobisty **Kod Bezpieczeństwa Konta:** ` {my_secure_code} `")
-    st.caption("⚠️ Zapisz ten kod! Jeśli zapomnisz hasła, tylko podanie tego kodu Właścicielowi pozwoli na jego zresetowanie.")
+    st.caption("⚠️ Zapisz ten kod! Jeśli zapomnisz hasła, tylko ręczne wpisanie tego kodu na ekranie blokady pozwoli powiadomić Właściciela.")
     
     if not saved_password:
         st.info("💡 To konto nie posiada jeszcze hasła. Każdy, kto pozna Twój klucz URL, może wejść na Twój profil.")
@@ -862,7 +871,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
         st.subheader("👑 Panel Admina: Zarządzanie systemem")
         
         if is_root_admin:
-            adm_tabs = st.tabs(["👥 Moderatorzy", "🛡️ Administratorzy", "🔑 Resetowanie Haseł"])
+            adm_tabs = st.tabs(["👥 Moderatorzy", "🛡️ Administratorzy", "🔑 Resetowanie Haseł i Wnioski"])
         else:
             adm_tabs = st.tabs(["👥 Moderatorzy"])
             
@@ -951,14 +960,48 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                                     st.session_state.global_store = current_data
                                     st.rerun()
 
-            # ZAKŁADKA: Bezpieczne resetowanie hasła dla Właściciela (admin)
+            # ZAKŁADKA: Bezpieczne resetowanie haseł ORAZ dedykowany chat próśb (TYLKO DLA WŁAŚCICIELA)
             with adm_tabs[2]:
-                st.markdown("### 🔑 Awaryjne resetowanie haseł")
-                st.caption("Opcja dostępna wyłącznie dla Głównego Właściciela. Wymaga podania Klucza Konta ORAZ unikalnego 6-cyfrowego Kodu Bezpieczeństwa tego użytkownika.")
+                st.markdown("### 🔒 Skrzynka próśb o reset haseł (Widok Właściciela)")
+                st.caption("Tutaj trafiają wyłącznie poprawne zgłoszenia awaryjne. Moderatorzy ani inni administratorzy nie mają tu dostępu.")
+                
+                resets_list = st.session_state.global_store.get("password_resets", [])
+                with st.container(height=220):
+                    if not resets_list:
+                        st.caption("Brak nowych próśb o reset hasła.")
+                    else:
+                        for r_reversed_idx, req in enumerate(reversed(resets_list)):
+                            orig_req_idx = len(resets_list) - 1 - r_reversed_idx
+                            
+                            r_col1, r_col2 = st.columns([4.2, 1.8])
+                            with r_col1:
+                                st.markdown(
+                                    f"""
+                                    <div style="background-color: rgba(255,0,0,0.06); padding: 8px 12px; border-radius: 6px; margin-bottom: 8px; border-left: 4px solid #FF0000;">
+                                        <span style="color: #FF0000; font-weight: bold;">👤 Kto: {req.get('sender_nick')}</span>
+                                        <span style="font-size: 0.75rem; opacity: 0.5; margin-left: 10px;">Klucz: `{req.get('author_key')}`</span>
+                                        <span style="font-size: 0.8rem; opacity: 0.6; float: right;">{req.get('time')}</span>
+                                        <p style="margin: 4px 0 0 0; font-size: 0.95rem;">{req.get('text')}</p>
+                                    </div>
+                                    """, 
+                                    unsafe_allow_html=True
+                                )
+                            with r_col2:
+                                if st.button("🗑️ Odrzuć / Usuń", key=f"del_req_{orig_req_idx}", type="primary", use_container_width=True):
+                                    current_data = load_global_data()
+                                    if orig_req_idx < len(current_data["password_resets"]):
+                                        current_data["password_resets"].pop(orig_req_idx)
+                                        save_global_data(current_data)
+                                        st.session_state.global_store = current_data
+                                        st.rerun()
+
+                st.write("---")
+                st.markdown("### 🛠️ Formularz wykonawczy resetu")
+                st.caption("Wpisz dane z powyższego zgłoszenia, aby zdjąć zabezpieczenie z wybranego konta:")
                 
                 with st.form("reset_user_password_form", clear_on_submit=True):
-                    reset_key = st.text_input("1. Klucz konta użytkownika (ID):", placeholder="Wklej klucz, np. usr_...")
-                    reset_code = st.text_input("2. Specjalny 6-cyfrowy Kod Bezpieczeństwa konta:", placeholder="Np. 123456", max_chars=6)
+                    reset_key = st.text_input("1. Klucz konta użytkownika (ID):", placeholder="Wklej klucz z wiadomości SOS...")
+                    reset_code = st.text_input("2. Przepisany 6-cyfrowy Kod Bezpieczeństwa:", placeholder="Np. 123456", max_chars=6)
                     submit_reset = st.form_submit_button("💥 Całkowicie usuń hasło profilu")
                     
                     if submit_reset:
@@ -966,19 +1009,24 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                         rc = reset_code.strip()
                         
                         if not rk or not rc:
-                            st.error("❌ Musisz uzupełnić oba pola: klucz konta oraz specjalny kod bezpieczeństwa!")
+                            st.error("❌ Musisz uzupełnić oba pola!")
                         elif rk not in st.session_state.global_store.get("user_data", {}):
-                            st.error("❌ Podany klucz konta nie istnieje w bazie danych aplikacji!")
+                            st.error("❌ Podany klucz konta nie istnieje w bazie!")
                         else:
                             correct_code = generate_account_secure_code(rk)
                             if rc != correct_code:
-                                st.error("❌ Weryfikacja nieudana! Podany Kod Bezpieczeństwa jest nieprawidłowy dla tego konta!")
+                                st.error("❌ Weryfikacja nieudana! Kod weryfikacyjny nie zgadza się z algorytmem klucza!")
                             else:
                                 current_data = load_global_data()
                                 current_data["user_data"][rk]["password"] = ""
+                                
+                                # Czyszczenie zgłoszenia z listy po udanym wykonaniu resetu
+                                if "password_resets" in current_data:
+                                    current_data["password_resets"] = [m for m in current_data["password_resets"] if m.get("author_key") != rk]
+                                    
                                 save_global_data(current_data)
                                 st.session_state.global_store = current_data
-                                st.success(f"✅ Pomyślnie zresetowano i usunięto hasło dla konta `{rk}`. Użytkownik może teraz wejść bez podawania hasła.")
+                                st.success(f"✅ Pomyślnie usunięto hasło dla konta `{rk}`.")
                                 st.rerun()
 
         st.write("---")
