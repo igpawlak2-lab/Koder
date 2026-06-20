@@ -97,10 +97,8 @@ current_user = st.session_state.user_author_key
 
 # Funkcja generująca niezależny, bezpieczny 6-cyfrowy kod weryfikacyjny konta na podstawie jego klucza
 def generate_account_secure_code(account_key):
-    # Wykorzystujemy prosty algorytm skrótu SHA256 z solą, by kod był niezmienny dla danego klucza
     salt = "KoderSecureSystemSalt2026"
     hashed = hashlib.sha256((account_key + salt).encode('utf-8')).hexdigest()
-    # Wyciągamy z heksadecymalnego ciągu unikalną wartość liczbową i mapujemy na 6 cyfr
     return str(int(hashed[:8], 16))[-6:].zfill(6)
 
 # --- LOGIKA RANGI ---
@@ -130,7 +128,7 @@ if current_user not in st.session_state.global_store["user_data"]:
     }
     save_global_data(st.session_state.global_store)
 
-# ISTNIEJĄCE KONTO: Kompatybilność wsteczna.
+# ISTNIEJĄCE KONTO: Kompatybilność wsteczna
 user_profile = st.session_state.global_store["user_data"][current_user]
 updated_profile = False
 
@@ -271,8 +269,43 @@ if account_has_password:
                 else:
                     st.error("❌ Nieprawidłowe hasło konta!")
         
-        # Ekran awaryjny z przypomnieniem o kodzie bezpieczeństwa dla zapominalskich
-        st.info("💡 Zapomniałeś hasła? Skontaktuj się z Właścicielem strony (`admin`) i przekaż mu swój **Klucz konta** oraz **6-cyfrowy Kod Bezpieczeństwa** wygenerowany dla Twojego profilu.")
+        # --- SEKCJA AWARYJNA DLA ZAPOMINALSKICH ---
+        st.write("---")
+        st.markdown("### 💡 Zapomniałeś hasła?")
+        st.write("Możesz wysłać automatyczne powiadomienie do Właściciela z prośbą o zresetowanie hasła Twojego profilu.")
+        
+        # Obliczamy kod bezpieczeństwa w tle na ekranie logowania
+        locked_user_secure_code = generate_account_secure_code(current_user)
+        locked_user_nick = user_profile.get("saved_nick", "").strip()
+        display_name_on_request = locked_user_nick if locked_user_nick else f"Konto_{current_user[:6]}"
+        
+        if st.button("📩 Wyślij prośbę o reset hasła do Admina", type="secondary"):
+            time_stamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
+            
+            # Formułujemy treść powiadomienia, która trafi na czat administracyjny
+            emergency_message = {
+                "sender_nick": f"🆘 POMOC: {display_name_on_request}",
+                "sender_role": "Użytkownik",
+                "time": time_stamp,
+                "text": f"Zapomniałem hasła, proszę o reset. Mój kod bezpieczeństwa to: **{locked_user_secure_code}** (Klucz konta: `{current_user}`)",
+                "bar_color": "#FF0000", # Czerwony pasek dla wyróżnienia zgłoszenia alarmowego
+                "author_key": current_user
+            }
+            
+            current_data = load_global_data()
+            if "staff_chat" not in current_data:
+                current_data["staff_chat"] = []
+                
+            # Sprawdzamy czy identyczna prośba nie została już wysłana przed momentem
+            already_sent = any(m.get("author_key") == current_user and "Zapomniałem hasła" in m.get("text", "") for m in current_data["staff_chat"])
+            
+            if already_sent:
+                st.warning("⚠️ Zgłoszenie zostało już wysłane na czat ekipy! Poczekaj, aż Admin je odczyta.")
+            else:
+                current_data["staff_chat"].append(emergency_message)
+                save_global_data(current_data)
+                st.session_state.global_store = current_data
+                st.success("✅ Prośba o reset wraz z Twoim kodem bezpieczeństwa i nickiem została pomyślnie wysłana na czat administracji!")
         
         # Pozwalamy na przełączenie klucza nawet z ekranu blokady
         st.write("---")
@@ -546,7 +579,7 @@ with c1:
                                     unsafe_allow_html=True
                                 )
                             with ch_col2:
-                                if is_my_own_message:
+                                if is_my_own_message or is_admin: # Admini oraz autor mogą czyścić wpisy, w tym zgłoszenia SOS
                                     if st.button("❌ Usuń", key=f"del_gmsg_{original_idx}", type="primary", use_container_width=True):
                                         current_data = load_global_data()
                                         if original_idx < len(current_data["staff_chat"]):
@@ -761,7 +794,6 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
     st.subheader("🔐 Bezpieczeństwo konta")
     saved_password = user_profile.get("password", "").strip()
     
-    # Wyświetlamy użytkownikowi jego dedykowany, statyczny kod bezpieczeństwa
     my_secure_code = generate_account_secure_code(current_user)
     st.markdown(f"ℹ️ Twój osobisty **Kod Bezpieczeństwa Konta:** ` {my_secure_code} `")
     st.caption("⚠️ Zapisz ten kod! Jeśli zapomnisz hasła, tylko podanie tego kodu Właścicielowi pozwoli na jego zresetowanie.")
@@ -829,11 +861,10 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
         st.write("---")
         st.subheader("👑 Panel Admina: Zarządzanie systemem")
         
-        # Tworzenie odpowiednich zakładek w zależności od poziomu uprawnień
         if is_root_admin:
             adm_tabs = st.tabs(["👥 Moderatorzy", "🛡️ Administratorzy", "🔑 Resetowanie Haseł"])
         else:
-            adm_tabs = st.tabs(["👥 Moderatorzy"]) # Promowani admini widzą tylko podstawowe zarządzanie modami
+            adm_tabs = st.tabs(["👥 Moderatorzy"])
             
         with adm_tabs[0]:
             if not is_root_admin:
@@ -876,7 +907,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                                 current_data["moderators"].remove(m_key)
                                 save_global_data(current_data)
                                 st.session_state.global_store = current_data
-                                rerun()
+                                st.rerun()
                                 
         if is_root_admin:
             with adm_tabs[1]:
@@ -920,7 +951,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                                     st.session_state.global_store = current_data
                                     st.rerun()
 
-            # NOWA ZAKŁADKA: Bezpieczne resetowanie hasła dla Właściciela (admin)
+            # ZAKŁADKA: Bezpieczne resetowanie hasła dla Właściciela (admin)
             with adm_tabs[2]:
                 st.markdown("### 🔑 Awaryjne resetowanie haseł")
                 st.caption("Opcja dostępna wyłącznie dla Głównego Właściciela. Wymaga podania Klucza Konta ORAZ unikalnego 6-cyfrowego Kodu Bezpieczeństwa tego użytkownika.")
@@ -939,12 +970,10 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                         elif rk not in st.session_state.global_store.get("user_data", {}):
                             st.error("❌ Podany klucz konta nie istnieje w bazie danych aplikacji!")
                         else:
-                            # Obliczamy poprawny kod weryfikacyjny dla podanego klucza
                             correct_code = generate_account_secure_code(rk)
                             if rc != correct_code:
                                 st.error("❌ Weryfikacja nieudana! Podany Kod Bezpieczeństwa jest nieprawidłowy dla tego konta!")
                             else:
-                                # Autoryzacja zakończona sukcesem -> Czyścimy hasło użytkownika
                                 current_data = load_global_data()
                                 current_data["user_data"][rk]["password"] = ""
                                 save_global_data(current_data)
