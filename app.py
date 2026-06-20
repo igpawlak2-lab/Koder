@@ -313,75 +313,12 @@ if not current_user:
                     st.success("🎉 Konto zostało pomyślnie utworzone!")
                     st.rerun()
                     
-       # --- NOWY EKRAN LOGOWANIA I REJESTRACJI (JEŚLI BRAK AKTYWNEGO KLUCZA) ---
-if not current_user:
-    st.title("📟 Witamy w aplikacji Koder")
-    st.write("Aby korzystać z systemu kodowania oraz paneli społecznościowych, musisz posiadać konto.")
-    
-    # Przechwytywanie klucza z pamięci podręcznej przeglądarki (jeśli istnieje)
-    components.html("""
-        <script>
-            var savedKey = localStorage.getItem("koder_author_key2");
-            if (savedKey) {
-                var currentUrl = new URL(window.parent.location.href);
-                currentUrl.searchParams.set("ak", savedKey);
-                window.parent.location.href = currentUrl.href;
-            }
-        </script>
-    """, height=0, width=0)
-
-    tab_login, tab_register = st.tabs(["🔑 Zaloguj się", "📝 Załóż nowe konto"])
-    
-    with tab_register:
-        st.subheader("Utwórz unikalny profil")
-        with st.form("register_form_global"):
-            reg_key = st.text_input("Wybierz swój Klucz Konta (Login):", placeholder="np. mojekonto123").strip()
-            reg_nick = st.text_input("Twój podpis/nick (opcjonalnie):", placeholder="np. Janek")
-            reg_pass = st.text_input("Ustaw hasło (zostaw puste, jeśli nie chcesz hasła):", type="password", placeholder="Opcjonalne...")
-            submit_reg = st.form_submit_button("🚀 Zarejestruj konto")
-            
-            if submit_reg:
-                if not reg_key:
-                    st.error("❌ Klucz konta nie może być pusty!")
-                elif reg_key == "admin2":
-                    st.error("❌ Klucz 'admin2' jest rezerwowany przez system ratunkowy.")
-                elif reg_key in st.session_state.global_store["user_data"]:
-                    st.error("❌ Podany klucz konta jest już zajęty! Wybierz inny.")
-                else:
-                    # Tworzenie nowego konta w bazie
-                    st.session_state.global_store["user_data"][reg_key] = {
-                        "history": [], "notepad": "", "has_liked": False, 
-                        "saved_nick": reg_nick.strip() if reg_nick.strip() else reg_key, 
-                        "password": reg_pass.strip(),  
-                        "theme_color": def_theme, "bg_color": def_bg, "clear_btn_color": def_clear,
-                        "staff_bar_color": "#FF4B4B"
-                    }
-                    save_global_data(st.session_state.global_store)
-                    
-                    st.session_state.user_author_key = reg_key
-                    st.query_params["ak"] = reg_key
-                    if reg_pass.strip():
-                        st.session_state.account_authenticated = True
-                        components.html(f'<script>localStorage.setItem("auth_{reg_key}", "true");</script>', height=0, width=0)
-                    else:
-                        st.session_state.account_authenticated = False
-                        
-                    components.html(f"<script>localStorage.setItem('koder_author_key2', '{reg_key}'); window.parent.location.href = window.parent.location.pathname + '?ak={reg_key}';</script>", height=0, width=0)
-                    st.success("🎉 Konto zostało pomyślnie utworzone!")
-                    st.rerun()
-                    
     with tab_login:
         st.subheader("Zaloguj się do swojego profilu")
         with st.form("login_form_global"):
             log_key = st.text_input("Wpisz swój Klucz Konta:", placeholder="Twój unikalny login").strip()
-            log_pass = st.text_input("Wpisz hasło:", type="password", placeholder="Hasło...")
-            
-            # Dynamiczne sprawdzanie warunku dla admin2 przed pokazaniem drugiego pola
-            if log_key == "admin2" and log_pass == "Przyrodnik1":
-                log_pass2 = st.text_input("Wpisz drugie hasło ratunkowe (Ignacy):", type="password", placeholder="Drugie hasło...")
-            else:
-                log_pass2 = "" # Domyślna wartość, gdy pole jest ukryte
-                
+            log_pass = st.text_input("Wpisz hasło (dla admin2 wpisz pierwsze hasło):", type="password", placeholder="Hasło...")
+            log_pass2 = st.text_input("Wpisz drugie hasło (TYLKO dla konta admin2):", type="password", placeholder="Drugie hasło...")
             submit_log = st.form_submit_button("🔓 Zaloguj się")
             
             if submit_log:
@@ -1220,12 +1157,11 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
             st.session_state.global_store = current_data
             st.rerun()
 
-        st.write("---")
+    st.write("---")
     st.write("**Twój unikalny klucz konta:**")
     st.code(st.session_state.user_author_key, language="text")
     
-    # Tutaj na końcu musi być zmienna user_saved_nick
-    new_nick = St.text_input("Zmień swój stały podpis (nick):", value=user_saved_nick)
+    new_nick = st.text_input("Zmień swój stały podpis (nick):", value=user_saved_nick)
     if new_nick != user_saved_nick:
         st.session_state.global_store["user_data"][current_user]["saved_nick"] = new_nick.strip()
         save_global_data(st.session_state.global_store)
