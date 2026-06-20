@@ -138,7 +138,7 @@ if current_user == "admin2":
         st.markdown("### 🛠️ Odzyskiwanie uprawnień i zarządzanie kadrami")
         current_data = load_global_data()
         
-        # --- NOWA FUNKCJONALNOŚĆ: PODGLĄD KODU DLA ADMIN2 ---
+        # Podgląd Kodu Bezpieczeństwa konta
         st.markdown("#### 🔍 Podgląd Kodu Bezpieczeństwa konta")
         with st.form("admin2_check_secure_code_form"):
             search_account_key = st.text_input("Wpisz klucz konta (ID) użytkownika:", placeholder="np. mojekonto123").strip()
@@ -322,6 +322,23 @@ if not current_user:
             if submit_log:
                 if not log_key:
                     st.error("❌ Musisz podać klucz konta.")
+                # --- PRZECHWYCENIE LOGOWANIA DLA ADMIN2 BEZ ZMIANY LINKU ---
+                elif log_key == "admin2":
+                    if log_pass.strip() == "Przyrodnik1":
+                        st.session_state.user_author_key = "admin2"
+                        st.session_state.admin2_authenticated = True
+                        st.query_params["ak"] = "admin2"
+                        st.query_params["auth"] = "true"
+                        components.html("""
+                            <script>
+                                localStorage.setItem("koder_author_key2", "admin2");
+                                localStorage.setItem("auth_admin2", "true");
+                                window.parent.location.href = window.parent.location.pathname + "?ak=admin2&auth=true";
+                            </script>
+                        """, height=0, width=0)
+                        st.rerun()
+                    else:
+                        st.error("❌ Błędne hasło ratunkowe dla konta admin2!")
                 elif log_key not in st.session_state.global_store["user_data"]:
                     st.error("❌ Takie konto nie istnieje. Załóż je w zakładce obok!")
                 else:
