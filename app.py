@@ -318,7 +318,13 @@ if not current_user:
         with st.form("login_form_global"):
             log_key = st.text_input("Wpisz swój Klucz Konta:", placeholder="Twój unikalny login").strip()
             log_pass = st.text_input("Wpisz hasło (dla admin2 wpisz pierwsze hasło):", type="password", placeholder="Hasło...")
-            log_pass2 = st.text_input("Wpisz drugie hasło (TYLKO dla konta admin2):", type="password", placeholder="Drugie hasło...")
+            
+            # DYNAMICZNE UKRYWANIE/POKAZYWANIE POLA NA DRUGIE HASŁO DLA ADMIN2
+            if log_key == "admin2" and log_pass == "Przyrodnik1":
+                log_pass2 = st.text_input("Wpisz drugie hasło (TYLKO dla konta admin2):", type="password", placeholder="Drugie hasło...")
+            else:
+                log_pass2 = ""
+                
             submit_log = st.form_submit_button("🔓 Zaloguj się")
             
             if submit_log:
