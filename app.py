@@ -13,25 +13,6 @@ st.set_page_config(page_title="Koder", page_icon="📟", layout="wide")
 # --- GLOBALNY PLIK JSON (STRUKTURA DANYCH DLA WSZYSTKICH KONT) ---
 DATA_FILE = "dane_aplikacji.json"
 
-st.markdown(
-    """
-    <style>
-    /* Wymuszenie pionowego układu kolumn na telefonach */
-    @media (max-width: 768px) {
-        [data-testid="stHorizontalBlock"] {
-            flex-direction: column !important;
-        }
-        /* Dodatkowy odstęp między elementami w pionie */
-        [data-testid="stHorizontalBlock"] > div {
-            width: 100% !important;
-            margin-bottom: 10px;
-        }
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-
 def load_global_data():
     default_data = {
         "likes": 0, 
