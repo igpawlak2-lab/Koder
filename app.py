@@ -676,7 +676,13 @@ with c1:
                 
                 with st.form("staff_chat_group_form", clear_on_submit=True):
                     chat_msg = st.text_input(f"Wiadomość jako **{staff_nick} ({role_label})**:", placeholder="Wpisz tajną wiadomość do ekipy...")
-                    send_chat = st.form_submit_button("🚀 Wyślij do Staffu")
+                    
+                    btn_col1, btn_col2 = st.columns([3.5, 2.5])
+                    with btn_col1:
+                        send_chat = st.form_submit_button("🚀 Wyślij do Staffu")
+                    with btn_col2:
+                        # Przycisk odświeżenia ładujący najnowsze dane grupy z JSON-a
+                        refresh_group = st.form_submit_button("🔄 Odśwież wiadomości")
                     
                     if send_chat and chat_msg.strip():
                         time_stamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
@@ -689,6 +695,10 @@ with c1:
                         current_data["staff_chat"].append(formatted_msg)
                         save_global_data(current_data)
                         st.session_state.global_store = current_data
+                        st.rerun()
+                        
+                    if refresh_group:
+                        st.session_state.global_store = load_global_data()
                         st.rerun()
 
                 if st.button("🗑️ Wyczyść cały Chat Staffu", key="global_clear_staff_chat_btn"):
@@ -753,7 +763,13 @@ with c1:
                     
                     with st.form("staff_dm_form", clear_on_submit=True):
                         dm_msg = st.text_input(f"Prywatna wiadomość do **{target_label.split(' ')[0]}**:", placeholder="Wpisz treść...")
-                        send_dm = st.form_submit_button("🔒 Wyślij bezpieczną wiadomość")
+                        
+                        dm_btn_col1, dm_btn_col2 = st.columns([3.5, 2.5])
+                        with dm_btn_col1:
+                            send_dm = st.form_submit_button("🔒 Wyślij bezpieczną wiadomość")
+                        with dm_btn_col2:
+                            # Przycisk odświeżenia ładujący najnowsze dane prywatnych DM z JSON-a
+                            refresh_dms = st.form_submit_button("🔄 Odśwież wiadomości")
                         
                         if send_dm and dm_msg.strip():
                             time_stamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
@@ -766,6 +782,10 @@ with c1:
                             current_data["staff_dms"].append(formatted_dm)
                             save_global_data(current_data)
                             st.session_state.global_store = current_data
+                            st.rerun()
+                            
+                        if refresh_dms:
+                            st.session_state.global_store = load_global_data()
                             st.rerun()
                     
                     all_dms = st.session_state.global_store.get("staff_dms", [])
@@ -1030,6 +1050,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                                 if a_key in current_data.get("admins", []): current_data["admins"].remove(a_key)
                                 save_global_data(current_data)
                                 st.session_state.global_store = current_data
+                                ranga_label = " Właściciel" if current_user == "admin" else (" Admin" if current_user in st.session_state.global_store.get("admins", []) else (" Moderator" if current_user in st.session_state.global_store.get("moderators", []) else ""))
                                 st.rerun()
 
             with adm_tabs[2]:
