@@ -22,7 +22,7 @@ def load_global_data():
         "admins": [],                       
         "staff_chat": [],    
         "staff_dms": [],
-        "password_resets": [],  # Nowy dedykowany bezpieczny kanał zgłoszeniowy                     
+        "password_resets": [],                       
         "announcement": "Brak aktualnych ogłoszeń.",
         "announcement_font": "sans-serif",
         "announcement_size": 16,
@@ -51,19 +51,6 @@ def load_global_data():
                 if "default_theme_color" not in data: data["default_theme_color"] = "#1E90FF"
                 if "default_bg_color" not in data: data["default_bg_color"] = "#FFFFFF"
                 if "default_clear_btn_color" not in data: data["default_clear_btn_color"] = "#5cb85c"
-                
-                # Migracja komentarzy
-                migrated_comments = []
-                for c in data["comments"]:
-                    if isinstance(c, dict) and "text" in c:
-                        if "author_key" not in c:
-                            c["author_key"] = c.get("session_id", "legacy")
-                        migrated_comments.append(c)
-                    elif isinstance(c, str):
-                        migrated_comments.append({"text": c, "author_key": "legacy"})
-                    else:
-                        migrated_comments.append({"text": str(c), "author_key": "legacy"})
-                data["comments"] = migrated_comments
                 return data
         except:
             return default_data
@@ -80,7 +67,6 @@ def save_global_data(data):
 if "global_store" not in st.session_state:
     st.session_state.global_store = load_global_data()
 
-# Pobieranie domyślnych kolorów startowych z pliku JSON
 def_theme = st.session_state.global_store.get("default_theme_color", "#1E90FF")
 def_bg = st.session_state.global_store.get("default_bg_color", "#FFFFFF")
 def_clear = st.session_state.global_store.get("default_clear_btn_color", "#5cb85c")
@@ -97,7 +83,7 @@ if "user_author_key" not in st.session_state:
 
 current_user = st.session_state.user_author_key
 
-# Funkcja generująca niezależny, bezpieczny 6-cyfrowy kod weryfikacyjny konta na podstawie jego klucza
+# Funkcja generująca bezpieczny kod weryfikacyjny konta
 def generate_account_secure_code(account_key):
     salt = "KoderSecureSystemSalt2026"
     hashed = hashlib.sha256((account_key + salt).encode('utf-8')).hexdigest()
@@ -107,70 +93,31 @@ def generate_account_secure_code(account_key):
 is_root_admin = (current_user == "admin")  
 is_promoted_admin = (current_user in st.session_state.global_store.get("admins", [])) 
 is_admin = is_root_admin or is_promoted_admin
-
 is_moderator = (current_user in st.session_state.global_store.get("moderators", []))
 is_staff = is_admin or is_moderator  
 
-# Upewniamy się, że w strukturze bazy istnieje profil dla aktualnego użytkownika
-if "user_data" not in st.session_state.global_store:
-    st.session_state.global_store["user_data"] = {}
-
-# NOWE KONTO: Inicjalizacja profilu
 if current_user not in st.session_state.global_store["user_data"]:
     st.session_state.global_store["user_data"][current_user] = {
-        "history": [], 
-        "notepad": "", 
-        "has_liked": False, 
-        "saved_nick": "",
-        "password": "",  
-        "theme_color": def_theme,      
-        "bg_color": def_bg,         
-        "clear_btn_color": def_clear,
+        "history": [], "notepad": "", "has_liked": False, "saved_nick": "", "password": "",  
+        "theme_color": def_theme, "bg_color": def_bg, "clear_btn_color": def_clear,
         "staff_bar_color": "#FF4B4B" if is_admin else "#FFA500" 
     }
     save_global_data(st.session_state.global_store)
 
-# ISTNIEJĄCE KONTO: Kompatybilność wsteczna
 user_profile = st.session_state.global_store["user_data"][current_user]
-updated_profile = False
 
-if "password" not in user_profile:
-    user_profile["password"] = ""
-    updated_profile = True
-if "saved_nick" not in user_profile:
-    user_profile["saved_nick"] = ""
-    updated_profile = True
-if "theme_color" not in user_profile:
-    user_profile["theme_color"] = "#1E90FF"
-    updated_profile = True
-if "bg_color" not in user_profile:
-    user_profile["bg_color"] = "#FFFFFF"
-    updated_profile = True
-if "clear_btn_color" not in user_profile:
-    user_profile["clear_btn_color"] = "#5cb85c"
-    updated_profile = True
-if "staff_bar_color" not in user_profile:
-    user_profile["staff_bar_color"] = "#FF4B4B" if is_admin else "#FFA500"
-    updated_profile = True
-
-if updated_profile:
-    save_global_data(st.session_state.global_store)
-
-# Wyciągamy spersonalizowane kolory przypisane do danego profilu
 theme_color = user_profile.get("theme_color", "#1E90FF")
 bg_color = user_profile.get("bg_color", "#FFFFFF")
 clear_btn_color = user_profile.get("clear_btn_color", "#5cb85c")
 staff_bar_color = user_profile.get("staff_bar_color", "#FF4B4B" if is_admin else "#FFA500")
 
-# Funkcja pomocnicza do obliczania kontrastu tekstu
 def get_contrast_text_color(hex_color):
     hex_color = hex_color.lstrip('#')
     try:
         r, g, b = int(hex_color[0:2], 16), int(hex_color[2:4], 16), int(hex_color[4:6], 16)
         brightness = (r * 299 + g * 587 + b * 114) / 1000
         return "#000000" if brightness > 135 else "#FFFFFF"
-    except:
-        return "#FFFFFF"
+    except: return "#FFFFFF"
 
 text_color = get_contrast_text_color(theme_color)
 clear_btn_text_color = get_contrast_text_color(clear_btn_color)
@@ -179,85 +126,60 @@ main_text_theme = get_contrast_text_color(bg_color)
 # --- STYLOWANIE INTERFEJSU CSS ---
 st.markdown(f"""
     <style>
-        .stApp {{
-            background-color: {bg_color} !important;
-        }}
-        .stApp h1, .stApp h2, .stApp h3, .stApp p, .stApp span, .stApp label {{
-            color: {main_text_theme} !important;
-        }}
-        
-        div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div {{
-            display: flex; gap: 10px; margin-top: 5px; width: 100%;
-        }}
-        
+        .stApp {{ background-color: {bg_color} !important; }}
+        .stApp h1, .stApp h2, .stApp h3, .stApp p, .stApp span, .stApp label {{ color: {main_text_theme} !important; }}
+        div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div {{ display: flex; gap: 10px; margin-top: 5px; width: 100%; }}
         div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label {{
             background-color: {"#262730" if main_text_theme == "#FFFFFF" else "#F0F2F6"} !important; 
             border: 2px solid {"#434654" if main_text_theme == "#FFFFFF" else "#E0E2E6"} !important; 
-            padding: 12px 10px !important;
-            border-radius: 10px; cursor: pointer; transition: all 0.2s ease-in-out;
+            padding: 12px 10px !important; border-radius: 10px; cursor: pointer; transition: all 0.2s ease-in-out;
             display: flex; align-items: center; justify-content: center; flex: 1;
             min-width: 140px; font-size: 16px !important; font-weight: bold !important; white-space: nowrap !important;
             color: {main_text_theme} !important;
         }}
-        div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label div[data-testid="stMarkdownContainer"]::before {{
-            display: none !important;
-        }}
+        div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label div[data-testid="stMarkdownContainer"]::before {{ display: none !important; }}
         div[data-testid="stRadio"] input[type="radio"] {{ display: none; }}
-        
         div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label:has(input:checked) {{
-            background-color: {theme_color} !important; 
-            color: {text_color} !important; 
-            border-color: {theme_color} !important;
-            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
+            background-color: {theme_color} !important; color: {text_color} !important; border-color: {theme_color} !important; box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
         }}
-        div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label:has(input:checked) div[data-testid="stMarkdownContainer"] {{
-            color: {text_color} !important;
+        div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div label:has(input:checked) div[data-testid="stMarkdownContainer"] {{ color: {text_color} !important; }}
+        div.stButton > button {{
+            background-color: {clear_btn_color} !important; color: {clear_btn_text_color} !important;
+            border: 2px solid {clear_btn_color} !important; border-radius: 8px !important; font-weight: bold !important;
+            box-shadow: 0px 2px 5px rgba(0,0,0,0.1) !important; transition: all 0.2s ease-in-out !important;
         }}
-
-        div.stButton > button[data-testid="stBaseButton-secondary"],
-        div.stButton > button[data-testid="stBaseButton-primary"],
-        .stApp div.stButton > button {{
-            background-color: {clear_btn_color} !important;
-            color: {clear_btn_text_color} !important;
-            border: 2px solid {clear_btn_color} !important;
-            border-radius: 8px !important;
-            font-weight: bold !important;
-            box-shadow: 0px 2px 5px rgba(0,0,0,0.1) !important;
-            transition: all 0.2s ease-in-out !important;
-        }}
-        
-        .stApp div.stButton > button p,
-        .stApp div.stButton > button div,
-        .stApp div.stButton > button span {{
-            color: {clear_btn_text_color} !important;
-        }}
-        
-        div.stButton > button:hover {{
-            background-color: {clear_btn_color} !important;
-            opacity: 0.85 !important;
-            border-color: {clear_btn_color} !important;
-            transform: scale(1.01);
-        }}
-        
-        div[data-testid="stVerticalBlockBorderWrapper"] {{
-            border-color: {theme_color} !important; border-radius: 12px; 
-            background-color: {"#1E1E1E" if main_text_theme == "#FFFFFF" else "#F9FAFB"};
-        }}
+        .stApp div.stButton > button p, .stApp div.stButton > button div, .stApp div.stButton > button span {{ color: {clear_btn_text_color} !important; }}
+        div.stButton > button:hover {{ background-color: {clear_btn_color} !important; opacity: 0.85 !important; border-color: {clear_btn_color} !important; transform: scale(1.01); }}
+        div[data-testid="stVerticalBlockBorderWrapper"] {{ border-color: {theme_color} !important; border-radius: 12px; background-color: {"#1E1E1E" if main_text_theme == "#FFFFFF" else "#F9FAFB"}; }}
     </style>
 """, unsafe_allow_html=True)
 
-# --- BLOKADA HASŁA (LOGOWANIE) ---
+# --- OBSŁUGA TRWAŁEJ SESJI LOGOWANIA Z LOKALNEJ PAMIĘCI PRZEGLĄDARKI ---
+# Odczytujemy stan zalogowania przesłany przez JS z localStorage
+url_auth_state = params.get("auth", "")
+if "account_authenticated" not in st.session_state:
+    st.session_state.account_authenticated = (url_auth_state == "true")
+
 account_has_password = user_profile.get("password", "").strip() != ""
 authenticated = True
 
 if account_has_password:
-    if "account_authenticated" not in st.session_state:
-        st.session_state.account_authenticated = False
-        
     if not st.session_state.account_authenticated:
         authenticated = False
         st.title("🔒 Konto zabezpieczone hasłem")
         st.write("Ten klucz konta ma przypisane hasło. Wprowadź je, aby uzyskać dostęp.")
+        
+        # Blok JS sprawdzający stan w przeglądarce i automatycznie wymuszający zalogowanie, jeśli klucz pasuje
+        components.html(f"""
+            <script>
+                var localAuthState = localStorage.getItem("auth_{current_user}");
+                var currentUrl = new URL(window.parent.location.href);
+                if (localAuthState === "true" && currentUrl.searchParams.get("auth") !== "true") {{
+                    currentUrl.searchParams.set("auth", "true");
+                    window.parent.location.href = currentUrl.href;
+                }}
+            </script>
+        """, height=0, width=0)
         
         with st.form("login_password_form"):
             input_pass = st.text_input("Podaj hasło do profilu:", type="password", placeholder="Wpisz hasło...")
@@ -266,12 +188,18 @@ if account_has_password:
             if submit_login:
                 if input_pass.strip() == user_profile.get("password"):
                     st.session_state.account_authenticated = True
-                    st.success("Dostęp przyznany!")
+                    st.query_params["auth"] = "true"
+                    components.html(f"""
+                        <script>
+                            localStorage.setItem("auth_{current_user}", "true");
+                            window.parent.location.href = window.parent.location.pathname + "?ak={current_user}&auth=true";
+                        </script>
+                    """, height=0, width=0)
                     st.rerun()
                 else:
                     st.error("❌ Nieprawidłowe hasło konta!")
         
-        # --- SEKCJA AWARYJNA: FORMULARZ ZGŁOSZENIOWY DO WŁAŚCICIELA ---
+        # --- SEKCJA AWARYJNA O RESET ---
         st.write("---")
         st.markdown("### 💡 Zapomniałeś hasła?")
         st.write("Aby zapobiec niechcianym zmianom, musisz samodzielnie podać prawidłowy Kod Bezpieczeństwa przypisany do Twojego konta.")
@@ -289,23 +217,17 @@ if account_has_password:
                 elif clean_code != expected_code:
                     st.error("❌ Podany Kod Bezpieczeństwa jest nieprawidłowy! Zgłoszenie nie zostało wysłane.")
                 else:
-                    # Kod jest poprawny - generujemy zgłoszenie
                     time_stamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
                     locked_user_nick = user_profile.get("saved_nick", "").strip()
                     display_name_on_request = locked_user_nick if locked_user_nick else f"Konto_{current_user[:6]}"
                     
                     emergency_message = {
-                        "sender_nick": display_name_on_request,
-                        "time": time_stamp,
+                        "sender_nick": display_name_on_request, "time": time_stamp,
                         "text": f"Zapomniałem hasła, proszę o reset (podaje ten 6 cyfrowy kod: **{clean_code}**)",
                         "author_key": current_user
                     }
-                    
                     current_data = load_global_data()
-                    if "password_resets" not in current_data:
-                        current_data["password_resets"] = []
-                        
-                    # Sprawdzamy powielanie zgłoszeń
+                    if "password_resets" not in current_data: current_data["password_resets"] = []
                     already_sent = any(m.get("author_key") == current_user for m in current_data["password_resets"])
                     
                     if already_sent:
@@ -316,7 +238,6 @@ if account_has_password:
                         st.session_state.global_store = current_data
                         st.success("✅ Prośba została pomyślnie dostarczona do tajnego panelu Właściciela!")
         
-        # Pozwalamy na przełączenie klucza nawet z ekranu blokady
         st.write("---")
         with st.expander("🔄 Chcesz zmienić klucz na inny?"):
             with st.form("switch_key_locked_form"):
@@ -326,8 +247,7 @@ if account_has_password:
                     clean_k = fallback_key.strip()
                     st.session_state.user_author_key = clean_k
                     st.query_params["ak"] = clean_k
-                    if "account_authenticated" in st.session_state:
-                        del st.session_state.account_authenticated
+                    if "account_authenticated" in st.session_state: del st.session_state.account_authenticated
                     components.html(f"<script>localStorage.setItem('koder_author_key2', '{clean_k}'); window.parent.location.href = window.parent.location.pathname + '?ak={clean_k}';</script>", height=0, width=0)
                     st.rerun()
         st.stop()
@@ -393,8 +313,7 @@ def dec_v1(s):
         if "." in converted:
             parts = converted.split(".")
             val, idx = int(parts[0]), parts[1]
-        else:
-            val, idx = int(converted), ""
+        else: val, idx = int(converted), ""
         if val in DATA_MAP:
             res = DATA_MAP[val][2]
             return res[0].upper() if idx in ["", "1"] else res[1].upper()
@@ -494,7 +413,7 @@ with c1:
         mode = st.session_state.mode_selection
         
         st.write(" ")
-        txt = st.text_input("Wprowadź dane i zatwierdź Enterem:", placeholder="Wpisz dane tutaj...")
+        txt = st.text_input("Wprowadź dane i zatwierdź Enterem:", placeholder="Wpisz dane tutaj...", key="main_encoder_input_field")
         
         if txt:
             res_display = ""
@@ -539,25 +458,19 @@ with c1:
             
             if chat_type == "👥 Grupa Ogólna Staffu":
                 st.subheader("👥 Ogólny Kanał Administracji")
-                st.caption("Wiadomości wysłane tutaj są widoczne dla wszystkich członków ekipy.")
                 
                 with st.form("staff_chat_group_form", clear_on_submit=True):
-                    chat_msg = st.text_input(f"Wiadomość jako **{staff_nick} ({role_label})**:", placeholder="Wpisz wiadomość do całej grupy administracji...")
+                    chat_msg = st.text_input(f"Wiadomość jako **{staff_nick} ({role_label})**:", placeholder="Wpisz wiadomość...")
                     send_chat = st.form_submit_button("🚀 Wyślij do Wszystkich")
                     
                     if send_chat and chat_msg.strip():
                         time_stamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
                         formatted_msg = {
-                            "sender_nick": staff_nick,
-                            "sender_role": role_label,
-                            "time": time_stamp,
-                            "text": chat_msg.strip(),
-                            "bar_color": staff_bar_color,
-                            "author_key": current_user  
+                            "sender_nick": staff_nick, "sender_role": role_label, "time": time_stamp,
+                            "text": chat_msg.strip(), "bar_color": staff_bar_color, "author_key": current_user  
                         }
                         current_data = load_global_data()
-                        if "staff_chat" not in current_data:
-                            current_data["staff_chat"] = []
+                        if "staff_chat" not in current_data: current_data["staff_chat"] = []
                         current_data["staff_chat"].append(formatted_msg)
                         save_global_data(current_data)
                         st.session_state.global_store = current_data
@@ -567,7 +480,7 @@ with c1:
                 st.write(" ")
                 with st.container(height=320):
                     if not staff_messages:
-                        st.caption("Brak wiadomości na kanale ogólnym staffu.")
+                        st.caption("Brak wiadomości.")
                     else:
                         for idx_reversed, msg in enumerate(reversed(staff_messages)):
                             original_idx = len(staff_messages) - 1 - idx_reversed
@@ -577,16 +490,13 @@ with c1:
                             
                             ch_col1, ch_col2 = st.columns([4.5, 1.5])
                             with ch_col1:
-                                st.markdown(
-                                    f"""
+                                st.markdown(f"""
                                     <div style="background-color: rgba(255,255,255,0.05); padding: 8px 12px; border-radius: 6px; margin-bottom: 8px; border-left: 4px solid {current_bar_color};">
                                         <span style="color: {current_bar_color}; font-weight: bold;">[{msg.get('sender_role')}] {msg.get('sender_nick')}</span> 
                                         <span style="font-size: 0.8rem; opacity: 0.6; float: right;">{msg.get('time')}</span>
                                         <p style="margin: 4px 0 0 0; font-size: 1rem;">{msg.get('text')}</p>
                                     </div>
-                                    """, 
-                                    unsafe_allow_html=True
-                                )
+                                """, unsafe_allow_html=True)
                             with ch_col2:
                                 if is_my_own_message or is_admin:
                                     if st.button("❌ Usuń", key=f"del_gmsg_{original_idx}", type="primary", use_container_width=True):
@@ -599,12 +509,12 @@ with c1:
 
             else:
                 st.subheader("💬 Prywatne Wiadomości 1 na 1")
-                st.caption("Wybierz osobę z ekipy, aby rozpocząć bezpieczną konwersację.")
                 
                 all_users = st.session_state.global_store.get("user_data", {})
                 mod_list = st.session_state.global_store.get("moderators", [])
                 admin_list = st.session_state.global_store.get("admins", [])
                 
+                # POPRAWKA LOGIKI: Nowe konta dodane do rang admin_list/mod_list są teraz w 100% poprawnie uwzględniane na liście DM
                 staff_targets = {}
                 for u_key, u_val in all_users.items():
                     is_target_staff = (u_key == "admin") or (u_key in admin_list) or (u_key in mod_list)
@@ -621,23 +531,17 @@ with c1:
                     target_user_key = staff_targets[target_label]
                     
                     with st.form("staff_dm_form", clear_on_submit=True):
-                        dm_msg = st.text_input(f"Prywatna wiadomość do **{target_label.split(' ')[0]}**:", placeholder="Wpisz treść wiadomości prywatnej...")
+                        dm_msg = st.text_input(f"Prywatna wiadomość do **{target_label.split(' ')[0]}**:", placeholder="Wpisz treść...")
                         send_dm = st.form_submit_button("🔒 Wyślij bezpieczną wiadomość")
                         
                         if send_dm and dm_msg.strip():
                             time_stamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
                             formatted_dm = {
-                                "sender_key": current_user,
-                                "sender_nick": staff_nick,
-                                "sender_role": role_label,
-                                "receiver_key": target_user_key,
-                                "time": time_stamp,
-                                "text": dm_msg.strip(),
-                                "bar_color": staff_bar_color
+                                "sender_key": current_user, "sender_nick": staff_nick, "sender_role": role_label,
+                                "receiver_key": target_user_key, "time": time_stamp, "text": dm_msg.strip(), "bar_color": staff_bar_color
                             }
                             current_data = load_global_data()
-                            if "staff_dms" not in current_data:
-                                current_data["staff_dms"] = []
+                            if "staff_dms" not in current_data: current_data["staff_dms"] = []
                             current_data["staff_dms"].append(formatted_dm)
                             save_global_data(current_data)
                             st.session_state.global_store = current_data
@@ -653,7 +557,7 @@ with c1:
                     st.write(" ")
                     with st.container(height=260):
                         if not visible_dms:
-                            st.caption(f"Brak dotychczasowej historii prywatnej z użytkownikiem {target_label.split(' ')[0]}.")
+                            st.caption(f"Brak historii z {target_label.split(' ')[0]}.")
                         else:
                             for original_dm_idx, dm in reversed(visible_dms):
                                 is_my_own_dm = (dm.get("sender_key") == current_user)
@@ -662,17 +566,14 @@ with c1:
                                 
                                 dm_col1, dm_col2 = st.columns([4.5, 1.5])
                                 with dm_col1:
-                                    st.markdown(
-                                        f"""
+                                    st.markdown(f"""
                                         <div style="background-color: rgba(30,144,255,0.03); padding: 8px 12px; border-radius: 6px; margin-bottom: 8px; border-left: 4px solid {current_bar_color};">
                                             <span style="color: {current_bar_color}; font-weight: bold;">🔑 {dm.get('sender_nick')}</span> 
                                             <span style="font-size: 0.75rem; opacity: 0.5; margin-left: 5px;">➔ do: {target_label.split(' ')[0]}</span>
                                             <span style="font-size: 0.8rem; opacity: 0.6; float: right;">{dm.get('time')}</span>
                                             <p style="margin: 4px 0 0 0; font-size: 1rem; font-style: italic;">{dm.get('text')}</p>
                                         </div>
-                                        """, 
-                                        unsafe_allow_html=True
-                                    )
+                                    """, unsafe_allow_html=True)
                                 with dm_col2:
                                     if is_my_own_dm:
                                         if st.button("❌ Usuń", key=f"del_dm_{original_dm_idx}", type="primary", use_container_width=True):
@@ -686,7 +587,6 @@ with c1:
     # --- TABLICA OGŁOSZEŃ ---
     st.write("---")
     st.subheader("📢 Tablica Ogłoszeń")
-    
     current_announcement = st.session_state.global_store.get("announcement", "Brak aktualnych ogłoszeń.")
     ann_font = st.session_state.global_store.get("announcement_font", "sans-serif")
     ann_size = st.session_state.global_store.get("announcement_size", 16)
@@ -695,37 +595,22 @@ with c1:
     ann_text_color = "#0c5460" if get_contrast_text_color(ann_bg) == "#000000" else "#FFFFFF"
     ann_border_color = "#2196F3" if ann_text_color == "#0c5460" else ann_bg
     
-    st.markdown(
-        f"""
+    st.markdown(f"""
         <div style="background-color: {ann_bg}; border-left: 6px solid {ann_border_color}; padding: 15px; border-radius: 6px; margin-bottom: 15px; font-family: {ann_font}, Arial, sans-serif; font-size: {ann_size}px; color: {ann_text_color}; line-height: 1.5;">
             {current_announcement}
         </div>
-        """, 
-        unsafe_allow_html=True
-    )
+    """, unsafe_allow_html=True)
     
     if is_staff:
-        st.caption(f"🛠️ Panel zarządzania ogłoszeniem:")
         new_announcement_text = st.text_area("Zmień treść ogłoszenia globalnego:", value=current_announcement)
-        
         f_col1, f_col2, f_col3 = st.columns([1.5, 1.5, 1.0])
         with f_col1:
-            font_options = {
-                "Bezszeryfowa (Modern)": "sans-serif",
-                "Szeryfowa (Classic)": "serif",
-                "Monospace (Kodowa)": "monospace",
-                "Comic Sans MS": "'Comic Sans MS', cursive",
-                "Impact (Pogrubiona)": "Impact, Charcoal"
-            }
+            font_options = {"Bezszeryfowa (Modern)": "sans-serif", "Szeryfowa (Classic)": "serif", "Monospace (Kodowa)": "monospace"}
             current_font_index = list(font_options.values()).index(ann_font) if ann_font in font_options.values() else 0
             chosen_font_label = st.selectbox("Wybierz krój czcionki:", list(font_options.keys()), index=current_font_index)
             selected_font_value = font_options[chosen_font_label]
-            
-        with f_col2:
-            selected_size_value = st.slider("Wielkość tekstu (px):", min_value=12, max_value=36, value=int(ann_size), step=1)
-            
-        with f_col3:
-            selected_ann_bg = st.color_picker("Tło tablicy:", value=ann_bg, key="admin_ann_bg_picker")
+        with f_col2: selected_size_value = st.slider("Wielkość tekstu (px):", min_value=12, max_value=36, value=int(ann_size), step=1)
+        with f_col3: selected_ann_bg = st.color_picker("Tło tablicy:", value=ann_bg, key="admin_ann_bg_picker")
             
         if st.button("💾 Zapisz ogłoszenie i wygląd", key="save_announcement_btn"):
             current_data = load_global_data()
@@ -733,7 +618,6 @@ with c1:
             current_data["announcement_font"] = selected_font_value
             current_data["announcement_size"] = selected_size_value
             current_data["announcement_bg_color"] = selected_ann_bg
-            
             save_global_data(current_data)
             st.session_state.global_store = current_data
             st.success("Ogłoszenie zaktualizowane!")
@@ -747,33 +631,23 @@ with c2:
         st.rerun()
     
     with st.container(height=240):
-        if not user_history:
-            st.caption("Brak Twoich ostatnich operacji.")
+        if not user_history: st.caption("Brak operacji.")
         else:
             for item in user_history: st.code(item, language="text")
 
     st.write(" ")
     st.subheader("📝 Twój Prywatny Notatnik")
-    
     def save_notepad_instantly():
         if "local_notepad_field" in st.session_state:
             val = st.session_state.local_notepad_field
             st.session_state.global_store["user_data"][current_user]["notepad"] = val
             save_global_data(st.session_state.global_store)
 
-    note_input = st.text_area(
-        "Zapisz swoje uwagi:",
-        value=user_notepad_content,
-        placeholder="Wpisz notatki...",
-        height=180,
-        key="local_notepad_field",
-        on_change=save_notepad_instantly
-    )
+    note_input = st.text_area("Zapisz swoje uwagi:", value=user_notepad_content, placeholder="Wpisz notatki...", height=180, key="local_notepad_field", on_change=save_notepad_instantly)
 
-# --- GLOBALNE POLUBIENIA I KOMENTARZE ---
+# --- GLOBALNE POLUBIENIA ---
 st.write("---")
 st.subheader("💬 Opinie użytkowników")
-
 col_like1, col_like2 = st.columns([1.5, 5])
 with col_like1:
     if not user_has_liked:
@@ -790,25 +664,33 @@ with col_like1:
             st.session_state.global_store["likes"] = total_likes
             save_global_data(st.session_state.global_store)
             st.rerun()
-
-with col_like2:
-    st.write(f"Ta strona została polubiona już **{st.session_state.global_store.get('likes', 0)}** razy!")
+with col_like2: st.write(f"Ta strona została polubiona już **{st.session_state.global_store.get('likes', 0)}** razy!")
 
 st.write(" ")
 
 # --- PANEL PERSONALIZACJI WYGLĄDU I ZABEZPIECZEŃ ---
 with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
     
-    # SEKCJA: ZABEZPIECZENIE HASŁEM
     st.subheader("🔐 Bezpieczeństwo konta")
     saved_password = user_profile.get("password", "").strip()
-    
     my_secure_code = generate_account_secure_code(current_user)
     st.markdown(f"ℹ️ Twój osobisty **Kod Bezpieczeństwa Konta:** ` {my_secure_code} `")
-    st.caption("⚠️ Zapisz ten kod! Jeśli zapomnisz hasła, tylko ręczne wpisanie tego kodu na ekranie blokady pozwoli powiadomić Właściciela.")
     
+    # NOWOŚĆ: Przycisk wylogowania zapamiętanej sesji (czyszczenie localStorage)
+    if account_has_password and st.session_state.account_authenticated:
+        if st.button("🔒 Wyloguj się z profilu", type="primary", key="logout_action_button_trigger"):
+            st.session_state.account_authenticated = False
+            st.query_params["auth"] = "false"
+            components.html(f"""
+                <script>
+                    localStorage.removeItem("auth_{current_user}");
+                    window.parent.location.href = window.parent.location.pathname + "?ak={current_user}&auth=false";
+                </script>
+            """, height=0, width=0)
+            st.rerun()
+            
     if not saved_password:
-        st.info("💡 To konto nie posiada jeszcze hasła. Każdy, kto pozna Twój klucz URL, może wejść na Twój profil.")
+        st.info("💡 To konto nie posiada jeszcze hasła.")
         with st.form("set_password_form"):
             new_pass = st.text_input("Ustaw nowe hasło do profilu:", type="password", placeholder="Wpisz silne hasło...")
             submit_pass = st.form_submit_button("🔒 Zapisz i aktywuj hasło")
@@ -816,25 +698,22 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                 st.session_state.global_store["user_data"][current_user]["password"] = new_pass.strip()
                 save_global_data(st.session_state.global_store)
                 st.session_state.account_authenticated = True
-                st.success("Hasło zostało pomyślnie ustawione! Przy następnej wizycie wymagane będzie logowanie.")
+                components.html(f'<script>localStorage.setItem("auth_{current_user}", "true");</script>', height=0, width=0)
+                st.success("Hasło zostało pomyślnie ustawione!")
                 st.rerun()
     else:
         st.success("🔒 Twoje konto jest chronione hasłem.")
-        if st.button("❌ Usuń hasło z konta (Otwórz profil)", type="primary"):
+        if st.button("❌ Całkowicie usuń hasło z konta", type="primary", key="delete_password_completely"):
             st.session_state.global_store["user_data"][current_user]["password"] = ""
             save_global_data(st.session_state.global_store)
-            if "account_authenticated" in st.session_state:
-                del st.session_state.account_authenticated
-            st.toast("Hasło profilu zostało usunięte.")
+            st.session_state.account_authenticated = False
+            components.html(f'<script>localStorage.removeItem("auth_{current_user}");</script>', height=0, width=0)
             st.rerun()
             
     st.write("---")
     st.subheader("Twoje własne ustawienia kolorów")
-    if is_staff:
-        cc_col1, cc_col2, cc_col3, cc_col4 = st.columns(4)
-    else:
-        cc_col1, cc_col2, cc_col3 = st.columns(3)
-        cc_col4 = None
+    if is_staff: cc_col1, cc_col2, cc_col3, cc_col4 = st.columns(4)
+    else: cc_col1, cc_col2, cc_col3 = st.columns(3); cc_col4 = None
         
     with cc_col1:
         chosen_color = st.color_picker("Aktywny przycisk wyboru:", value=theme_color, key="user_theme_picker")
@@ -842,21 +721,18 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
             st.session_state.global_store["user_data"][current_user]["theme_color"] = chosen_color
             save_global_data(st.session_state.global_store)
             st.rerun()
-            
     with cc_col2:
         chosen_bg = st.color_picker("Tło całej aplikacji:", value=bg_color, key="user_bg_picker")
         if chosen_bg != bg_color:
             st.session_state.global_store["user_data"][current_user]["bg_color"] = chosen_bg
             save_global_data(st.session_state.global_store)
             st.rerun()
-            
     with cc_col3:
         chosen_clear_color = st.color_picker("Przyciski akcji:", value=clear_btn_color, key="user_clear_picker")
         if chosen_clear_color != clear_btn_color:
             st.session_state.global_store["user_data"][current_user]["clear_btn_color"] = chosen_clear_color
             save_global_data(st.session_state.global_store)
             st.rerun()
-            
     if cc_col4 and is_staff:
         with cc_col4:
             chosen_bar_color = st.color_picker("Twój pasek na czacie:", value=staff_bar_color, key="user_staff_bar_picker")
@@ -865,58 +741,43 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                 save_global_data(st.session_state.global_store)
                 st.rerun()
 
-    # --- PANEL UPRAWNIEŃ I RESETOWANIA (ADMINISTRACJA) ---
+    # --- PANEL UPRAWNIEŃ (ADMINISTRACJA) ---
     if is_admin:
         st.write("---")
         st.subheader("👑 Panel Admina: Zarządzanie systemem")
-        
-        if is_root_admin:
-            adm_tabs = st.tabs(["👥 Moderatorzy", "🛡️ Administratorzy", "🔑 Resetowanie Haseł i Wnioski"])
-        else:
-            adm_tabs = st.tabs(["👥 Moderatorzy"])
+        if is_root_admin: adm_tabs = st.tabs(["👥 Moderatorzy", "🛡️ Administratorzy", "🔑 Resetowanie Haseł"])
+        else: adm_tabs = st.tabs(["👥 Moderatorzy"])
             
         with adm_tabs[0]:
-            if not is_root_admin:
-                st.markdown("### 👥 Zarządzanie Moderatorami")
-            st.caption("Dodaj lub usuń uprawnienia moderatora:")
             current_mods = st.session_state.global_store.get("moderators", [])
-            
             with st.form("add_moderator_form", clear_on_submit=True):
-                mod_key_input = st.text_input("Wklej klucz konta, które chcesz awansować na Moderatora:")
+                mod_key_input = st.text_input("Wklej klucz konta, które chcesz awansować na Moderatorami:")
                 submit_mod = st.form_submit_button("➕ Nadaj uprawnienia moderatora")
-                
                 if submit_mod and mod_key_input.strip():
                     target_key = mod_key_input.strip()
-                    if target_key == "admin" or target_key in st.session_state.global_store.get("admins", []):
-                        st.error("To konto ma już wyższą rangę.")
-                    elif target_key in current_mods:
-                        st.warning("To konto jest już moderatorem.")
+                    if target_key == "admin" or target_key in st.session_state.global_store.get("admins", []): st.error("Wyższa ranga.")
+                    elif target_key in current_mods: st.warning("Już jest mod.")
                     else:
                         current_data = load_global_data()
-                        if "moderators" not in current_data:
-                            current_data["moderators"] = []
+                        if "moderators" not in current_data: current_data["moderators"] = []
                         current_data["moderators"].append(target_key)
                         save_global_data(current_data)
                         st.session_state.global_store = current_data
-                        st.success(f"Dodano moderatora: {target_key}")
                         st.rerun()
                         
             if current_mods:
-                st.write("**Aktualna lista moderatorów:**")
                 for m_idx, m_key in enumerate(current_mods):
                     m_col1, m_col2 = st.columns([4.0, 2.0])
                     with m_col1:
                         u_nick = st.session_state.global_store["user_data"].get(m_key, {}).get("saved_nick", "")
-                        display_text = f"🔑 `{m_key}`" + (f" (Podpis: **{u_nick}**)" if u_nick else "")
-                        st.markdown(display_text)
+                        st.markdown(f"🔑 `{m_key}`" + (f" (Podpis: **{u_nick}**)" if u_nick else ""))
                     with m_col2:
                         if st.button("❌ Odbierz rangę MOD", key=f"remove_mod_{m_idx}", type="primary", use_container_width=True):
                             current_data = load_global_data()
-                            if m_key in current_data.get("moderators", []):
-                                current_data["moderators"].remove(m_key)
-                                save_global_data(current_data)
-                                st.session_state.global_store = current_data
-                                st.rerun()
+                            if m_key in current_data.get("moderators", []): current_data["moderators"].remove(m_key)
+                            save_global_data(current_data)
+                            st.session_state.global_store = current_data
+                            st.rerun()
                                 
         if is_root_admin:
             with adm_tabs[1]:
@@ -924,68 +785,48 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                 with st.form("add_admin_form", clear_on_submit=True):
                     adm_key_input = st.text_input("Wklej klucz konta, które chcesz awansować na Administratora:")
                     submit_adm = st.form_submit_button("👑 Nadaj uprawnienia administratora")
-                    
                     if submit_adm and adm_key_input.strip():
                         target_key = adm_key_input.strip()
-                        if target_key == "admin":
-                            st.error("Główne konto posiada niezbywalne prawa.")
-                        elif target_key in current_admins:
-                            st.warning("To konto jest już administratorem.")
-                        else:
+                        if target_key != "admin" and target_key not in current_admins:
                             current_data = load_global_data()
-                            if "admins" not in current_data:
-                                current_data["admins"] = []
+                            if "admins" not in current_data: current_data["admins"] = []
                             current_data["admins"].append(target_key)
-                            if "moderators" in current_data and target_key in current_data["moderators"]:
-                                current_data["moderators"].remove(target_key)
+                            if "moderators" in current_data and target_key in current_data["moderators"]: current_data["moderators"].remove(target_key)
                             save_global_data(current_data)
                             st.session_state.global_store = current_data
-                            st.success(f"Dodano administratora: {target_key}")
                             st.rerun()
                             
                 if current_admins:
-                    st.write("**Lista dodatkowych administratorów:**")
                     for a_idx, a_key in enumerate(current_admins):
                         a_col1, a_col2 = st.columns([4.0, 2.0])
                         with a_col1:
                             u_nick = st.session_state.global_store["user_data"].get(a_key, {}).get("saved_nick", "")
-                            display_text = f"🛡️ `{a_key}`" + (f" (Podpis: **{u_nick}**)" if u_nick else "")
-                            st.markdown(display_text)
+                            st.markdown(f"🛡️ `{a_key}`" + (f" (Podpis: **{u_nick}**)" if u_nick else ""))
                         with a_col2:
                             if st.button("❌ Odbierz rangę ADMIN", key=f"remove_adm_{a_idx}", type="primary", use_container_width=True):
                                 current_data = load_global_data()
-                                if a_key in current_data.get("admins", []):
-                                    current_data["admins"].remove(a_key)
-                                    save_global_data(current_data)
-                                    st.session_state.global_store = current_data
-                                    st.rerun()
+                                if a_key in current_data.get("admins", []): current_data["admins"].remove(a_key)
+                                save_global_data(current_data)
+                                st.session_state.global_store = current_data
+                                st.rerun()
 
-            # ZAKŁADKA: Bezpieczne resetowanie haseł ORAZ dedykowany chat próśb (TYLKO DLA WŁAŚCICIELA)
             with adm_tabs[2]:
                 st.markdown("### 🔒 Skrzynka próśb o reset haseł (Widok Właściciela)")
-                st.caption("Tutaj trafiają wyłącznie poprawne zgłoszenia awaryjne. Moderatorzy ani inni administratorzy nie mają tu dostępu.")
-                
                 resets_list = st.session_state.global_store.get("password_resets", [])
                 with st.container(height=220):
-                    if not resets_list:
-                        st.caption("Brak nowych próśb o reset hasła.")
+                    if not resets_list: st.caption("Brak nowych próśb.")
                     else:
                         for r_reversed_idx, req in enumerate(reversed(resets_list)):
                             orig_req_idx = len(resets_list) - 1 - r_reversed_idx
-                            
                             r_col1, r_col2 = st.columns([4.2, 1.8])
                             with r_col1:
-                                st.markdown(
-                                    f"""
+                                st.markdown(f"""
                                     <div style="background-color: rgba(255,0,0,0.06); padding: 8px 12px; border-radius: 6px; margin-bottom: 8px; border-left: 4px solid #FF0000;">
                                         <span style="color: #FF0000; font-weight: bold;">👤 Kto: {req.get('sender_nick')}</span>
                                         <span style="font-size: 0.75rem; opacity: 0.5; margin-left: 10px;">Klucz: `{req.get('author_key')}`</span>
-                                        <span style="font-size: 0.8rem; opacity: 0.6; float: right;">{req.get('time')}</span>
                                         <p style="margin: 4px 0 0 0; font-size: 0.95rem;">{req.get('text')}</p>
                                     </div>
-                                    """, 
-                                    unsafe_allow_html=True
-                                )
+                                """, unsafe_allow_html=True)
                             with r_col2:
                                 if st.button("🗑️ Odrzuć / Usuń", key=f"del_req_{orig_req_idx}", type="primary", use_container_width=True):
                                     current_data = load_global_data()
@@ -996,61 +837,36 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                                         st.rerun()
 
                 st.write("---")
-                st.markdown("### 🛠️ Formularz wykonawczy resetu")
-                st.caption("Wpisz dane z powyższego zgłoszenia, aby zdjąć zabezpieczenie z wybranego konta:")
-                
                 with st.form("reset_user_password_form", clear_on_submit=True):
-                    reset_key = st.text_input("1. Klucz konta użytkownika (ID):", placeholder="Wklej klucz z wiadomości SOS...")
-                    reset_code = st.text_input("2. Przepisany 6-cyfrowy Kod Bezpieczeństwa:", placeholder="Np. 123456", max_chars=6)
+                    reset_key = st.text_input("1. Klucz konta użytkownika (ID):")
+                    reset_code = st.text_input("2. Przepisany 6-cyfrowy Kod Bezpieczeństwa:")
                     submit_reset = st.form_submit_button("💥 Całkowicie usuń hasło profilu")
-                    
                     if submit_reset:
-                        rk = reset_key.strip()
-                        rc = reset_code.strip()
-                        
-                        if not rk or not rc:
-                            st.error("❌ Musisz uzupełnić oba pola!")
-                        elif rk not in st.session_state.global_store.get("user_data", {}):
-                            st.error("❌ Podany klucz konta nie istnieje w bazie!")
-                        else:
-                            correct_code = generate_account_secure_code(rk)
-                            if rc != correct_code:
-                                st.error("❌ Weryfikacja nieudana! Kod weryfikacyjny nie zgadza się z algorytmem klucza!")
-                            else:
-                                current_data = load_global_data()
-                                current_data["user_data"][rk]["password"] = ""
-                                
-                                # Czyszczenie zgłoszenia z listy po udanym wykonaniu resetu
-                                if "password_resets" in current_data:
-                                    current_data["password_resets"] = [m for m in current_data["password_resets"] if m.get("author_key") != rk]
-                                    
-                                save_global_data(current_data)
-                                st.session_state.global_store = current_data
-                                st.success(f"✅ Pomyślnie usunięto hasło dla konta `{rk}`.")
-                                st.rerun()
+                        rk, rc = reset_key.strip(), reset_code.strip()
+                        if rk in st.session_state.global_store.get("user_data", {}) and rc == generate_account_secure_code(rk):
+                            current_data = load_global_data()
+                            current_data["user_data"][rk]["password"] = ""
+                            current_data["password_resets"] = [m for m in current_data["password_resets"] if m.get("author_key") != rk]
+                            save_global_data(current_data)
+                            st.session_state.global_store = current_data
+                            st.success("Hasło skasowane!")
+                            st.rerun()
 
         st.write("---")
-        st.subheader("🎨 Panel Admina: Domyślny motyw startowy")
         adm_cc1, adm_cc2, adm_cc3 = st.columns(3)
         with adm_cc1: new_def_theme = st.color_picker("Domyślny przycisk wyboru:", value=def_theme, key="admin_def_theme")
         with adm_cc2: new_def_bg = st.color_picker("Domyślne tło aplikacji:", value=def_bg, key="admin_def_bg")
         with adm_cc3: new_def_clear = st.color_picker("Domyślne przyciski akcji:", value=def_clear, key="admin_def_clear")
-            
         if (new_def_theme != def_theme) or (new_def_bg != def_bg) or (new_def_clear != def_clear):
             current_data = load_global_data()
-            current_data["default_theme_color"] = new_def_theme
-            current_data["default_bg_color"] = new_def_bg
-            current_data["default_clear_btn_color"] = new_def_clear
+            current_data["default_theme_color"], current_data["default_bg_color"], current_data["default_clear_btn_color"] = new_def_theme, new_def_bg, new_def_clear
             save_global_data(current_data)
             st.session_state.global_store = current_data
-            st.success("Zmieniono szablon startowy!")
             st.rerun()
 
     st.write("---")
     st.write("**Twój unikalny klucz konta:**")
     st.code(st.session_state.user_author_key, language="text")
-    
-    current_nick_val = st.session_state.global_store["user_data"][current_user].get("saved_nick", "")
     new_nick = st.text_input("Ustaw swój stały podpis (nick):", value=current_nick_val)
     if new_nick != current_nick_val:
         st.session_state.global_store["user_data"][current_user]["saved_nick"] = new_nick.strip()
@@ -1061,22 +877,11 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
     with st.form("account_key_form"):
         new_key = st.text_input("Zmień konto na inne (wklej klucz):")
         submit_change = st.form_submit_button("Zmień klucz konta")
-        
         if submit_change and new_key.strip():
             clean_key = new_key.strip()
             st.session_state.user_author_key = clean_key
             st.query_params["ak"] = clean_key
-            if "account_authenticated" in st.session_state:
-                del st.session_state.account_authenticated
-            
-            if clean_key not in st.session_state.global_store["user_data"]:
-                st.session_state.global_store["user_data"][clean_key] = {
-                    "history": [], "notepad": "", "has_liked": False, "saved_nick": "", "password": "",
-                    "theme_color": def_theme, "bg_color": def_bg, "clear_btn_color": def_clear,
-                    "staff_bar_color": "#FF4B4B" if (clean_key == "admin" or clean_key in st.session_state.global_store.get("admins", [])) else "#FFA500"
-                }
-                save_global_data(st.session_state.global_store)
-                
+            if "account_authenticated" in st.session_state: del st.session_state.account_authenticated
             components.html(f"<script>localStorage.setItem('koder_author_key2', '{clean_key}'); window.parent.location.href = window.parent.location.pathname + '?ak={clean_key}';</script>", height=0, width=0)
             st.rerun()
 
@@ -1091,7 +896,6 @@ with st.form("comment_form", clear_on_submit=True):
         podpis = nick.strip() if nick.strip() else "Anonim"
         ranga_label = " Właściciel" if current_user == "admin" else (" Admin" if current_user in st.session_state.global_store.get("admins", []) else (" Moderator" if current_user in st.session_state.global_store.get("moderators", []) else ""))
         nowy_komentarz_tekst = f"**{podpis}{ranga_label}** | {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}:\n{komentarz_tekst.strip()}"
-        
         nowy_komentarz_obj = {"text": nowy_komentarz_tekst, "author_key": current_user}
         current_data = load_global_data()
         current_data["comments"].insert(0, nowy_komentarz_obj)
@@ -1102,28 +906,22 @@ with st.form("comment_form", clear_on_submit=True):
 # --- WYŚWIETLANIE KOMENTARZY ---
 comments_list = st.session_state.global_store.get("comments", [])
 if comments_list:
-    st.write("**Ostatnie komentarze:**")
     for idx, com in enumerate(comments_list):
         if isinstance(com, dict) and "text" in com:
             cc1, cc2 = st.columns([4.8, 1.2])
             with cc1: st.info(com["text"])
             with cc2:
                 if is_staff:
-                    label_btn = "🗑️ Usuń (ADMIN)" if is_admin else "🗑️ Usuń (MOD)"
-                    if st.button(label_btn, key=f"del_com_{idx}", type="primary", use_container_width=True):
+                    if st.button("🗑️ Usuń (STAFF)", key=f"del_com_{idx}", type="primary", use_container_width=True):
                         current_data = load_global_data()
-                        if idx < len(current_data["comments"]):
-                            current_data["comments"].pop(idx)
-                            save_global_data(current_data)
-                            st.session_state.global_store = current_data
-                            st.rerun()
+                        current_data["comments"].pop(idx)
+                        save_global_data(current_data)
+                        st.session_state.global_store = current_data
+                        st.rerun()
                 elif com.get("author_key") == current_user and current_user not in ["", "anonymous", "legacy"]:
                     if st.button("❌ Usuń", key=f"del_com_{idx}", type="primary", use_container_width=True):
                         current_data = load_global_data()
-                        if idx < len(current_data["comments"]):
-                            current_data["comments"].pop(idx)
-                            save_global_data(current_data)
-                            st.session_state.global_store = current_data
-                            st.rerun()
-else:
-    st.caption("Brak komentarzy. Bądź pierwszy!")
+                        current_data["comments"].pop(idx)
+                        save_global_data(current_data)
+                        st.session_state.global_store = current_data
+                        st.rerun()
