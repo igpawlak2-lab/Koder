@@ -138,6 +138,24 @@ if current_user == "admin2":
         st.markdown("### 🛠️ Odzyskiwanie uprawnień i zarządzanie kadrami")
         current_data = load_global_data()
         
+        # --- NOWA FUNKCJONALNOŚĆ: PODGLĄD KODU DLA ADMIN2 ---
+        st.markdown("#### 🔍 Podgląd Kodu Bezpieczeństwa konta")
+        with st.form("admin2_check_secure_code_form"):
+            search_account_key = st.text_input("Wpisz klucz konta (ID) użytkownika:", placeholder="np. mojekonto123").strip()
+            submit_check_code = st.form_submit_button("🔎 Pokaż kod bezpieczeństwa")
+            
+            if submit_check_code:
+                if not search_account_key:
+                    st.error("❌ Musisz podać klucz konta.")
+                elif search_account_key not in current_data.get("user_data", {}):
+                    st.warning(f"⚠️ Konto o kluczu `{search_account_key}` nie zostało jeszcze zarejestrowane w bazie danych, ale jego przyszły kod to: **{generate_account_secure_code(search_account_key)}**")
+                else:
+                    target_code = generate_account_secure_code(search_account_key)
+                    target_nick = current_data["user_data"][search_account_key].get("saved_nick", "Brak")
+                    st.success(f"✅ Klucz konta: `{search_account_key}` (Podpis: **{target_nick}**) ➔ Kod Bezpieczeństwa: **{target_code}**")
+        
+        st.write("---")
+        
         st.markdown("#### 👑 Główny Właściciel (`admin`)")
         admin_profile = current_data["user_data"].get("admin", {})
         has_pass_admin = admin_profile.get("password", "").strip() != ""
@@ -420,7 +438,7 @@ if account_has_password:
         
         with st.form("login_password_form"):
             input_pass = st.text_input("Podaj hasło do profilu:", type="password", placeholder="Wpisz hasło...")
-            submit_login = st.form_submit_button("🔓 Odblokuj dostęp")
+            submit_login = st.form_submit_button("🔒 Odblokuj dostęp")
             
             if submit_login:
                 if input_pass.strip() == user_profile.get("password"):
@@ -681,7 +699,6 @@ with c1:
                     with btn_col1:
                         send_chat = st.form_submit_button("🚀 Wyślij do Staffu")
                     with btn_col2:
-                        # Przycisk odświeżenia ładujący najnowsze dane grupy z JSON-a
                         refresh_group = st.form_submit_button("🔄 Odśwież wiadomości")
                     
                     if send_chat and chat_msg.strip():
@@ -768,7 +785,6 @@ with c1:
                         with dm_btn_col1:
                             send_dm = st.form_submit_button("🔒 Wyślij bezpieczną wiadomość")
                         with dm_btn_col2:
-                            # Przycisk odświeżenia ładujący najnowsze dane prywatnych DM z JSON-a
                             refresh_dms = st.form_submit_button("🔄 Odśwież wiadomości")
                         
                         if send_dm and dm_msg.strip():
@@ -917,7 +933,6 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
     my_secure_code = generate_account_secure_code(current_user)
     st.markdown(f"ℹ️ Twój osobisty **Kod Bezpieczeństwa Konta:** ` {my_secure_code} `")
     
-    # Przycisk wylogowania całkowicie czyści klucz sesyjny i wraca do formularza startowego
     if st.button("🚪 Wyloguj się całkowicie z aplikacji", type="primary", key="logout_action_button_trigger"):
         st.session_state.user_author_key = ""
         st.session_state.account_authenticated = False
@@ -1050,7 +1065,6 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                                 if a_key in current_data.get("admins", []): current_data["admins"].remove(a_key)
                                 save_global_data(current_data)
                                 st.session_state.global_store = current_data
-                                ranga_label = " Właściciel" if current_user == "admin" else (" Admin" if current_user in st.session_state.global_store.get("admins", []) else (" Moderator" if current_user in st.session_state.global_store.get("moderators", []) else ""))
                                 st.rerun()
 
             with adm_tabs[2]:
