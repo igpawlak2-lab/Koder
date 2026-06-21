@@ -719,12 +719,12 @@ with c1:
                 save_global_data(st.session_state.global_store)
                 st.rerun()
 
-       # --- PANEL KOMUNIKACJI STAFFU (ZWIJANY CHAT AWARYJNY) ---
+         # --- PANEL KOMUNIKACJI STAFFU (ZWIJANY CHAT AWARYJNY) ---
     if is_staff:
         with tab_chat:
-            # Zamknięcie całego czatu w zwijanym expanderze o nazwie "Chat awaryjny"
-            with st.expander("💬 Chat awaryjny", expanded=False):
-                st.radio("Wybierz rodzaj czatu:", ["👥 Grupa Ogólna Staffu", "💬 Wiadomości Privatne (DM)"], horizontal=True, key="staff_chat_type")
+            # Tworzymy zwijany kontener. expanded=False sprawia, że domyślnie jest ZAMKNIĘTY.
+            with st.expander("💬 Otwórz Chat Staffu / Awaryjny", expanded=False):
+                st.radio("Wybierz rodzaj czatu:", ["👥 Grupa Ogólna Staffu", "💬 Wiadomości Prywatne (DM)"], horizontal=True, key="staff_chat_type")
                 chat_type = st.session_state.staff_chat_type
                 
                 role_label = "Admin" if is_admin else "Moderator"
@@ -822,6 +822,7 @@ with c1:
                         target_label = st.selectbox("Wybierz odbiorcę prywatnej wiadomości:", list(staff_targets.keys()))
                         target_user_key = staff_targets[target_label]
                         
+                        # TUTAJ: Poprawione St.form na st.form (rozwiązuje błąd z NameError)
                         with st.form("staff_dm_form", clear_on_submit=True):
                             dm_msg = st.text_input(f"Prywatna wiadomość do **{target_label.split(' ')[0]}**:", placeholder="Wpisz treść...")
                             
