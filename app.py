@@ -947,11 +947,30 @@ with c2:
 
     note_input = st.text_area("Zapisz swoje uwagi:", value=user_notepad_content, placeholder="Wpisz notatki, kody lub sekwencje...", height=180, key="local_notepad_field", on_change=save_notepad_instantly)
 
-    # =========================================================================
-    # --- NOWOŚĆ: CZAT POMOCNICZY (SUPPORT CHAT / HELPDESK) ---
-    # =========================================================================
-    st.write("---")
-    st.subheader("📞 Czat Pomocniczy (Support)")
+        # --- CZAT POMOCNICZY (SUPPORT) ---
+    # Tworzymy zwijany nagłówek, domyślnie zamknięty (expanded=False)
+    with st.expander("📞 Otwórz Czat Pomocniczy (Support)", expanded=False):
+        
+        st.write("Wybierz kod konta użytkownika, aby odpowiedzieć:")
+        
+        # Tutaj znajduje się Twój obecny selectbox (pobierający np. "Woda")
+        # Upewnij się, że zmienne takie jak support_targets pasują do Twojego kodu
+        # Poniżej poglądowa struktura – dopasuj nazwy zmiennych, zachowując te wcięcia:
+        
+        # Przykład (zostaw swoje oryginalne zmienne, tylko daj im wcięcie):
+        # target_user = st.selectbox("Wybierz użytkownika:", ...) 
+        
+        # Poniżej Twój formularz wysyłania odpowiedzi (teraz z dodatkowym wcięciem):
+        with st.form("support_reply_form", clear_on_submit=True):
+            # ... treść Twojego formularza (st.text_area, st.form_submit_button) ...
+            pass # usuń 'pass', gdy wkleisz tu swoje linijki
+            
+        st.markdown("### Pełna historia wszystkich zgłoszeń systemowych:")
+        
+        # Poniżej Twój kontener z historią wiadomości (również przesunięty w prawo):
+        with st.container(height=400):
+            # ... Twoja pętla for wyświetlająca historię (np. z ikonami zegarka ⏱️) ...
+            pass # usuń 'pass', gdy wkleisz tu swoje linijki
     
     support_messages = st.session_state.global_store.get("support_chat", [])
     
