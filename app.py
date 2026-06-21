@@ -974,7 +974,8 @@ with c2:
             pass # usuń 'pass', gdy wkleisz tu swoje linijki
 
         # B. WIDOK DLA ZWYKŁEGO UŻYTKOWNIKA
-        else:
+            
+            else:
         st.caption("Napisz bezpośrednio do administracji. Inni użytkownicy nie widzą Twojego zgłoszenia.")
         with st.form("user_support_send_form", clear_on_submit=True):
             user_msg_input = st.text_area("Opisz swój problem / pytanie:", placeholder="Twoja wiadomość...")
