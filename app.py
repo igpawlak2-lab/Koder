@@ -947,7 +947,8 @@ with c2:
 
     note_input = st.text_area("Zapisz swoje uwagi:", value=user_notepad_content, placeholder="Wpisz notatki, kody lub sekwencje...", height=180, key="local_notepad_field", on_change=save_notepad_instantly)
 
-        # --- CZAT POMOCNICZY (SUPPORT) ---
+
+      # --- CZAT POMOCNICZY (SUPPORT) ---
     # Tworzymy zwijany nagłówek, domyślnie zamknięty (expanded=False)
     with st.expander("📞 Otwórz Czat Pomocniczy (Support)", expanded=False):
         
@@ -971,65 +972,6 @@ with c2:
         with st.container(height=400):
             # ... Twoja pętla for wyświetlająca historię (np. z ikonami zegarka ⏱️) ...
             pass # usuń 'pass', gdy wkleisz tu swoje linijki
-    
-    support_messages = st.session_state.global_store.get("support_chat", [])
-    
-    # A. WIDOK DLA KADRY (Właściciel, Admin, Moderator)
-    if is_staff:
-        # Znalezienie unikalnych kluczy kont zwykłych użytkowników, którzy wysłali zgłoszenie
-        active_tickets = set(
-            msg["sender_key"] for msg in support_messages 
-            if msg.get("sender_role") == "Użytkownik"
-        )
-        
-        if active_tickets:
-            selected_ticket_user = st.selectbox(
-                "Wybierz kod konta użytkownika, aby odpowiedzieć:", 
-                sorted(list(active_tickets)), 
-                key="staff_support_user_select"
-            )
-            
-            with st.form("staff_support_reply_form", clear_on_submit=True):
-                reply_txt = st.text_area(f"Odpowiedź do użytkownika [{selected_ticket_user}]:", placeholder="Wpisz treść pomocy...")
-                if st.form_submit_button(" Wyślij odpowiedź wsparcia"):
-                    if reply_txt.strip():
-                        # Podmiana znaków J -> I za pomocą funkcji czyszczącej clean_txt logic
-                        clean_reply = reply_txt.strip().replace('j', 'i').replace('J', 'I')
-                        time_stamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
-                        
-                        staff_label = "Właściciel" if is_root_admin else ("Admin" if is_promoted_admin else "Moderator")
-                        staff_display_name = user_saved_nick if user_saved_nick else f"Staff_{current_user[:4]}"
-                        
-                        new_reply_obj = {
-                            "sender_key": current_user,
-                            "sender_nick": staff_display_name,
-                            "sender_role": staff_label,
-                            "receiver_key": selected_ticket_user,
-                            "text": clean_reply,
-                            "time": time_stamp
-                        }
-                        
-                        current_data = load_global_data()
-                        if "support_chat" not in current_data: current_data["support_chat"] = []
-                        current_data["support_chat"].append(new_reply_obj)
-                        save_global_data(current_data)
-                        st.session_state.global_store = current_data
-                        st.success(f"Wysłano odpowiedź do {selected_ticket_user}!")
-                        st.rerun()
-        else:
-            st.info("Brak otwartych zgłoszeń od użytkowników.")
-            
-        # Wyświetlanie wszystkich wiadomości dla kadry
-        st.write(" **Pełna historia wszystkich zgłoszeń systemowych:**")
-        with st.container(height=300):
-            if not support_messages:
-                st.caption("Brak wiadomości w czacie pomocy.")
-            else:
-                for msg in reversed(support_messages):
-                    if msg.get("sender_role") == "Użytkownik":
-                        st.markdown(f"⏱️ `{msg.get('time')}` | **Użytkownik** (`{msg.get('sender_key')}`): {msg.get('text')}")
-                    else:
-                        st.markdown(f"⏱️ `{msg.get('time')}` | **{msg.get('sender_role')}** ({msg.get('sender_nick')}) ➡️ do `{msg.get('receiver_key')}`: {msg.get('text')}")
 
     # B. WIDOK DLA ZWYKŁEGO UŻYTKOWNIKA
     else:
