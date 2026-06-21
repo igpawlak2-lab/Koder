@@ -22,7 +22,6 @@ def load_global_data():
         "admins": [],                       
         "staff_chat": [],    
         "staff_dms": [],
-        "support_chat": [], # --- NOWOŚĆ: Pula wiadomości wsparcia technicznego ---
         "password_resets": [],                       
         "announcement": "Brak aktualnych ogłoszeń.",
         "announcement_font": "sans-serif",
@@ -44,7 +43,6 @@ def load_global_data():
                 if "admins" not in data: data["admins"] = []
                 if "staff_chat" not in data: data["staff_chat"] = [] 
                 if "staff_dms" not in data: data["staff_dms"] = []
-                if "support_chat" not in data: data["support_chat"] = [] # Bezpieczne ładowanie
                 if "password_resets" not in data: data["password_resets"] = []
                 if "announcement" not in data: data["announcement"] = "Brak aktualnych ogłoszeń."
                 if "announcement_font" not in data: data["announcement_font"] = "sans-serif"
@@ -279,7 +277,7 @@ if not current_user:
     
     with tab_register:
         st.subheader("Utwórz unikalny profil")
-        with st.form("register_form_global_fixed"):
+        with st.form("register_form_global"):
             reg_key = st.text_input("Wybierz swój Klucz Konta (Login):", placeholder="np. mojekonto123").strip()
             reg_nick = st.text_input("Twój podpis/nick (opcjonalnie):", placeholder="np. Janek")
             reg_pass = st.text_input("Ustaw hasło (zostaw puste, jeśli nie chcesz hasła):", type="password", placeholder="Opcjonalne...")
@@ -293,6 +291,7 @@ if not current_user:
                 elif reg_key in st.session_state.global_store["user_data"]:
                     st.error("❌ Podany klucz konta jest już zajęty! Wybierz inny.")
                 else:
+                    # Tworzenie nowego konta w bazie
                     st.session_state.global_store["user_data"][reg_key] = {
                         "history": [], "notepad": "", "has_liked": False, 
                         "saved_nick": reg_nick.strip() if reg_nick.strip() else reg_key, 
@@ -316,11 +315,12 @@ if not current_user:
                     st.rerun()
                     
     with tab_login:
+        st.subheader("Zaloguj się do swojego profilu")
         with st.form("login_form_global"):
-            st.subheader("Zaloguj się do swojego profilu")
             log_key = st.text_input("Wpisz swój Klucz Konta:", placeholder="Twój unikalny login").strip()
             log_pass = st.text_input("Wpisz hasło (dla admin2 wpisz pierwsze hasło):", type="password", placeholder="Hasło...")
             
+            # DYNAMICZNE UKRYWANIE/POKAZYWANIE POLA NA DRUGIE HASŁO DLA ADMIN2
             if log_key == "admin2" and log_pass == "Przyrodnik1":
                 log_pass2 = st.text_input("Wpisz drugie hasło (TYLKO dla konta admin2):", type="password", placeholder="Drugie hasło...")
             else:
@@ -331,6 +331,7 @@ if not current_user:
             if submit_log:
                 if not log_key:
                     st.error("❌ Musisz podać klucz konta.")
+                # --- PRZECHWYCENIE LOGOWANIA DLA ADMIN2 Z DWOMA HASŁAMI ---
                 elif log_key == "admin2":
                     if log_pass.strip() == "Przyrodnik1" and log_pass2.strip() == "Ignacy":
                         st.session_state.user_author_key = "admin2"
@@ -415,6 +416,7 @@ st.markdown(f"""
         .stApp {{ background-color: {bg_color} !important; }}
         .stApp h1, .stApp h2, .stApp h3, .stApp p, .stApp span, .stApp label {{ color: {main_text_theme} !important; }}
         
+        /* POPRAWKA UKŁADU MOBILNEGO: Wymuszenie kolumn w pion na małych ekranach */
         @media (max-width: 768px) {{
             [data-testid="stHorizontalBlock"] {{
                 flex-direction: column !important;
@@ -685,7 +687,7 @@ with c1:
         mode = st.session_state.mode_selection
         
         st.write(" ")
-        txt = st.text_input("Wprowadź dane i zatveckość Enterem:", placeholder="Wpisz dane tutaj...", key="main_encoder_input_field")
+        txt = st.text_input("Wprowadź dane i zatwierdź Enterem:", placeholder="Wpisz dane tutaj...", key="main_encoder_input_field")
         
         if txt:
             res_display = ""
@@ -787,6 +789,7 @@ with c1:
                                     </div>
                                 """, unsafe_allow_html=True)
                             with ch_col2:
+                                # POPRAWKA: Możliwość usuwania wiadomości z prywatnego chatu TYLKO dla osoby, która ją napisała
                                 if is_my_own_message:
                                     if st.button("❌ Usuń", key=f"del_gmsg_{original_idx}", type="primary", use_container_width=True):
                                         current_data = load_global_data()
@@ -796,6 +799,7 @@ with c1:
                                             st.session_state.global_store = current_data
                                             st.rerun()
                                 else:
+                                    # Dla cudzych wiadomości przycisk usuwania jest zablokowany nawet dla adminów
                                     st.button("🔒 Zablokowane", key=f"lock_gmsg_{original_idx}", disabled=True, use_container_width=True)
 
             else:
@@ -944,116 +948,6 @@ with c2:
 
     note_input = st.text_area("Zapisz swoje uwagi:", value=user_notepad_content, placeholder="Wpisz notatki, kody lub sekwencje...", height=180, key="local_notepad_field", on_change=save_notepad_instantly)
 
-    # =========================================================================
-    # --- NOWOŚĆ: CZAT POMOCNICZY (SUPPORT CHAT / HELPDESK) ---
-    # =========================================================================
-    st.write("---")
-    st.subheader("📞 Czat Pomocniczy (Support)")
-    
-    support_messages = st.session_state.global_store.get("support_chat", [])
-    
-    # A. WIDOK DLA KADRY (Właściciel, Admin, Moderator)
-    if is_staff:
-        # Znalezienie unikalnych kluczy kont zwykłych użytkowników, którzy wysłali zgłoszenie
-        active_tickets = set(
-            msg["sender_key"] for msg in support_messages 
-            if msg.get("sender_role") == "Użytkownik"
-        )
-        
-        if active_tickets:
-            selected_ticket_user = st.selectbox(
-                "Wybierz kod konta użytkownika, aby odpowiedzieć:", 
-                sorted(list(active_tickets)), 
-                key="staff_support_user_select"
-            )
-            
-            with st.form("staff_support_reply_form", clear_on_submit=True):
-                reply_txt = st.text_area(f"Odpowiedź do użytkownika [{selected_ticket_user}]:", placeholder="Wpisz treść pomocy...")
-                if st.form_submit_button(" Wyślij odpowiedź wsparcia"):
-                    if reply_txt.strip():
-                        # Podmiana znaków J -> I za pomocą funkcji czyszczącej clean_txt logic
-                        clean_reply = reply_txt.strip().replace('j', 'i').replace('J', 'I')
-                        time_stamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
-                        
-                        staff_label = "Właściciel" if is_root_admin else ("Admin" if is_promoted_admin else "Moderator")
-                        staff_display_name = user_saved_nick if user_saved_nick else f"Staff_{current_user[:4]}"
-                        
-                        new_reply_obj = {
-                            "sender_key": current_user,
-                            "sender_nick": staff_display_name,
-                            "sender_role": staff_label,
-                            "receiver_key": selected_ticket_user,
-                            "text": clean_reply,
-                            "time": time_stamp
-                        }
-                        
-                        current_data = load_global_data()
-                        if "support_chat" not in current_data: current_data["support_chat"] = []
-                        current_data["support_chat"].append(new_reply_obj)
-                        save_global_data(current_data)
-                        st.session_state.global_store = current_data
-                        st.success(f"Wysłano odpowiedź do {selected_ticket_user}!")
-                        st.rerun()
-        else:
-            st.info("Brak otwartych zgłoszeń od użytkowników.")
-            
-        # Wyświetlanie wszystkich wiadomości dla kadry
-        st.write(" **Pełna historia wszystkich zgłoszeń systemowych:**")
-        with st.container(height=300):
-            if not support_messages:
-                st.caption("Brak wiadomości w czacie pomocy.")
-            else:
-                for msg in reversed(support_messages):
-                    if msg.get("sender_role") == "Użytkownik":
-                        st.markdown(f"⏱️ `{msg.get('time')}` | **Użytkownik** (`{msg.get('sender_key')}`): {msg.get('text')}")
-                    else:
-                        st.markdown(f"⏱️ `{msg.get('time')}` | **{msg.get('sender_role')}** ({msg.get('sender_nick')}) ➡️ do `{msg.get('receiver_key')}`: {msg.get('text')}")
-
-    # B. WIDOK DLA ZWYKŁEGO UŻYTKOWNIKA
-    else:
-        st.caption("Napisz bezpośrednio do administracji. Inni użytkownicy nie widzą Twojego zgłoszenia.")
-        with st.form("user_support_send_form", clear_on_submit=True):
-            user_msg_input = st.text_area("Opisz swój problem / pytanie:", placeholder="Twoja wiadomość...")
-            if st.form_submit_button("🚀 Wyślij do administracji"):
-                if user_msg_input.strip():
-                    clean_user_msg = user_msg_input.strip().replace('j', 'i').replace('J', 'I')
-                    time_stamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
-                    
-                    new_user_msg_obj = {
-                        "sender_key": current_user,
-                        "sender_nick": user_saved_nick if user_saved_nick else current_user,
-                        "sender_role": "Użytkownik",
-                        "receiver_key": "ALL_STAFF",
-                        "text": clean_user_msg,
-                        "time": time_stamp
-                    }
-                    
-                    current_data = load_global_data()
-                    if "support_chat" not in current_data: current_data["support_chat"] = []
-                    current_data["support_chat"].append(new_user_msg_obj)
-                    save_global_data(current_data)
-                    st.session_state.global_store = current_data
-                    st.success("Wiadomość została dostarczona!")
-                    st.rerun()
-                    
-        # Historia wiadomości przefiltrowana dla zalogowanego użytkownika
-        st.write(" **Twoja prywatna historia rozmowy:**")
-        user_visible_messages = [
-            m for m in support_messages 
-            if m.get("sender_key") == current_user or m.get("receiver_key") == current_user
-        ]
-        
-        with st.container(height=250):
-            if not user_visible_messages:
-                st.caption("Nie wysłałeś jeszcze żadnych pytań.")
-            else:
-                for msg in reversed(user_visible_messages):
-                    if msg.get("sender_role") == "Użytkownik":
-                        st.markdown(f"👤 **Ty** `[{msg.get('time')}]`:\n> {msg.get('text')}")
-                    else:
-                        st.markdown(f"🔹 **Odpowiedź od ({msg.get('sender_role')} {msg.get('sender_nick')})** `[{msg.get('time')}]`:\n> {msg.get('text')}")
-    # =========================================================================
-
 # --- GLOBALNE POLUBIENIA ---
 st.write("---")
 st.subheader("💬 Opinie użytkowników")
@@ -1171,6 +1065,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                         st.error("❌ Wyższa ranga.")
                     elif target_key in current_mods: 
                         st.warning("⚠️ Już jest mod.")
+                    # WYMÓG HASŁA DLA NOWEGO MODERATORA
                     elif not target_password:
                         st.error("❌ Błąd bezpieczeństwa: Użytkownik musi najpierw ustawić hasło na swoim koncie, aby otrzymać rangę Moderatora!")
                     else:
@@ -1200,6 +1095,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
             with adm_tabs[1]:
                 current_admins = st.session_state.global_store.get("admins", [])
                 
+                # --- POPRAWKA: Możliwość przydzielania wybranemu adminowi uprawnień do resetu haseł ---
                 if current_admins:
                     st.markdown("#### 🔑 Przydziel uprawnienia do resetowania haseł")
                     wybrany_admin = st.selectbox("Wybierz administratora z nadania:", current_admins, key="root_select_admin_for_perms")
@@ -1220,7 +1116,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                                 st.rerun()
                     st.write("---")
                 
-                with st.form("add_admin_form", clear_on_submit=True):
+                with St.form("add_admin_form", clear_on_submit=True):
                     adm_key_input = st.text_input("Wklej klucz konta, które chcesz awansować na Administratora:")
                     submit_adm = st.form_submit_button("👑 Nadaj uprawnienia administratora")
                     if submit_adm and adm_key_input.strip():
@@ -1229,6 +1125,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                         target_password = target_user_profile.get("password", "").strip()
                         
                         if target_key != "admin" and target_key not in current_admins:
+                            # WYMÓG HASŁA DLA NOWEGO ADMINISTRATORA
                             if not target_password:
                                 st.error("❌ Błąd bezpieczeństwa: Użytkownik musi najpierw ustawić hasło na swoim koncie, aby otrzymać rangę Administratora!")
                             else:
@@ -1258,12 +1155,15 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                                 st.session_state.global_store = current_data
                                 st.rerun()
 
+        # PANEL RESETOWANIA HASEŁ (Dostępny dla Root Admina oraz wyznaczonych administratorów z flagą can_reset_passwords)
         if is_admin:
+            # Ustalamy, do którego tabu przypiąć sekcję resetu haseł w zależności od roli admina
             if is_root_admin:
                 target_tab = adm_tabs[2]
                 access_granted = True
             else:
-                target_tab = adm_tabs[0] 
+                # Sprawdzamy, czy promowany administrator ma przyznane uprawnienie
+                target_tab = adm_tabs[0] # Dla zwykłego admina tworzymy sekcję poniżej moderatorów w jedynym dostępnym tabie
                 access_granted = user_profile.get("can_reset_passwords", False)
                 
             with target_tab:
