@@ -973,7 +973,7 @@ with c2:
             # ... Twoja pętla for wyświetlająca historię (np. z ikonami zegarka ⏱️) ...
             pass # usuń 'pass', gdy wkleisz tu swoje linijki
 
-    # B. WIDOK DLA ZWYKŁEGO UŻYTKOWNIKA
+        # B. WIDOK DLA ZWYKŁEGO UŻYTKOWNIKA
     else:
         st.caption("Napisz bezpośrednio do administracji. Inni użytkownicy nie widzą Twojego zgłoszenia.")
         with st.form("user_support_send_form", clear_on_submit=True):
