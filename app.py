@@ -719,170 +719,172 @@ with c1:
                 save_global_data(st.session_state.global_store)
                 st.rerun()
 
-    # --- PANEL KOMUNIKACJI STAFFU ---
+       # --- PANEL KOMUNIKACJI STAFFU (ZWIJANY CHAT AWARYJNY) ---
     if is_staff:
         with tab_chat:
-            st.radio("Wybierz rodzaj czatu:", ["👥 Grupa Ogólna Staffu", "💬 Wiadomości Privatne (DM)"], horizontal=True, key="staff_chat_type")
-            chat_type = st.session_state.staff_chat_type
-            
-            role_label = "Admin" if is_admin else "Moderator"
-            staff_nick = user_saved_nick if user_saved_nick else f"User_{current_user[:6]}"
-            
-            if chat_type == "👥 Grupa Ogólna Staffu":
-                st.markdown(f"<h3>🕵️‍♂️ Prywatny kanał komunikacji</h3>", unsafe_allow_html=True)
-                st.caption("Ten czat jest widoczny wyłącznie dla Administratora oraz zatwierdzonych Moderatorów.")
+            # Zamknięcie całego czatu w zwijanym expanderze o nazwie "Chat awaryjny"
+            with st.expander("💬 Chat awaryjny", expanded=False):
+                st.radio("Wybierz rodzaj czatu:", ["👥 Grupa Ogólna Staffu", "💬 Wiadomości Privatne (DM)"], horizontal=True, key="staff_chat_type")
+                chat_type = st.session_state.staff_chat_type
                 
-                with st.form("staff_chat_group_form", clear_on_submit=True):
-                    chat_msg = st.text_input(f"Wiadomość jako **{staff_nick} ({role_label})**:", placeholder="Wpisz tajną wiadomość do ekipy...")
+                role_label = "Admin" if is_admin else "Moderator"
+                staff_nick = user_saved_nick if user_saved_nick else f"User_{current_user[:6]}"
+                
+                if chat_type == "👥 Grupa Ogólna Staffu":
+                    st.markdown(f"<h3>🕵️‍♂️ Prywatny kanał komunikacji</h3>", unsafe_allow_html=True)
+                    st.caption("Ten czat jest widoczny wyłącznie dla Administratora oraz zatwierdzonych Moderatorów.")
                     
-                    btn_col1, btn_col2 = st.columns([3.5, 2.5])
-                    with btn_col1:
-                        send_chat = st.form_submit_button("🚀 Wyślij do Staffu")
-                    with btn_col2:
-                        refresh_group = st.form_submit_button("🔄 Odśwież wiadomości")
-                    
-                    if send_chat and chat_msg.strip():
-                        time_stamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
-                        formatted_msg = {
-                            "sender_nick": staff_nick, "sender_role": role_label, "time": time_stamp,
-                            "text": chat_msg.strip(), "bar_color": staff_bar_color, "author_key": current_user  
-                        }
-                        current_data = load_global_data()
-                        if "staff_chat" not in current_data: current_data["staff_chat"] = []
-                        current_data["staff_chat"].append(formatted_msg)
-                        save_global_data(current_data)
-                        st.session_state.global_store = current_data
-                        st.rerun()
+                    with st.form("staff_chat_group_form", clear_on_submit=True):
+                        chat_msg = st.text_input(f"Wiadomość jako **{staff_nick} ({role_label})**:", placeholder="Wpisz tajną wiadomość do ekipy...")
                         
-                    if refresh_group:
-                        st.session_state.global_store = load_global_data()
-                        st.rerun()
-
-                if st.button("🗑️ Wyczyść cały Chat Staffu", key="global_clear_staff_chat_btn"):
-                    current_data = load_global_data()
-                    current_data["staff_chat"] = []
-                    save_global_data(current_data)
-                    st.session_state.global_store = current_data
-                    st.rerun()
-
-                staff_messages = st.session_state.global_store.get("staff_chat", [])
-                st.write(" ")
-                with st.container(height=450):
-                    if not staff_messages:
-                        st.caption("Brak wiadomości.")
-                    else:
-                        for idx_reversed, msg in enumerate(reversed(staff_messages)):
-                            original_idx = len(staff_messages) - 1 - idx_reversed
-                            fallback_color = "#FF4B4B" if msg.get("sender_role") == "Admin" else "#FFA500"
-                            current_bar_color = msg.get("bar_color", fallback_color)
-                            is_my_own_message = (msg.get("author_key") == current_user)
-                            
-                            ch_col1, ch_col2 = st.columns([4.5, 1.5])
-                            with ch_col1:
-                                st.markdown(f"""
-                                    <div style="background-color: rgba(255,255,255,0.02); padding: 8px 12px; border-radius: 6px; margin-bottom: 8px; border-left: 4px solid {current_bar_color};">
-                                        <span style="font-weight: bold; color: {main_text_theme};">[{msg.get('sender_role')}] {msg.get('sender_nick')}</span> 
-                                        <span style="font-size: 0.8rem; opacity: 0.5; float: right;">{msg.get('time')}</span>
-                                        <p style="margin: 4px 0 0 0; font-size: 1.05rem; color: {main_text_theme};">{msg.get('text')}</p>
-                                    </div>
-                                """, unsafe_allow_html=True)
-                            with ch_col2:
-                                if is_my_own_message:
-                                    if st.button("❌ Usuń", key=f"del_gmsg_{original_idx}", type="primary", use_container_width=True):
-                                        current_data = load_global_data()
-                                        if original_idx < len(current_data["staff_chat"]):
-                                            current_data["staff_chat"].pop(original_idx)
-                                            save_global_data(current_data)
-                                            st.session_state.global_store = current_data
-                                            st.rerun()
-                                else:
-                                    st.button("🔒 Zablokowane", key=f"lock_gmsg_{original_idx}", disabled=True, use_container_width=True)
-
-            else:
-                st.subheader("💬 Prywatne Wiadomości 1 na 1")
-                
-                all_users = st.session_state.global_store.get("user_data", {})
-                mod_list = st.session_state.global_store.get("moderators", [])
-                admin_list = st.session_state.global_store.get("admins", [])
-                
-                staff_targets = {}
-                for u_key, u_val in all_users.items():
-                    is_target_staff = (u_key == "admin") or (u_key in admin_list) or (u_key in mod_list)
-                    if is_target_staff and u_key != current_user:
-                        saved_name = u_val.get("saved_nick", "").strip()
-                        if saved_name:
-                            t_role = "Właściciel" if u_key == "admin" else ("Admin" if u_key in admin_list else "Moderator")
-                            staff_targets[f"{saved_name} ({t_role})"] = u_key
-                
-                if not staff_targets:
-                    st.warning("⚠️ Nie znaleziono innych członków ekipy posiadających ustawiony podpis (nick).")
-                else:
-                    target_label = st.selectbox("Wybierz odbiorcę prywatnej wiadomości:", list(staff_targets.keys()))
-                    target_user_key = staff_targets[target_label]
-                    
-                    with st.form("staff_dm_form", clear_on_submit=True):
-                        dm_msg = st.text_input(f"Prywatna wiadomość do **{target_label.split(' ')[0]}**:", placeholder="Wpisz treść...")
+                        btn_col1, btn_col2 = st.columns([3.5, 2.5])
+                        with btn_col1:
+                            send_chat = st.form_submit_button("🚀 Wyślij do Staffu")
+                        with btn_col2:
+                            refresh_group = st.form_submit_button("🔄 Odśwież wiadomości")
                         
-                        dm_btn_col1, dm_btn_col2 = st.columns([3.5, 2.5])
-                        with dm_btn_col1:
-                            send_dm = st.form_submit_button("🔒 Wyślij bezpieczną wiadomość")
-                        with dm_btn_col2:
-                            refresh_dms = st.form_submit_button("🔄 Odśwież wiadomości")
-                        
-                        if send_dm and dm_msg.strip():
+                        if send_chat and chat_msg.strip():
                             time_stamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
-                            formatted_dm = {
-                                "sender_key": current_user, "sender_nick": staff_nick, "sender_role": role_label,
-                                "receiver_key": target_user_key, "time": time_stamp, "text": dm_msg.strip(), "bar_color": staff_bar_color
+                            formatted_msg = {
+                                "sender_nick": staff_nick, "sender_role": role_label, "time": time_stamp,
+                                "text": chat_msg.strip(), "bar_color": staff_bar_color, "author_key": current_user  
                             }
                             current_data = load_global_data()
-                            if "staff_dms" not in current_data: current_data["staff_dms"] = []
-                            current_data["staff_dms"].append(formatted_dm)
+                            if "staff_chat" not in current_data: current_data["staff_chat"] = []
+                            current_data["staff_chat"].append(formatted_msg)
                             save_global_data(current_data)
                             st.session_state.global_store = current_data
                             st.rerun()
                             
-                        if refresh_dms:
+                        if refresh_group:
                             st.session_state.global_store = load_global_data()
                             st.rerun()
-                    
-                    all_dms = st.session_state.global_store.get("staff_dms", [])
-                    visible_dms = []
-                    for o_idx, dm in enumerate(all_dms):
-                        if (dm.get("sender_key") == current_user and dm.get("receiver_key") == target_user_key) or \
-                           (dm.get("sender_key") == target_user_key and dm.get("receiver_key") == current_user):
-                            visible_dms.append((o_idx, dm))
-                            
+
+                    if st.button("🗑️ Wyczyść cały Chat Staffu", key="global_clear_staff_chat_btn"):
+                        current_data = load_global_data()
+                        current_data["staff_chat"] = []
+                        save_global_data(current_data)
+                        st.session_state.global_store = current_data
+                        st.rerun()
+
+                    staff_messages = st.session_state.global_store.get("staff_chat", [])
                     st.write(" ")
-                    with st.container(height=260):
-                        if not visible_dms:
-                            st.caption(f"Brak historii z {target_label.split(' ')[0]}.")
+                    with st.container(height=450):
+                        if not staff_messages:
+                            st.caption("Brak wiadomości.")
                         else:
-                            for original_dm_idx, dm in reversed(visible_dms):
-                                is_my_own_dm = (dm.get("sender_key") == current_user)
-                                fallback_color = "#FF4B4B" if dm.get("sender_role") == "Admin" else "#FFA500"
-                                current_bar_color = dm.get("bar_color", fallback_color)
+                            for idx_reversed, msg in enumerate(reversed(staff_messages)):
+                                original_idx = len(staff_messages) - 1 - idx_reversed
+                                fallback_color = "#FF4B4B" if msg.get("sender_role") == "Admin" else "#FFA500"
+                                current_bar_color = msg.get("bar_color", fallback_color)
+                                is_my_own_message = (msg.get("author_key") == current_user)
                                 
-                                dm_col1, dm_col2 = st.columns([4.5, 1.5])
-                                with dm_col1:
+                                ch_col1, ch_col2 = st.columns([4.5, 1.5])
+                                with ch_col1:
                                     st.markdown(f"""
-                                        <div style="background-color: rgba(30,144,255,0.03); padding: 8px 12px; border-radius: 6px; margin-bottom: 8px; border-left: 4px solid {current_bar_color};">
-                                            <span style="color: {current_bar_color}; font-weight: bold;">🔑 {dm.get('sender_nick')}</span> 
-                                            <span style="font-size: 0.75rem; opacity: 0.5; margin-left: 5px;">➔ do: {target_label.split(' ')[0]}</span>
-                                            <span style="font-size: 0.8rem; opacity: 0.6; float: right;">{dm.get('time')}</span>
-                                            <p style="margin: 4px 0 0 0; font-size: 1rem; font-style: italic;">{dm.get('text')}</p>
+                                        <div style="background-color: rgba(255,255,255,0.02); padding: 8px 12px; border-radius: 6px; margin-bottom: 8px; border-left: 4px solid {current_bar_color};">
+                                            <span style="font-weight: bold; color: {main_text_theme};">[{msg.get('sender_role')}] {msg.get('sender_nick')}</span> 
+                                            <span style="font-size: 0.8rem; opacity: 0.5; float: right;">{msg.get('time')}</span>
+                                            <p style="margin: 4px 0 0 0; font-size: 1.05rem; color: {main_text_theme};">{msg.get('text')}</p>
                                         </div>
                                     """, unsafe_allow_html=True)
-                                with dm_col2:
-                                    if is_my_own_dm:
-                                        if st.button("❌ Usuń", key=f"del_dm_{original_dm_idx}", type="primary", use_container_width=True):
+                                with ch_col2:
+                                    if is_my_own_message:
+                                        if st.button("❌ Usuń", key=f"del_gmsg_{original_idx}", type="primary", use_container_width=True):
                                             current_data = load_global_data()
-                                            if original_dm_idx < len(current_data["staff_dms"]):
-                                                current_data["staff_dms"].pop(original_dm_idx)
+                                            if original_idx < len(current_data["staff_chat"]):
+                                                current_data["staff_chat"].pop(original_idx)
                                                 save_global_data(current_data)
                                                 st.session_state.global_store = current_data
                                                 st.rerun()
+                                    else:
+                                        st.button("🔒 Zablokowane", key=f"lock_gmsg_{original_idx}", disabled=True, use_container_width=True)
 
+                else:
+                    st.subheader("💬 Prywatne Wiadomości 1 na 1")
+                    
+                    all_users = st.session_state.global_store.get("user_data", {})
+                    mod_list = st.session_state.global_store.get("moderators", [])
+                    admin_list = st.session_state.global_store.get("admins", [])
+                    
+                    staff_targets = {}
+                    for u_key, u_val in all_users.items():
+                        is_target_staff = (u_key == "admin") or (u_key in admin_list) or (u_key in mod_list)
+                        if is_target_staff and u_key != current_user:
+                            saved_name = u_val.get("saved_nick", "").strip()
+                            if saved_name:
+                                t_role = "Właściciel" if u_key == "admin" else ("Admin" if u_key in admin_list else "Moderator")
+                                staff_targets[f"{saved_name} ({t_role})"] = u_key
+                    
+                    if not staff_targets:
+                        st.warning("⚠️ Nie znaleziono innych członków ekipy posiadających ustawiony podpis (nick).")
+                    else:
+                        target_label = st.selectbox("Wybierz odbiorcę prywatnej wiadomości:", list(staff_targets.keys()))
+                        target_user_key = staff_targets[target_label]
+                        
+                        with st.form("staff_dm_form", clear_on_submit=True):
+                            dm_msg = st.text_input(f"Prywatna wiadomość do **{target_label.split(' ')[0]}**:", placeholder="Wpisz treść...")
+                            
+                            dm_btn_col1, dm_btn_col2 = st.columns([3.5, 2.5])
+                            with dm_btn_col1:
+                                send_dm = st.form_submit_button("🔒 Wyślij bezpieczną wiadomość")
+                            with dm_btn_col2:
+                                refresh_dms = st.form_submit_button("🔄 Odśwież wiadomości")
+                            
+                            if send_dm and dm_msg.strip():
+                                time_stamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
+                                formatted_dm = {
+                                    "sender_key": current_user, "sender_nick": staff_nick, "sender_role": role_label,
+                                    "receiver_key": target_user_key, "time": time_stamp, "text": dm_msg.strip(), "bar_color": staff_bar_color
+                                }
+                                current_data = load_global_data()
+                                if "staff_dms" not in current_data: current_data["staff_dms"] = []
+                                current_data["staff_dms"].append(formatted_dm)
+                                save_global_data(current_data)
+                                st.session_state.global_store = current_data
+                                st.rerun()
+                                
+                            if refresh_dms:
+                                st.session_state.global_store = load_global_data()
+                                st.rerun()
+                        
+                        all_dms = st.session_state.global_store.get("staff_dms", [])
+                        visible_dms = []
+                        for o_idx, dm in enumerate(all_dms):
+                            if (dm.get("sender_key") == current_user and dm.get("receiver_key") == target_user_key) or \
+                               (dm.get("sender_key") == target_user_key and dm.get("receiver_key") == current_user):
+                                visible_dms.append((o_idx, dm))
+                                
+                        st.write(" ")
+                        with st.container(height=260):
+                            if not visible_dms:
+                                st.caption(f"Brak historii z {target_label.split(' ')[0]}.")
+                            else:
+                                for original_dm_idx, dm in reversed(visible_dms):
+                                    is_my_own_dm = (dm.get("sender_key") == current_user)
+                                    fallback_color = "#FF4B4B" if dm.get("sender_role") == "Admin" else "#FFA500"
+                                    current_bar_color = dm.get("bar_color", fallback_color)
+                                    
+                                    dm_col1, dm_col2 = st.columns([4.5, 1.5])
+                                    with dm_col1:
+                                        st.markdown(f"""
+                                            <div style="background-color: rgba(30,144,255,0.03); padding: 8px 12px; border-radius: 6px; margin-bottom: 8px; border-left: 4px solid {current_bar_color};">
+                                                <span style="color: {current_bar_color}; font-weight: bold;">🔑 {dm.get('sender_nick')}</span> 
+                                                <span style="font-size: 0.75rem; opacity: 0.5; margin-left: 5px;">➔ do: {target_label.split(' ')[0]}</span>
+                                                <span style="font-size: 0.8rem; opacity: 0.6; float: right;">{dm.get('time')}</span>
+                                                <p style="margin: 4px 0 0 0; font-size: 1rem; font-style: italic;">{dm.get('text')}</p>
+                                            </div>
+                                        """, unsafe_allow_html=True)
+                                    with dm_col2:
+                                        if is_my_own_dm:
+                                            if st.button("❌ Usuń", key=f"del_dm_{original_dm_idx}", type="primary", use_container_width=True):
+                                                current_data = load_global_data()
+                                                if original_dm_idx < len(current_data["staff_dms"]):
+                                                    current_data["staff_dms"].pop(original_dm_idx)
+                                                    save_global_data(current_data)
+                                                    st.session_state.global_store = current_data
+                                                    st.rerun()
+                                                    
     # --- TABLICA OGŁOSZEŃ ---
     st.write("---")
     st.subheader("📢 Tablica Ogłoszeń")
