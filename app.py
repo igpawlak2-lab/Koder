@@ -947,66 +947,72 @@ with c2:
 
     note_input = st.text_area("Zapisz swoje uwagi:", value=user_notepad_content, placeholder="Wpisz notatki, kody lub sekwencje...", height=180, key="local_notepad_field", on_change=save_notepad_instantly)
 
-
-         # === CZAT POMOCNICZY (SUPPORT) - BEZPIECZNA WERSJA ZWIJANA ===
-    with st.expander("📞 Otwórz Czat Pomocniczy (Support)", expanded=False):
-        st.write("Wybierz kod konta użytkownika, aby odpowiedzieć:")
+    # =========================================================================
+    # --- NOWOŚĆ: CZAT POMOCNICZY (SUPPORT CHAT / HELPDESK) ---
+    # =========================================================================
+    st.write("---")
+    st.subheader("📞 Czat Pomocniczy (Support)")
+    
+    support_messages = st.session_state.global_store.get("support_chat", [])
+    
+    # A. WIDOK DLA KADRY (Właściciel, Admin, Moderator)
+    if is_staff:
+        # Znalezienie unikalnych kluczy kont zwykłych użytkowników, którzy wysłali zgłoszenie
+        active_tickets = set(
+            msg["sender_key"] for msg in support_messages 
+            if msg.get("sender_role") == "Użytkownik"
+        )
         
-        # Pobieranie użytkowników z bazy danych sesji
-        support_users = []
-        all_users_data = st.session_state.global_store.get("user_data", {})
-        admins_list = st.session_state.global_store.get("admins", [])
-        mods_list = st.session_state.global_store.get("moderators", [])
-        
-        for u_key in all_users_data.keys():
-            if u_key != "admin" and u_key not in admins_list and u_key not in mods_list:
-                support_users.append(u_key)
-                
-        if not support_users:
-            st.caption("Brak zarejestrowanych użytkowników w systemie.")
+        if active_tickets:
+            selected_ticket_user = st.selectbox(
+                "Wybierz kod konta użytkownika, aby odpowiedzieć:", 
+                sorted(list(active_tickets)), 
+                key="staff_support_user_select"
+            )
+            
+            with st.form("staff_support_reply_form", clear_on_submit=True):
+                reply_txt = st.text_area(f"Odpowiedź do użytkownika [{selected_ticket_user}]:", placeholder="Wpisz treść pomocy...")
+                if st.form_submit_button(" Wyślij odpowiedź wsparcia"):
+                    if reply_txt.strip():
+                        # Podmiana znaków J -> I za pomocą funkcji czyszczącej clean_txt logic
+                        clean_reply = reply_txt.strip().replace('j', 'i').replace('J', 'I')
+                        time_stamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
+                        
+                        staff_label = "Właściciel" if is_root_admin else ("Admin" if is_promoted_admin else "Moderator")
+                        staff_display_name = user_saved_nick if user_saved_nick else f"Staff_{current_user[:4]}"
+                        
+                        new_reply_obj = {
+                            "sender_key": current_user,
+                            "sender_nick": staff_display_name,
+                            "sender_role": staff_label,
+                            "receiver_key": selected_ticket_user,
+                            "text": clean_reply,
+                            "time": time_stamp
+                        }
+                        
+                        current_data = load_global_data()
+                        if "support_chat" not in current_data: current_data["support_chat"] = []
+                        current_data["support_chat"].append(new_reply_obj)
+                        save_global_data(current_data)
+                        st.session_state.global_store = current_data
+                        st.success(f"Wysłano odpowiedź do {selected_ticket_user}!")
+                        st.rerun()
         else:
-            # Selektor wyboru użytkownika ("Woda" itp.)
-            chosen_support_user = st.selectbox("Wybierz użytkownika z listy:", support_users, key="support_user_select")
+            st.info("Brak otwartych zgłoszeń od użytkowników.")
             
-            # Formularz odpowiedzi
-            with st.form("support_response_form", clear_on_submit=True):
-                st.write(f"Odpowiedź do użytkownika **[{chosen_support_user}]**:")
-                reply_txt = st.text_area("Wpisz treść pomocy...", placeholder="Jak mogę pomóc temu użytkownikowi?", key="support_reply_area")
-                send_reply_btn = st.form_submit_button("Wyślij odpowiedź wsparcia")
-                
-                if send_reply_btn and reply_txt.strip():
-                    time_stamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
-                    new_reply = {
-                        "sender": current_user,
-                        "sender_role": "Właściciel (admin)" if is_admin else "Moderator",
-                        "receiver": chosen_support_user,
-                        "time": time_stamp,
-                        "text": reply_txt.strip()
-                    }
-                    current_data = load_global_data()
-                    if "support_chats" not in current_data:
-                        current_data["support_chats"] = []
-                    current_data["support_chats"].append(new_reply)
-                    save_global_data(current_data)
-                    st.session_state.global_store = current_data
-                    st.rerun()
+        # Wyświetlanie wszystkich wiadomości dla kadry
+        st.write(" **Pełna historia wszystkich zgłoszeń systemowych:**")
+        with st.container(height=300):
+            if not support_messages:
+                st.caption("Brak wiadomości w czacie pomocy.")
+            else:
+                for msg in reversed(support_messages):
+                    if msg.get("sender_role") == "Użytkownik":
+                        st.markdown(f"⏱️ `{msg.get('time')}` | **Użytkownik** (`{msg.get('sender_key')}`): {msg.get('text')}")
+                    else:
+                        st.markdown(f"⏱️ `{msg.get('time')}` | **{msg.get('sender_role')}** ({msg.get('sender_nick')}) ➡️ do `{msg.get('receiver_key')}`: {msg.get('text')}")
 
-            # Sekcja historii zgłoszeń wewnątrz zwijacza
-            st.markdown("### Pełna historia wszystkich zgłoszeń systemowych:")
-            all_support_messages = st.session_state.global_store.get("support_chats", [])
-            
-            with st.container(height=400):
-                if not all_support_messages:
-                    st.caption("Brak zarejestrowanej historii zgłoszeń.")
-                else:
-                    for msg in reversed(all_support_messages):
-                        msg_sender = msg.get("sender")
-                        # Sprawdzamy czy autor wiadomości to staff
-                        if msg_sender == "admin" or msg_sender in admins_list or msg_sender in mods_list:
-                            st.markdown(f"⏱️ `{msg.get('time')}` | **{msg.get('sender_role', 'Staff')} ({msg_sender})** ➡️ do `{msg.get('receiver')}` : {msg.get('text')}")
-                        else:
-                            st.markdown(f"⏱️ `{msg.get('time')}` | **Użytkownik ({msg_sender})**: {msg.get('text')}")
-        # B. WIDOK DLA ZWYKŁEGO UŻYTKOWNIKA
+    # B. WIDOK DLA ZWYKŁEGO UŻYTKOWNIKA
     else:
         st.caption("Napisz bezpośrednio do administracji. Inni użytkownicy nie widzą Twojego zgłoszenia.")
         with st.form("user_support_send_form", clear_on_submit=True):
