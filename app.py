@@ -325,8 +325,8 @@ if current_user == "admin2":
     
 
                   with st.form("admin2_exit_form_active"):
-            target_back_key = st.text_input("Wklej klucz konta docelowego:")
-            if st.form_submit_button("Wyloguj i przełącz konto") and target_back_key.strip():
+                  target_back_key = st.text_input("Wklej klucz konta docelowego:")
+                  if st.form_submit_button("Wyloguj i przełącz konto") and target_back_key.strip():
                 tbk = target_back_key.strip()
                 st.session_state.user_author_key = tbk
                 st.query_params["ak"] = tbk
