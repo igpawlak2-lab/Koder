@@ -322,7 +322,7 @@ if current_user == "admin2":
 
                     st.rerun()
         with st.form(...):
-    .
+    
 
         with st.form("admin2_exit_form_active"):
             target_back_key = st.text_input("Wklej klucz konta docelowego:")
