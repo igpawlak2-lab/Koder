@@ -240,116 +240,23 @@ if current_user == "admin2":
 
     with rc2:
         st.markdown("### 🚪 Wyjście")
-       
-    st.write("---")
-    st.markdown("#### 🗑️ Usuwanie kont użytkowników")
+        with st.form("admin2_exit_form_active"):
+            target_back_key = st.text_input("Wklej klucz konta docelowego:")
+            if st.form_submit_button("Wyloguj i przełącz konto") and target_back_key.strip():
+                tbk = target_back_key.strip()
+                st.session_state.user_author_key = tbk
+                st.query_params["ak"] = tbk
+                if "admin2_authenticated" in st.session_state: del st.session_state.admin2_authenticated
+                components.html(f"""
+                    <script>
+                        localStorage.removeItem("auth_admin2");
+                        localStorage.setItem("koder_author_key2", "{tbk}");
+                        window.parent.location.href = window.parent.location.pathname + "?ak={tbk}";
+                    </script>
+                """, height=0, width=0)
+                st.rerun()
+    st.stop()
 
-    with st.form("admin2_delete_account_form"):
-        delete_account_key = st.text_input(
-            "Kod konta użytkownika do usunięcia:",
-            placeholder="np. konto123"
-        )
-
-        confirm_admin2_pass = st.text_input(
-            "Podaj pierwsze hasło admin2:",
-            type="password"
-        )
-
-        confirm_word = st.text_input(
-            "Wpisz USUN aby potwierdzić:"
-        )
-
-        delete_submit = st.form_submit_button("💥 Usuń konto całkowicie")
-
-        if delete_submit:
-            target = delete_account_key.strip()
-
-            if confirm_admin2_pass != "Przyrodnik1":
-                st.error("❌ Nieprawidłowe pierwsze hasło admin2.")
-
-            elif confirm_word != "USUN":
-                st.error("❌ Musisz wpisać dokładnie: USUN")
-
-            elif not target:
-                st.error("❌ Podaj kod konta.")
-
-            elif target in ["admin", "admin2"]:
-                st.error("❌ Nie można usunąć kont systemowych.")
-
-            else:
-                current_data = load_global_data()
-
-                if target not in current_data.get("user_data", {}):
-                    st.error("❌ Takie konto nie istnieje.")
-                else:
-
-                    del current_data["user_data"][target]
-
-                    if target in current_data.get("admins", []):
-                        current_data["admins"].remove(target)
-
-                    if target in current_data.get("moderators", []):
-                        current_data["moderators"].remove(target)
-
-                    current_data["staff_chat"] = [
-                        m for m in current_data.get("staff_chat", [])
-                        if m.get("author_key") != target
-                    ]
-
-                    current_data["staff_dms"] = [
-                        m for m in current_data.get("staff_dms", [])
-                        if m.get("sender_key") != target
-                        and m.get("receiver_key") != target
-                    ]
-
-                    current_data["support_chat"] = [
-                        m for m in current_data.get("support_chat", [])
-                        if m.get("sender_key") != target
-                        and m.get("receiver_key") != target
-                    ]
-
-                    current_data["password_resets"] = [
-                        m for m in current_data.get("password_resets", [])
-                        if m.get("author_key") != target
-                    ]
-
-                    save_global_data(current_data)
-                    st.session_state.global_store = current_data
-
-                    st.success(
-                        f"✅ Konto '{target}' zostało całkowicie usunięte z systemu."
-                    )
-
-                    st.rerun()
-
-with st.form("admin2_delete_account_form"):
-    # kod usuwania konta
-    pass
-
-st.write("---")
-
-with st.form("admin2_exit_form_active"):
-    target_back_key = st.text_input("Wklej klucz konta docelowego:")
-
-    if st.form_submit_button("Wyloguj i przełącz konto") and target_back_key.strip():
-        tbk = target_back_key.strip()
-        st.session_state.user_author_key = tbk
-        st.query_params["ak"] = tbk
-
-        if "admin2_authenticated" in st.session_state:
-            del st.session_state.admin2_authenticated
-
-        components.html(f"""
-            <script>
-                localStorage.removeItem("auth_admin2");
-                localStorage.setItem("koder_author_key2", "{tbk}");
-                window.parent.location.href = window.parent.location.pathname + "?ak={tbk}";
-            </script>
-        """, height=0, width=0)
-
-        st.rerun()
-
-st.stop()
 
 # --- NOWY EKRAN LOGOWANIA I REJESTRACJI (JEŚLI BRAK AKTYWNEGO KLUCZA) ---
 if not current_user:
