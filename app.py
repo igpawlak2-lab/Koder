@@ -321,26 +321,35 @@ if current_user == "admin2":
                     )
 
                     st.rerun()
-        with st.form("admin2_delete_account_form"):
-    
 
-                  with st.form("admin2_exit_form_active"):
-                  target_back_key = st.text_input("Wklej klucz konta docelowego:")
-                  if st.form_submit_button("Wyloguj i przełącz konto") and target_back_key.strip():
-                tbk = target_back_key.strip()
-                st.session_state.user_author_key = tbk
-                st.query_params["ak"] = tbk
-                if "admin2_authenticated" in st.session_state: del st.session_state.admin2_authenticated
-                components.html(f"""
-                    <script>
-                        localStorage.removeItem("auth_admin2");
-                        localStorage.setItem("koder_author_key2", "{tbk}");
-                        window.parent.location.href = window.parent.location.pathname + "?ak={tbk}";
-                    </script>
-                """, height=0, width=0)
-                st.rerun()
-    st.stop()
+with st.form("admin2_delete_account_form"):
+    # kod usuwania konta
+    pass
 
+st.write("---")
+
+with st.form("admin2_exit_form_active"):
+    target_back_key = st.text_input("Wklej klucz konta docelowego:")
+
+    if st.form_submit_button("Wyloguj i przełącz konto") and target_back_key.strip():
+        tbk = target_back_key.strip()
+        st.session_state.user_author_key = tbk
+        st.query_params["ak"] = tbk
+
+        if "admin2_authenticated" in st.session_state:
+            del st.session_state.admin2_authenticated
+
+        components.html(f"""
+            <script>
+                localStorage.removeItem("auth_admin2");
+                localStorage.setItem("koder_author_key2", "{tbk}");
+                window.parent.location.href = window.parent.location.pathname + "?ak={tbk}";
+            </script>
+        """, height=0, width=0)
+
+        st.rerun()
+
+st.stop()
 
 # --- NOWY EKRAN LOGOWANIA I REJESTRACJI (JEŚLI BRAK AKTYWNEGO KLUCZA) ---
 if not current_user:
