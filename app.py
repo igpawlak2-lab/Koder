@@ -321,7 +321,7 @@ if current_user == "admin2":
                     )
 
                     st.rerun()
-        with st.form(...):
+        with st.form("admin2_delete_account_form"):
     
 
         with st.form("admin2_exit_form_active"):
