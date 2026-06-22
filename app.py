@@ -240,7 +240,7 @@ if current_user == "admin2":
 
     with rc2:
         st.markdown("### 🚪 Wyjście")
-            ```python
+       
     st.write("---")
     st.markdown("#### 🗑️ Usuwanie kont użytkowników")
 
