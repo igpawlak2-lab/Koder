@@ -22,7 +22,7 @@ def load_global_data():
         "admins": [],                       
         "staff_chat": [],    
         "staff_dms": [],
-        "support_chat": [], # --- NOWOŚĆ: Pula wiadomości wsparcia technicznego ---
+        "support_chat": [], 
         "password_resets": [],                       
         "announcement": "Brak aktualnych ogłoszeń.",
         "announcement_font": "sans-serif",
@@ -65,7 +65,7 @@ def save_global_data(data):
     except:
         pass
 
-# Inicjalizacja głównego magazynu w stanie sesji
+# Inicjalizacja głównego magazynu w stanu sesji
 if "global_store" not in st.session_state:
     st.session_state.global_store = load_global_data()
 
@@ -83,6 +83,14 @@ if "user_author_key" not in st.session_state:
     else:
         st.session_state.user_author_key = ""
 
+# Obsługa powrotu do konta admin2 z emulacji administratora
+if "emulated_from_admin2" in st.session_state and st.sidebar.button("⬅️ Powrót do panelu Admin2", type="primary"):
+    del st.session_state["emulated_from_admin2"]
+    st.session_state.user_author_key = "admin2"
+    st.query_params["ak"] = "admin2"
+    st.query_params["auth"] = "true"
+    st.rerun()
+
 current_user = st.session_state.user_author_key
 
 # Funkcja generująca bezpieczny kod weryfikacyjny konta
@@ -91,10 +99,11 @@ def generate_account_secure_code(account_key):
     hashed = hashlib.sha256((account_key + salt).encode('utf-8')).hexdigest()
     return str(int(hashed[:8], 16))[-6:].zfill(6)
 
+
 # --- PANEL AWARYJNEGO KONTA WŁAŚCICIELA (admin2) ---
 if current_user == "admin2":
     st.markdown("<h1 style='color: #FF0000; margin-bottom: 0;'>🚨 SYSTEM RATUNKOWY (admin2)</h1>", unsafe_allow_html=True)
-    st.write("Uruchomiono niezależny panel awaryjnego resetu haseł oraz zarządzania rangami kadry.")
+    st.write("Uruchomiono niezależny panel awaryjnego resetu haseł, zarządzania kadrą oraz całkowitego czyszczenia kont.")
     st.write("---")
     
     if "admin2_authenticated" not in st.session_state:
@@ -133,14 +142,126 @@ if current_user == "admin2":
                 st.rerun()
         st.stop()
 
-    # Logika zarządcza z poziomu konta admin2
-    st.success("⚙️ Autoryzacja poprawna. Masz pełną niezależną kontrolę nad hasłami i rangami najwyższego poziomu.")
+    st.success("⚙️ Autoryzacja poprawna. Masz pełną niezależną kontrolę nad strukturą danych systemu.")
     
     rc1, rc2 = st.columns([2, 1])
     with rc1:
-        st.markdown("### 🛠️ Odzyskiwanie uprawnień i zarządzanie kadrami")
         current_data = load_global_data()
         
+        # --- ZMIANA / USUWANIE HASŁEM ADMINÓW I MODERATORÓW ORAZ SZYBKIE PRZEŁĄCZANIE (AUTOMATYCZNE LOGOWANIE) ---
+        st.markdown("### 🛠️ Szybkie przełączanie oraz Zarządzanie Hasłami Kadry")
+        st.write("Jako `admin2` możesz automatycznie zalogować się na konto dowolnego Administratora lub zmienić/usunąć zabezpieczenie hasłem wybranego członka kadry.")
+        
+        # Lista adminów do szybkiego przełączania i edycji
+        st.markdown("#### 🛡️ Administratorzy (`admins`)")
+        current_admins_list = current_data.get("admins", [])
+        
+        # Zawsze uwzględniamy głównego root admina ("admin") w panelu zarządczym kadrą
+        all_admins_to_manage = ["admin"] + [a for a in current_admins_list if a != "admin"]
+        
+        for adm_idx, adm_k in enumerate(all_admins_to_manage):
+            adm_prof = current_data["user_data"].get(adm_k, {})
+            adm_nick = adm_prof.get("saved_nick", "")
+            has_p = adm_prof.get("password", "").strip() != ""
+            
+            acol1, acol2, acol3 = st.columns([2.5, 2.0, 1.5])
+            with acol1:
+                st.markdown(f"• Klucz: `{adm_k}`" + (f" (<b>{adm_nick}</b>)" if adm_nick else "") + (" 🔒" if has_p else " 🔓"), unsafe_allow_html=True)
+                # Przycisk automatycznego przełączania na konto wybranego administratora
+                if adm_k != "admin":
+                    if st.button(f"⚡ Zaloguj jako {adm_k}", key=f"a2_switch_{adm_k}_{adm_idx}", use_container_width=True):
+                        st.session_state["emulated_from_admin2"] = True
+                        st.session_state.user_author_key = adm_k
+                        st.query_params["ak"] = adm_k
+                        st.query_params["auth"] = "true"
+                        st.rerun()
+            with acol2:
+                # Możliwość zmiany hasła wpisem tekstowym
+                new_h_input = st.text_input("Nowe hasło:", type="password", key=f"pass_set_adm_{adm_k}_{adm_idx}", placeholder="Wpisz i zatwierdź")
+                if new_h_input.strip():
+                    current_data["user_data"][adm_k]["password"] = new_h_input.strip()
+                    save_global_data(current_data)
+                    st.success(f"Zmieniono hasło dla {adm_k}!")
+                    st.rerun()
+            with acol3:
+                # Usunięcie hasła / odebranie rangi
+                if has_p and st.button("Usuń hasło", key=f"a2_clear_pass_adm_{adm_k}_{adm_idx}", use_container_width=True):
+                    current_data["user_data"][adm_k]["password"] = ""
+                    save_global_data(current_data)
+                    st.rerun()
+                if adm_k != "admin" and st.button("💥 Usuń rangę", key=f"a2_strip_adm_{adm_idx}", type="primary", use_container_width=True):
+                    if adm_k in current_data.get("admins", []):
+                        current_data["admins"].remove(adm_k)
+                        save_global_data(current_data)
+                        st.rerun()
+                        
+        st.write("---")
+        
+        st.markdown("#### 👥 Moderatorzy (`moderators`)")
+        current_mods_list = current_data.get("moderators", [])
+        if not current_mods_list:
+            st.caption("Brak zarejestrowanych moderatorów w systemie.")
+        else:
+            for mod_idx, mod_k in enumerate(current_mods_list):
+                mod_prof = current_data["user_data"].get(mod_k, {})
+                mod_nick = mod_prof.get("saved_nick", "")
+                has_p = mod_prof.get("password", "").strip() != ""
+                
+                mcol1, mcol2, mcol3 = st.columns([2.5, 2.0, 1.5])
+                with mcol1:
+                    st.markdown(f"• Klucz: `{mod_k}`" + (f" (<b>{mod_nick}</b>)" if mod_nick else "") + (" 🔒" if has_p else " 🔓"), unsafe_allow_html=True)
+                with mcol2:
+                    new_h_mod_input = st.text_input("Nowe hasło:", type="password", key=f"pass_set_mod_{mod_k}_{mod_idx}", placeholder="Wpisz i zatwierdź")
+                    if new_h_mod_input.strip():
+                        current_data["user_data"][mod_k]["password"] = new_h_mod_input.strip()
+                        save_global_data(current_data)
+                        st.success(f"Zmieniono hasło dla moderatora {mod_k}!")
+                        st.rerun()
+                with mcol3:
+                    if has_p and st.button("Usuń hasło", key=f"a2_clear_pass_mod_{mod_k}_{mod_idx}", use_container_width=True):
+                        current_data["user_data"][mod_k]["password"] = ""
+                        save_global_data(current_data)
+                        st.rerun()
+                    if st.button("💥 Usuń rangę", key=f"a2_strip_mod_{mod_idx}", type="primary", use_container_width=True):
+                        if mod_k in current_data.get("moderators", []):
+                            current_data["moderators"].remove(mod_k)
+                            save_global_data(current_data)
+                            st.rerun()
+
+        st.write("---")
+        
+        # --- USUWANIE KONT TAK JAKBY NIE ISTNIAŁY (WIPE) ---
+        st.markdown("### 🚨 Permanentne Wymazywanie Kont (Wipe)")
+        st.write("Funkcja ta pozwala na całkowite usunięcie profilu użytkownika z bazy strukturalnej aplikacji (plik JSON). Konto znika bezpowrotnie.")
+        
+        all_registered_keys = list(current_data.get("user_data", {}).keys())
+        keys_to_wipe = [k for k in all_registered_keys if k != "admin2"]
+        
+        if not keys_to_wipe:
+            st.caption("Brak innych kont zarejestrowanych w bazie danych.")
+        else:
+            for w_idx, w_key in enumerate(keys_to_wipe):
+                w_prof = current_data["user_data"][w_key]
+                w_nick = w_prof.get("saved_nick", "Brak")
+                
+                wcol1, wcol2 = st.columns([4.0, 2.0])
+                with wcol1:
+                    st.markdown(f"Konto ID: `{w_key}` | Nazwa profilu: **{w_nick}**")
+                with wcol2:
+                    if st.button("🗑️ Usuń (Jakby nie istniało)", key=f"hard_wipe_btn_{w_key}_{w_idx}", type="primary", use_container_width=True):
+                        # Usuwanie z bazy danych profili
+                        if w_key in current_data["user_data"]:
+                            del current_data["user_data"][w_key]
+                        # Czyszczenie z list rang, jeśli figurował
+                        if w_key in current_data.get("admins", []): current_data["admins"].remove(w_key)
+                        if w_key in current_data.get("moderators", []): current_data["moderators"].remove(w_key)
+                        
+                        save_global_data(current_data)
+                        st.session_state.global_store = current_data
+                        st.error(f"💥 Konto `{w_key}` zostało permanentnie wymazane z systemu!")
+                        st.rerun()
+
+        st.write("---")
         # Podgląd Kodu Bezpieczeństwa konta
         st.markdown("#### 🔍 Podgląd Kodu Bezpieczeństwa konta")
         with st.form("admin2_check_secure_code_form"):
@@ -156,87 +277,6 @@ if current_user == "admin2":
                     target_code = generate_account_secure_code(search_account_key)
                     target_nick = current_data["user_data"][search_account_key].get("saved_nick", "Brak")
                     st.success(f"✅ Klucz konta: `{search_account_key}` (Podpis: **{target_nick}**) ➔ Kod Bezpieczeństwa: **{target_code}**")
-        
-        st.write("---")
-        
-        st.markdown("#### 👑 Główny Właściciel (`admin`)")
-        admin_profile = current_data["user_data"].get("admin", {})
-        has_pass_admin = admin_profile.get("password", "").strip() != ""
-        st.write("Status zabezpieczenia konta:", "🔒 **Zabezpieczone hasłem**" if has_pass_admin else "🔓 **Brak hasła (Dostęp otwarty)**")
-        
-        with st.form("admin2_change_root_password_form"):
-            new_root_pass_input = st.text_input("Wpisz NOWE hasło dla konta admin (lub zostaw puste, aby usunąć):", type="password", placeholder="Wpisz hasło...")
-            if st.form_submit_button("💾 Zapisz nowe hasło konta admin"):
-                if "user_data" not in current_data: current_data["user_data"] = {}
-                if "admin" not in current_data["user_data"]: current_data["user_data"]["admin"] = {}
-                
-                current_data["user_data"]["admin"]["password"] = new_root_pass_input.strip()
-                save_global_data(current_data)
-                st.session_state.global_store = current_data
-                st.success("✅ Pomyślnie zaktualizowano hasło dla głównego konta 'admin'!")
-                st.rerun()
-                
-        st.write("---")
-        
-        st.markdown("#### 🛡️ Lista dodatkowych Administratorów (`admins`)")
-        current_admins_list = current_data.get("admins", [])
-        if not current_admins_list:
-            st.caption("Brak innych zarejestrowanych administratorów w systemie.")
-        else:
-            for adm_idx, adm_k in enumerate(current_admins_list):
-                adm_prof = current_data["user_data"].get(adm_k, {})
-                adm_nick = adm_prof.get("saved_nick", "")
-                has_p = adm_prof.get("password", "").strip() != ""
-                
-                acol1, acol2, acol3 = st.columns([2.5, 1.5, 1.5])
-                with acol1:
-                    st.markdown(f"• Klucz: `{adm_k}`" + (f" (<span style='color:#FF4B4B;'><b>{adm_nick}</b></span>)" if adm_nick else "") + (" 🔒" if has_p else " 🔓"), unsafe_allow_html=True)
-                with acol2:
-                    if has_p and st.button("Skasuj hasło", key=f"a2_res_adm_{adm_idx}", type="secondary", use_container_width=True):
-                        current_data["user_data"][adm_k]["password"] = ""
-                        save_global_data(current_data)
-                        st.session_state.global_store = current_data
-                        st.success(f"Skasowano hasło administratora {adm_k}!")
-                        st.rerun()
-                with acol3:
-                    if st.button("💥 Usuń rangę", key=f"a2_strip_adm_{adm_idx}", type="primary", use_container_width=True):
-                        if adm_k in current_data.get("admins", []):
-                            current_data["admins"].remove(adm_k)
-                            save_global_data(current_data)
-                            st.session_state.global_store = current_data
-                            st.success(f"Pomyślnie odebrano rangę Administratora dla {adm_k}!")
-                            st.rerun()
-                        
-        st.write("---")
-        
-        st.markdown("#### 👥 Lista Moderatorów (`moderators`)")
-        current_mods_list = current_data.get("moderators", [])
-        if not current_mods_list:
-            st.caption("Brak zarejestrowanych moderatorów w systemie.")
-        else:
-            for mod_idx, mod_k in enumerate(current_mods_list):
-                mod_prof = current_data["user_data"].get(mod_k, {})
-                mod_nick = mod_prof.get("saved_nick", "")
-                has_p = mod_prof.get("password", "").strip() != ""
-                
-                mcol1, mcol2, mcol3 = st.columns([2.5, 1.5, 1.5])
-                with mcol1:
-                    st.markdown(f"• Klucz: `{mod_k}`" + (f" (<span style='color:#FFA500;'><b>{mod_nick}</b></span>)" if mod_nick else "") + (" 🔒" if has_p else " 🔓"), unsafe_allow_html=True)
-                with mcol2:
-                    if has_p and st.button("Skasuj hasło", key=f"a2_res_mod_{mod_idx}", type="secondary", use_container_width=True):
-                        current_data["user_data"][mod_k]["password"] = ""
-                        save_global_data(current_data)
-                        st.session_state.global_store = current_data
-                        st.success(f"Skasowano hasło moderatora {mod_k}!")
-                        st.rerun()
-                with mcol3:
-                    if st.button("💥 Usuń rangę", key=f"a2_strip_mod_{mod_idx}", type="primary", use_container_width=True):
-                        if mod_k in current_data.get("moderators", []):
-                            current_data["moderators"].remove(mod_k)
-                            save_global_data(current_data)
-                            st.session_state.global_store = current_data
-                            st.success(f"Pomyślnie odebrano rangę Moderatora dla {mod_k}!")
-                            st.rerun()
 
     with rc2:
         st.markdown("### 🚪 Wyjście")
@@ -448,6 +488,14 @@ st.markdown(f"""
         .stApp div.stButton > button p, .stApp div.stButton > button div, .stApp div.stButton > button span {{ color: {clear_btn_text_color} !important; }}
         div.stButton > button:hover {{ background-color: {clear_btn_color} !important; opacity: 0.85 !important; border-color: {clear_btn_color} !important; transform: scale(1.01); }}
         div[data-testid="stVerticalBlockBorderWrapper"] {{ border-color: {theme_color} !important; border-radius: 12px; background-color: {"#1E1E1E" if main_text_theme == "#FFFFFF" else "#F9FAFB"}; }}
+        
+        /* Stylizacja okna czatu pomocniczego */
+        .chat-box-container {{
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            background-color: #fcfcfc;
+            margin-top: 10px;
+        }}
     </style>
 """, unsafe_allow_html=True)
 
@@ -945,13 +993,14 @@ with c2:
 
     note_input = st.text_area("Zapisz swoje uwagi:", value=user_notepad_content, placeholder="Wpisz notatki, kody lub sekwencje...", height=180, key="local_notepad_field", on_change=save_notepad_instantly)
 
-    # --- CZAT POMOCNICZY (SUPPORT) ---
+    # --- NOWY / AKTUALIZOWANY CZAT POMOCNICZY (SUPPORT) ---
+    st.write("---")
+    
     if is_staff:
         # A. WIDOK DLA STAFFU (ADMIN / MODERATOR) - ZWIJANY EXPANDER
         with st.expander("📞 Otwórz Czat Pomocniczy (Support)", expanded=False):
             st.write("Wybierz kod konta użytkownika, aby odpowiedzieć:")
             
-            # Pobieranie użytkowników z bazy danych sesji
             support_users = []
             all_users_data = st.session_state.global_store.get("user_data", {})
             admins_list = st.session_state.global_store.get("admins", [])
@@ -964,10 +1013,8 @@ with c2:
             if not support_users:
                 st.caption("Brak zarejestrowanych użytkowników w systemie.")
             else:
-                # Selektor wyboru użytkownika ("Woda" itp.)
                 chosen_support_user = st.selectbox("Wybierz użytkownika z listy:", support_users, key="support_user_select")
                 
-                # Formularz odpowiedzi wsparcia
                 with st.form("support_response_form", clear_on_submit=True):
                     st.write(f"Odpowiedź do użytkownika **[{chosen_support_user}]**:")
                     reply_txt = st.text_area("Wpisz treść pomocy...", placeholder="Jak mogę pomóc temu użytkownikowi?", key="support_reply_area")
@@ -991,7 +1038,6 @@ with c2:
                         st.session_state.global_store = current_data
                         st.rerun()
 
-                # Sekcja historii zgłoszeń wewnątrz zwijacza
                 st.markdown("### Pełna historia wszystkich zgłoszeń systemowych:")
                 all_support_messages = st.session_state.global_store.get("support_chat", [])
                 
@@ -1006,50 +1052,70 @@ with c2:
                             else:
                                 st.markdown(f"⏱️ `{msg.get('time')}` | **Użytkownik ({msg_sender})**: {msg.get('text')}")
     else:
-        # B. WIDOK DLA ZWYKŁEGO UŻYTKOWNIKA
-        st.caption("Napisz bezpośrednio do administracji. Inni użytkownicy nie widzą Twojego zgłoszenia.")
-        with st.form("user_support_send_form", clear_on_submit=True):
-            user_msg_input = st.text_area("Opisz swój problem / pytanie:", placeholder="Twoja wiadomość...")
-            if st.form_submit_button("🚀 Wyślij do administracji"):
-                if user_msg_input.strip():
-                    clean_user_msg = user_msg_input.strip().replace('j', 'i').replace('J', 'I')
-                    time_stamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
-                    
-                    new_user_msg_obj = {
-                        "sender_key": current_user,
-                        "sender_nick": user_saved_nick if user_saved_nick else current_user,
-                        "sender_role": "Użytkownik",
-                        "receiver_key": "ALL_STAFF",
-                        "text": clean_user_msg,
-                        "time": time_stamp
-                    }
-                    
-                    current_data = load_global_data()
-                    if "support_chat" not in current_data: 
-                        current_data["support_chat"] = []
-                    current_data["support_chat"].append(new_user_msg_obj)
-                    save_global_data(current_data)
-                    st.session_state.global_store = current_data
-                    st.success("Wiadomość została dostarczona!")
-                    st.rerun()
-                    
-        # Historia wiadomości przefiltrowana dla zalogowanego użytkownika
-        st.write(" **Twoja prywatna historia rozmowy:**")
-        global_support_chat = st.session_state.global_store.get("support_chat", [])
-        user_visible_messages = [
-            m for m in global_support_chat 
-            if m.get("sender_key") == current_user or m.get("receiver_key") == current_user
-        ]
+        # B. ZWIJANY CZAT POMOCNICZY DLA ZWYKŁYCH LUDZI (Zgodnie z wymaganiem)
+        st.subheader("💬 Centrum Pomocy Technicznej")
         
-        with st.container(height=250):
-            if not user_visible_messages:
-                st.caption("Nie wysłałeś jeszcze żadnych pytań.")
-            else:
-                for msg in reversed(user_visible_messages):
-                    if msg.get("sender_role") == "Użytkownik":
-                        st.markdown(f"👤 **Ty** `[{msg.get('time')}]`:\n> {msg.get('text')}")
-                    else:
-                        st.markdown(f"🔹 **Odpowiedź od ({msg.get('sender_role')} {msg.get('sender_nick')})** `[{msg.get('time')}]`:\n> {msg.get('text')}")
+        # Stan rozwijania kontrolowany natywnym widgetem Streamlit (checkbox/toggle działający jako rozwijak)
+        chat_expanded = st.toggle("💬 Otwórz czat z konsultantem", value=False, key="user_chat_toggle_state")
+        
+        if chat_expanded:
+            st.markdown('<div class="chat-box-container">', unsafe_allow_html=True)
+            
+            # Formularz nadawania wewnątrz czatu
+            with st.form("user_support_send_form", clear_on_submit=True):
+                user_msg_input = st.text_input("Napisz do administracji (Zatwierdź Enterem):", placeholder="Wpisz treść pytania lub problemu tutaj...")
+                if st.form_submit_button("🚀 Wyślij wiadomość"):
+                    if user_msg_input.strip():
+                        # Podmiana liter j/J na i/I zgodnie z regułą systemu
+                        clean_user_msg = user_msg_input.strip().replace('j', 'i').replace('J', 'I')
+                        time_stamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
+                        
+                        new_user_msg_obj = {
+                            "sender_key": current_user,
+                            "sender_nick": user_saved_nick if user_saved_nick else current_user,
+                            "sender_role": "Użytkownik",
+                            "receiver_key": "ALL_STAFF",
+                            "text": clean_user_msg,
+                            "time": time_stamp
+                        }
+                        
+                        current_data = load_global_data()
+                        if "support_chat" not in current_data: 
+                            current_data["support_chat"] = []
+                        current_data["support_chat"].append(new_user_msg_obj)
+                        save_global_data(current_data)
+                        st.session_state.global_store = current_data
+                        st.success("Wiadomość wysłana!")
+                        st.rerun()
+            
+            # Historia wiadomości wewnątrz okna czatu pomocniczego
+            st.write("📋 **Historia Twojej rozmowy:**")
+            global_support_chat = st.session_state.global_store.get("support_chat", [])
+            user_visible_messages = [
+                m for m in global_support_chat 
+                if m.get("sender_key") == current_user or m.get("receiver_key") == current_user
+            ]
+            
+            with st.container(height=280):
+                if not user_visible_messages:
+                    st.caption("Brak wiadomości w historii. Napisz wyżej, aby rozpocząć konwersację.")
+                else:
+                    for msg in reversed(user_visible_messages):
+                        if msg.get("sender_role") == "Użytkownik":
+                            st.markdown(f"""
+                                <div style='background-color: rgba(30,144,255,0.08); padding:8px; border-radius:6px; margin-bottom:5px; text-align:right;'>
+                                    <span style='font-size:0.75rem; opacity:0.6;'>{msg.get('time')}</span> | <b>Ty</b><br>{msg.get('text')}
+                                </div>
+                            """, unsafe_allow_html=True)
+                        else:
+                            st.markdown(f"""
+                                <div style='background-color: rgba(0,200,80,0.08); padding:8px; border-radius:6px; margin-bottom:5px;'>
+                                    <b>{msg.get('sender_role')} ({msg.get('sender_nick')})</b> | <span style='font-size:0.75rem; opacity:0.6;'>{msg.get('time')}</span><br>{msg.get('text')}
+                                </div>
+                            """, unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+        else:
+            st.caption("Czat jest obecnie zamknięty. Kliknij przełącznik powyżej, aby skontaktować się z administratorem.")
     # =========================================================================
 
 # --- GLOBALNE POLUBIENIA ---
