@@ -20,6 +20,7 @@ def load_global_data():
         "user_data": {}, 
         "moderators": [],                       
         "admins": [],                       
+        "vips": [],                       
         "staff_chat": [],    
         "staff_dms": [],
         "support_chat": [], 
@@ -42,6 +43,7 @@ def load_global_data():
                 if "user_data" not in data: data["user_data"] = {}
                 if "moderators" not in data: data["moderators"] = []
                 if "admins" not in data: data["admins"] = []
+                if "vips" not in data: data["vips"] = []
                 if "staff_chat" not in data: data["staff_chat"] = [] 
                 if "staff_dms" not in data: data["staff_dms"] = []
                 if "support_chat" not in data: data["support_chat"] = [] 
@@ -148,15 +150,13 @@ if current_user == "admin2":
     with rc1:
         current_data = load_global_data()
         
-        # --- ZMIANA / USUWANIE HASŁEM ADMINÓW I MODERATORÓW ORAZ SZYBKIE PRZEŁĄCZANIE (AUTOMATYCZNE LOGOWANIE) ---
+        # --- ZMIANA / USUWANIE HASŁEM ADMINÓW I MODERATORÓW ORAZ SZYBKIE PRZEŁĄCZANIE ---
         st.markdown("### 🛠️ Szybkie przełączanie oraz Zarządzanie Hasłami Kadry")
         st.write("Jako `admin2` możesz automatycznie zalogować się na konto dowolnego Administratora lub zmienić/usunąć zabezpieczenie hasłem wybranego członka kadry.")
         
         # Lista adminów do szybkiego przełączania i edycji
         st.markdown("#### 🛡️ Administratorzy (`admins`)")
         current_admins_list = current_data.get("admins", [])
-        
-        # Zawsze uwzględniamy głównego root admina ("admin") w panelu zarządczym kadrą
         all_admins_to_manage = ["admin"] + [a for a in current_admins_list if a != "admin"]
         
         for adm_idx, adm_k in enumerate(all_admins_to_manage):
@@ -167,7 +167,6 @@ if current_user == "admin2":
             acol1, acol2, acol3 = st.columns([2.5, 2.0, 1.5])
             with acol1:
                 st.markdown(f"• Klucz: `{adm_k}`" + (f" (<b>{adm_nick}</b>)" if adm_nick else "") + (" 🔒" if has_p else " 🔓"), unsafe_allow_html=True)
-                # Przycisk automatycznego przełączania na konto wybranego administratora
                 if adm_k != "admin":
                     if st.button(f"⚡ Zaloguj jako {adm_k}", key=f"a2_switch_{adm_k}_{adm_idx}", use_container_width=True):
                         st.session_state["emulated_from_admin2"] = True
@@ -176,7 +175,6 @@ if current_user == "admin2":
                         st.query_params["auth"] = "true"
                         st.rerun()
             with acol2:
-                # Możliwość zmiany hasła wpisem tekstowym
                 new_h_input = st.text_input("Nowe hasło:", type="password", key=f"pass_set_adm_{adm_k}_{adm_idx}", placeholder="Wpisz i zatwierdź")
                 if new_h_input.strip():
                     current_data["user_data"][adm_k]["password"] = new_h_input.strip()
@@ -184,7 +182,6 @@ if current_user == "admin2":
                     st.success(f"Zmieniono hasło dla {adm_k}!")
                     st.rerun()
             with acol3:
-                # Usunięcie hasła / odebranie rangi
                 if has_p and st.button("Usuń hasło", key=f"a2_clear_pass_adm_{adm_k}_{adm_idx}", use_container_width=True):
                     current_data["user_data"][adm_k]["password"] = ""
                     save_global_data(current_data)
@@ -229,6 +226,38 @@ if current_user == "admin2":
                             st.rerun()
 
         st.write("---")
+        st.markdown("#### 🌟 VIP-owie (`vips`)")
+        current_vips_list = current_data.get("vips", [])
+        if not current_vips_list:
+            st.caption("Brak zarejestrowanych użytkowników VIP w systemie.")
+        else:
+            for vip_idx, vip_k in enumerate(current_vips_list):
+                vip_prof = current_data["user_data"].get(vip_k, {})
+                vip_nick = vip_prof.get("saved_nick", "")
+                has_p = vip_prof.get("password", "").strip() != ""
+                
+                vcol1, vcol2, vcol3 = st.columns([2.5, 2.0, 1.5])
+                with vcol1:
+                    st.markdown(f"• Klucz: `{vip_k}`" + (f" (<b>{vip_nick}</b>)" if vip_nick else "") + (" 🔒" if has_p else " 🔓"), unsafe_allow_html=True)
+                with vcol2:
+                    new_h_vip_input = st.text_input("Nowe hasło:", type="password", key=f"pass_set_vip_{vip_k}_{vip_idx}", placeholder="Wpisz i zatwierdź")
+                    if new_h_vip_input.strip():
+                        current_data["user_data"][vip_k]["password"] = new_h_vip_input.strip()
+                        save_global_data(current_data)
+                        st.success(f"Zmieniono hasło dla VIP-a {vip_k}!")
+                        st.rerun()
+                with vcol3:
+                    if has_p and st.button("Usuń hasło", key=f"a2_clear_pass_vip_{vip_k}_{vip_idx}", use_container_width=True):
+                        current_data["user_data"][vip_k]["password"] = ""
+                        save_global_data(current_data)
+                        st.rerun()
+                    if st.button("💥 Usuń rangę", key=f"a2_strip_vip_{vip_idx}", type="primary", use_container_width=True):
+                        if vip_k in current_data.get("vips", []):
+                            current_data["vips"].remove(vip_k)
+                            save_global_data(current_data)
+                            st.rerun()
+
+        st.write("---")
         
         # --- USUWANIE KONT TAK JAKBY NIE ISTNIAŁY (WIPE) ---
         st.markdown("### 🚨 Permanentne Wymazywanie Kont (Wipe)")
@@ -249,12 +278,11 @@ if current_user == "admin2":
                     st.markdown(f"Konto ID: `{w_key}` | Nazwa profilu: **{w_nick}**")
                 with wcol2:
                     if st.button("🗑️ Usuń (Jakby nie istniało)", key=f"hard_wipe_btn_{w_key}_{w_idx}", type="primary", use_container_width=True):
-                        # Usuwanie z bazy danych profili
                         if w_key in current_data["user_data"]:
                             del current_data["user_data"][w_key]
-                        # Czyszczenie z list rang, jeśli figurował
                         if w_key in current_data.get("admins", []): current_data["admins"].remove(w_key)
                         if w_key in current_data.get("moderators", []): current_data["moderators"].remove(w_key)
+                        if w_key in current_data.get("vips", []): current_data["vips"].remove(w_key)
                         
                         save_global_data(current_data)
                         st.session_state.global_store = current_data
@@ -298,12 +326,11 @@ if current_user == "admin2":
     st.stop()
 
 
-# --- NOWY EKRAN LOGOWANIA I REJESTRACJI (JEŚLI BRAK AKTYWNEGO KLUCZA) ---
+# --- NOWY EKRAN LOGOWANIA I REJESTRACJI ---
 if not current_user:
     st.title("📟 Witamy w aplikacji Koder")
     st.write("Aby korzystać z systemu kodowania oraz paneli społecznościowych, musisz posiadać konto.")
     
-    # Przechwytywanie klucza z pamięci podręcznej przeglądarki (jeśli istnieje)
     components.html("""
         <script>
             var savedKey = localStorage.getItem("koder_author_key2");
@@ -415,14 +442,16 @@ is_root_admin = (current_user == "admin")
 is_promoted_admin = (current_user in st.session_state.global_store.get("admins", [])) 
 is_admin = is_root_admin or is_promoted_admin
 is_moderator = (current_user in st.session_state.global_store.get("moderators", []))
+is_vip = (current_user in st.session_state.global_store.get("vips", []))
 is_staff = is_admin or is_moderator  
+has_kod3_access = is_vip or is_staff
 
 # Zabezpieczenie integralności profilu
 if current_user not in st.session_state.global_store["user_data"]:
     st.session_state.global_store["user_data"][current_user] = {
         "history": [], "notepad": "", "has_liked": False, "saved_nick": current_user, "password": "",  
         "theme_color": def_theme, "bg_color": def_bg, "clear_btn_color": def_clear,
-        "staff_bar_color": "#FF4B4B" if is_admin else "#FFA500",
+        "staff_bar_color": "#FF4B4B" if is_admin else ("#FFA500" if is_moderator else "#1E90FF"),
         "can_reset_passwords": False
     }
     save_global_data(st.session_state.global_store)
@@ -432,9 +461,8 @@ user_profile = st.session_state.global_store["user_data"][current_user]
 theme_color = user_profile.get("theme_color", "#1E90FF")
 bg_color = user_profile.get("bg_color", "#FFFFFF")
 clear_btn_color = user_profile.get("clear_btn_color", "#5cb85c")
-staff_bar_color = user_profile.get("staff_bar_color", "#FF4B4B" if is_admin else "#FFA500")
+staff_bar_color = user_profile.get("staff_bar_color", "#FF4B4B" if is_admin else ("#FFA500" if is_moderator else "#1E90FF"))
 
-# Flaga sprawdzająca, czy dany administrator ma od Root Admina uprawnienie do resetowania haseł
 can_user_reset_passwords = is_root_admin or user_profile.get("can_reset_passwords", False)
 
 def get_contrast_text_color(hex_color):
@@ -489,7 +517,6 @@ st.markdown(f"""
         div.stButton > button:hover {{ background-color: {clear_btn_color} !important; opacity: 0.85 !important; border-color: {clear_btn_color} !important; transform: scale(1.01); }}
         div[data-testid="stVerticalBlockBorderWrapper"] {{ border-color: {theme_color} !important; border-radius: 12px; background-color: {"#1E1E1E" if main_text_theme == "#FFFFFF" else "#F9FAFB"}; }}
         
-        /* Stylizacja okna czatu pomocniczego */
         .chat-box-container {{
             border: 1px solid #ccc;
             border-radius: 8px;
@@ -505,89 +532,86 @@ if "account_authenticated" not in st.session_state:
     st.session_state.account_authenticated = (url_auth_state == "true")
 
 account_has_password = user_profile.get("password", "").strip() != ""
-authenticated = True
 
-if account_has_password:
-    if not st.session_state.account_authenticated:
-        authenticated = False
-        st.title("🔒 Konto zabezpieczone hasłem")
-        st.write("Ten klucz konta ma przypisane hasło. Wprowadź je, aby uzyskać dostęp.")
+if account_has_password and not st.session_state.account_authenticated:
+    st.title("🔒 Konto zabezpieczone hasłem")
+    st.write("Ten klucz konta ma przypisane hasło. Wprowadź je, aby uzyskać dostęp.")
+    
+    components.html(f"""
+        <script>
+            var localAuthState = localStorage.getItem("auth_{current_user}");
+            var currentUrl = new URL(window.parent.location.href);
+            if (localAuthState === "true" && currentUrl.searchParams.get("auth") !== "true") {{
+                currentUrl.searchParams.set("auth", "true");
+                window.parent.location.href = currentUrl.href;
+            }}
+        </script>
+    """, height=0, width=0)
+    
+    with st.form("login_password_form"):
+        input_pass = st.text_input("Podaj hasło do profilu:", type="password", placeholder="Wpisz hasło...")
+        submit_login = st.form_submit_button("🔒 Odblokuj dostęp")
         
-        components.html(f"""
-            <script>
-                var localAuthState = localStorage.getItem("auth_{current_user}");
-                var currentUrl = new URL(window.parent.location.href);
-                if (localAuthState === "true" && currentUrl.searchParams.get("auth") !== "true") {{
-                    currentUrl.searchParams.set("auth", "true");
-                    window.parent.location.href = currentUrl.href;
-                }}
-            </script>
-        """, height=0, width=0)
-        
-        with st.form("login_password_form"):
-            input_pass = st.text_input("Podaj hasło do profilu:", type="password", placeholder="Wpisz hasło...")
-            submit_login = st.form_submit_button("🔒 Odblokuj dostęp")
-            
-            if submit_login:
-                if input_pass.strip() == user_profile.get("password"):
-                    st.session_state.account_authenticated = True
-                    st.query_params["auth"] = "true"
-                    components.html(f"""
-                        <script>
-                            localStorage.setItem("auth_{current_user}", "true");
-                            window.parent.location.href = window.parent.location.pathname + "?ak={current_user}&auth=true";
-                        </script>
-                    """, height=0, width=0)
-                    st.rerun()
-                else:
-                    st.error("❌ Nieprawidłowe hasło konta!")
-        
-        st.write("---")
-        st.markdown("### 💡 Zapomniałeś hasła?")
-        st.write("Aby zapobiec niechcianym zmianom, musisz samodzielnie podać prawidłowy Kod Bezpieczeństwa przypisany do Twojego konta.")
-        
-        with st.form("emergency_reset_request_form"):
-            user_entered_code = st.text_input("Wpisz swój 6-cyfrowy Kod Bezpieczeństwa:", type="default", placeholder="np. 123456", max_chars=6)
-            submit_request = st.form_submit_button("📩 Wyślij prośbę o reset hasła do Właściciela")
-            
-            if submit_request:
-                clean_code = user_entered_code.strip()
-                expected_code = generate_account_secure_code(current_user)
-                
-                if not clean_code:
-                    st.error("❌ Musisz podać swój kod bezpieczeństwa, aby wysłać prośbę!")
-                elif clean_code != expected_code:
-                    st.error("❌ Podany Kod Bezpieczeństwa jest nieprawidłowy! Zgłoszenie nie zostało wysłane.")
-                else:
-                    time_stamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
-                    locked_user_nick = user_profile.get("saved_nick", "").strip()
-                    display_name_on_request = locked_user_nick if locked_user_nick else f"Konto_{current_user[:6]}"
-                    
-                    emergency_message = {
-                        "sender_nick": display_name_on_request, "time": time_stamp,
-                        "text": f"Zapomniałem hasła, proszę o reset (podaje ten 6 cyfrowy kod: **{clean_code}**)",
-                        "author_key": current_user
-                    }
-                    current_data = load_global_data()
-                    if "password_resets" not in current_data: current_data["password_resets"] = []
-                    already_sent = any(m.get("author_key") == current_user for m in current_data["password_resets"])
-                    
-                    if already_sent:
-                        st.warning("⚠️ Prośba o reset oczekuje już w panelu Właściciela. Czekaj cierpliwie.")
-                    else:
-                        current_data["password_resets"].append(emergency_message)
-                        save_global_data(current_data)
-                        st.session_state.global_store = current_data
-                        st.success("✅ Prośba została pomyślnie dostarczona do tajnego panelu Właściciela!")
-        
-        st.write("---")
-        with st.expander("🔄 Chcesz zalogować się na inne konto?"):
-            if st.button("🚪 Przejdź do ekranu wyboru konta"):
-                st.session_state.user_author_key = ""
-                st.query_params.clear()
-                components.html("<script>localStorage.removeItem('koder_author_key2'); window.parent.location.href = window.parent.location.pathname;</script>", height=0, width=0)
+        if submit_login:
+            if input_pass.strip() == user_profile.get("password"):
+                st.session_state.account_authenticated = True
+                st.query_params["auth"] = "true"
+                components.html(f"""
+                    <script>
+                        localStorage.setItem("auth_{current_user}", "true");
+                        window.parent.location.href = window.parent.location.pathname + "?ak={current_user}&auth=true";
+                    </script>
+                """, height=0, width=0)
                 st.rerun()
-        st.stop()
+            else:
+                st.error("❌ Nieprawidłowe hasło konta!")
+    
+    st.write("---")
+    st.markdown("### 💡 Zapomniałeś hasła?")
+    st.write("Aby zapobiec niechcianym zmianom, musisz samodzielnie podać prawidłowy Kod Bezpieczeństwa przypisany do Twojego konta.")
+    
+    with st.form("emergency_reset_request_form"):
+        user_entered_code = st.text_input("Wpisz swój 6-cyfrowy Kod Bezpieczeństwa:", type="default", placeholder="np. 123456", max_chars=6)
+        submit_request = st.form_submit_button("📩 Wyślij prośbę o reset hasła do Właściciela")
+        
+        if submit_request:
+            clean_code = user_entered_code.strip()
+            expected_code = generate_account_secure_code(current_user)
+            
+            if not clean_code:
+                st.error("❌ Musisz podać swój kod bezpieczeństwa, aby wysłać prośbę!")
+            elif clean_code != expected_code:
+                st.error("❌ Podany Kod Bezpieczeństwa jest nieprawidłowy! Zgłoszenie nie zostało wysłane.")
+            else:
+                time_stamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
+                locked_user_nick = user_profile.get("saved_nick", "").strip()
+                display_name_on_request = locked_user_nick if locked_user_nick else f"Konto_{current_user[:6]}"
+                
+                emergency_message = {
+                    "sender_nick": display_name_on_request, "time": time_stamp,
+                    "text": f"Zapomniałem hasła, proszę o reset (podaje ten 6 cyfrowy kod: **{clean_code}**)",
+                    "author_key": current_user
+                }
+                current_data = load_global_data()
+                if "password_resets" not in current_data: current_data["password_resets"] = []
+                already_sent = any(m.get("author_key") == current_user for m in current_data["password_resets"])
+                
+                if already_sent:
+                    st.warning("⚠️ Prośba o reset oczekuje już w panelu Właściciela. Czekaj cierpliwie.")
+                else:
+                    current_data["password_resets"].append(emergency_message)
+                    save_global_data(current_data)
+                    st.session_state.global_store = current_data
+                    st.success("✅ Prośba została pomyślnie dostarczona do tajnego panelu Właściciela!")
+    
+    st.write("---")
+    with st.expander("🔄 Chcesz zalogować się na inne konto?"):
+        if st.button("🚪 Przejdź do ekranu wyboru konta"):
+            st.session_state.user_author_key = ""
+            st.query_params.clear()
+            components.html("<script>localStorage.removeItem('koder_author_key2'); window.parent.location.href = window.parent.location.pathname;</script>", height=0, width=0)
+            st.rerun()
+    st.stop()
 
 # --- MAPA UKŁADU OKRESOWEGO I FUNKCJE ENKODERA ---
 DATA_MAP = {
@@ -623,6 +647,7 @@ def clean_txt(t):
     t = t.replace('J', 'I')
     return re.sub(r'[^A-Z ]', '', t)
 
+# --- SYSTEMY KODOWANIA V1 ORAZ V2 ---
 def enc_v1(l):
     for i, (g, o, s) in DATA_MAP.items():
         if s == l: return f"{i}"
@@ -701,13 +726,54 @@ def dec_v2(s):
     except ValueError: pass
     return "?"
 
-# --- DYNAMICZNY NAGŁÓWEK ---
+# --- UNIKALNY ALGORYTM: KOD 3 (DOSTĘPNY OD RANGI VIP) ---
+# Algorytm oparty na zbalansowanej symetrii liczby masowej (A) jako indeks górny i atomowej (Z) jako indeks dolny
+def enc_v3(l):
+    for i, (g, o, s) in DATA_MAP.items():
+        if s == l: return f"{i}.{g}.0"
+    for i, (g, o, s) in DATA_MAP.items():
+        if s[0] == l and len(s) > 1: return f"{i}.{g}.1"
+        if len(s) > 1 and s[1] == l.lower(): return f"{i}.{g}.2"
+    return "?"
+
+def format_v3_unicode(code_str):
+    if "." in code_str:
+        parts = code_str.split(".")
+        val_z, val_a, sub = parts[0], parts[1], parts[2]
+        unicode_sub = to_subscript(sub) if sub != "0" else ""
+        return f"{to_subscript(val_z)}{to_superscript(val_a)}{unicode_sub}"
+    return code_str
+
+def dec_v3(s):
+    s = s.strip()
+    if not s: return ""
+    z_part, a_part, sub_part = "", "", ""
+    for char in s:
+        if char in REV_SUB:
+            if not a_part: z_part += REV_SUB[char]
+            else: sub_part += REV_SUB[char]
+        elif char in REV_SUP:
+            a_part += REV_SUP[char]
+    if not z_part or not a_part: return "?"
+    try:
+        z, a, pos = int(z_part), int(a_part), sub_part
+        if pos == "": pos = "0"
+        for i, (vg, vo, vs) in DATA_MAP.items():
+            if i == z and vg == a:
+                return vs[1].upper() if pos == "2" and len(vs) > 1 else vs[0].upper()
+    except ValueError: pass
+    return "?"
+
+
+# --- DYNAMICZNY NAGŁÓWEK Z RANGAMI ---
 if is_root_admin:
     st.markdown("<h1 style='margin-bottom: 0;'>📟 KODER <span style='color: #FF4B4B; font-size: 1.2rem; vertical-align: middle; background-color: rgba(255,75,75,0.1); padding: 4px 8px; border-radius: 6px; margin-left: 10px; font-weight: bold;'>Właściciel</span></h1>", unsafe_allow_html=True)
 elif is_promoted_admin:
     st.markdown("<h1 style='margin-bottom: 0;'>📟 KODER <span style='color: #FF4B4B; font-size: 1.2rem; vertical-align: middle; background-color: rgba(255,75,75,0.1); padding: 4px 8px; border-radius: 6px; margin-left: 10px; font-weight: bold;'>Admin</span></h1>", unsafe_allow_html=True)
 elif is_moderator:
     st.markdown("<h1 style='margin-bottom: 0;'>📟 KODER <span style='color: #FFA500; font-size: 1.2rem; vertical-align: middle; background-color: rgba(255,165,0,0.1); padding: 4px 8px; border-radius: 6px; margin-left: 10px; font-weight: bold;'>Moderator</span></h1>", unsafe_allow_html=True)
+elif is_vip:
+    st.markdown("<h1 style='margin-bottom: 0;'>📟 KODER <span style='color: #BA55D3; font-size: 1.2rem; vertical-align: middle; background-color: rgba(186,85,211,0.1); padding: 4px 8px; border-radius: 6px; margin-left: 10px; font-weight: bold;'>VIP 🌟</span></h1>", unsafe_allow_html=True)
 else:
     st.title("📟 KODER")
 
@@ -726,7 +792,12 @@ with c1:
         tab_main = st.tabs(["🎛️ Panel Sterowania"])[0]
         
     with tab_main:
-        st.radio("Wybierz system kodu:", ["Kod 1", "Kod 2"], horizontal=True, key="proto_selection")
+        # Dynamiczne generowanie opcji w zależności od posiadania rangi VIP lub wyższej
+        available_codes = ["Kod 1", "Kod 2"]
+        if has_kod3_access:
+            available_codes.append("Kod 3")
+            
+        st.radio("Wybierz system kodu:", available_codes, horizontal=True, key="proto_selection")
         st.radio("Wybierz operację:", ["Koduj", "Odkoduj"], horizontal=True, key="mode_selection")
         
         proto = st.session_state.proto_selection
@@ -736,38 +807,49 @@ with c1:
         txt = st.text_input("Wprowadź dane i zatwierdź Enterem:", placeholder="Wpisz dane tutaj...", key="main_encoder_input_field")
         
         if txt:
-            res_display = ""
-            if mode == "Koduj":
-                words = clean_txt(txt).split(' ')
-                raw_words = [[enc_v1(l) if "Kod 1" in proto else enc_v2(l) for l in w] for w in words]
-                if "Kod 1" in proto:
-                    res_display = "   ".join([" ".join([format_v1_unicode(l) for l in w]) for w in raw_words])
-                else:
-                    res_display = "   ".join([" ".join([format_v2_unicode(l) for l in w]) for w in raw_words])
+            # Dodatkowe zabezpieczenie logiki na wypadek manipulacji stanem sesji
+            if "Kod 3" in proto and not has_kod3_access:
+                st.error("❌ Brak uprawnień! Kod 3 jest dostępny wyłącznie dla użytkowników z rangą VIP lub wyższą.")
             else:
-                decoded_words = []
-                for w in txt.split("   "):
-                    word_chars = []
-                    for s in w.strip().split(" "):
-                        if s: word_chars.append(dec_v1(s) if "Kod 1" in proto else dec_v2(s))
-                    decoded_words.append("".join(word_chars))
-                res_display = " ".join(decoded_words)
+                res_display = ""
+                if mode == "Koduj":
+                    words = clean_txt(txt).split(' ')
+                    if "Kod 1" in proto:
+                        raw_words = [[enc_v1(l) for l in w] for w in words]
+                        res_display = "   ".join([" ".join([format_v1_unicode(l) for l in w]) for w in raw_words])
+                    elif "Kod 2" in proto:
+                        raw_words = [[enc_v2(l) for l in w] for w in words]
+                        res_display = "   ".join([" ".join([format_v2_unicode(l) for l in w]) for w in raw_words])
+                    elif "Kod 3" in proto:
+                        raw_words = [[enc_v3(l) for l in w] for w in words]
+                        res_display = "   ".join([" ".join([format_v3_unicode(l) for l in w]) for w in raw_words])
+                else:
+                    decoded_words = []
+                    for w in txt.split("   "):
+                        word_chars = []
+                        for s in w.strip().split(" "):
+                            if s: 
+                                if "Kod 1" in proto: word_chars.append(dec_v1(s))
+                                elif "Kod 2" in proto: word_chars.append(dec_v2(s))
+                                elif "Kod 3" in proto: word_chars.append(dec_v3(s))
+                        decoded_words.append("".join(word_chars))
+                    res_display = " ".join(decoded_words)
 
-            st.markdown(f"**Wynik:** <div style='font-size:1.4rem; font-weight:bold; background-color:#F0F2F6; color:#1E1E1E; padding:12px; border-radius:8px; margin-bottom:10px;'>{res_display}</div>", unsafe_allow_html=True)
-            if mode == "Koduj":
-                st.caption("📋 Kliknij ikonę po prawej stronie bloku, aby skopiować kod wraz z indeksami:")
-                st.code(res_display, language="text")
-            
-            h_time = datetime.datetime.now().strftime('%H:%M:%S')
-            entry = f"{h_time} | {proto} | {mode}: {txt} -> {res_display}"
-            
-            if not user_history or user_history[0] != entry:
-                user_history.insert(0, entry)
-                st.session_state.global_store["user_data"][current_user]["history"] = user_history
-                save_global_data(st.session_state.global_store)
-                st.rerun()
+                st.markdown(f"**Wynik:** <div style='font-size:1.4rem; font-weight:bold; background-color:#F0F2F6; color:#1E1E1E; padding:12px; border-radius:8px; margin-bottom:10px;'>{res_display}</div>", unsafe_allow_html=True)
+                if mode == "Koduj":
+                    st.caption("📋 Kliknij ikonę po prawej stronie bloku, aby skopiować kod wraz z indeksami:")
+                    st.code(res_display, language="text")
+                
+                h_time = datetime.datetime.now().strftime('%H:%M:%S')
+                entry = f"{h_time} | {proto} | {mode}: {txt} -> {res_display}"
+                
+                if not user_history or user_history[0] != entry:
+                    user_history.insert(0, entry)
+                    st.session_state.global_store["user_data"][current_user]["history"] = user_history
+                    save_global_data(st.session_state.global_store)
+                    st.rerun()
 
-    # --- PANEL KOMUNIKACJI STAFFU (ZWIJANY CHAT AWARYJNY) ---
+    # --- PANEL KOMUNIKACJI STAFFU ---
     if is_staff:
         with tab_chat:
             with st.expander("💬 Otwórz Chat Staffu / Awaryjny", expanded=False):
@@ -785,10 +867,8 @@ with c1:
                         chat_msg = st.text_input(f"Wiadomość jako **{staff_nick} ({role_label})**:", placeholder="Wpisz tajną wiadomość do ekipy...")
                         
                         btn_col1, btn_col2 = st.columns([3.5, 2.5])
-                        with btn_col1:
-                            send_chat = st.form_submit_button("🚀 Wyślij do Staffu")
-                        with btn_col2:
-                            refresh_group = st.form_submit_button("🔄 Odśwież wiadomości")
+                        with btn_col1: send_chat = st.form_submit_button("🚀 Wyślij do Staffu")
+                        with btn_col2: refresh_group = st.form_submit_button("🔄 Odśwież wiadomości")
                         
                         if send_chat and chat_msg.strip():
                             time_stamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
@@ -849,7 +929,6 @@ with c1:
 
                 else:
                     st.subheader("💬 Prywatne Wiadomości 1 na 1")
-                    
                     all_users = st.session_state.global_store.get("user_data", {})
                     mod_list = st.session_state.global_store.get("moderators", [])
                     admin_list = st.session_state.global_store.get("admins", [])
@@ -873,10 +952,8 @@ with c1:
                             dm_msg = st.text_input(f"Prywatna wiadomość do **{target_label.split(' ')[0]}**:", placeholder="Wpisz treść...")
                             
                             dm_btn_col1, dm_btn_col2 = st.columns([3.5, 2.5])
-                            with dm_btn_col1:
-                                send_dm = st.form_submit_button("🔒 Wyślij bezpieczną wiadomość")
-                            with dm_btn_col2:
-                                refresh_dms = st.form_submit_button("🔄 Odśwież wiadomości")
+                            with dm_btn_col1: send_dm = st.form_submit_button("🔒 Wyślij bezpieczną wiadomość")
+                            with dm_btn_col2: refresh_dms = st.form_submit_button("🔄 Odśwież wiadomości")
                             
                             if send_dm and dm_msg.strip():
                                 time_stamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
@@ -993,14 +1070,11 @@ with c2:
 
     note_input = st.text_area("Zapisz swoje uwagi:", value=user_notepad_content, placeholder="Wpisz notatki, kody lub sekwencje...", height=180, key="local_notepad_field", on_change=save_notepad_instantly)
 
-    # --- NOWY / AKTUALIZOWANY CZAT POMOCNICZY (SUPPORT) ---
+    # --- CZAT POMOCNICZY (SUPPORT) ---
     st.write("---")
-    
     if is_staff:
-        # A. WIDOK DLA STAFFU (ADMIN / MODERATOR) - ZWIJANY EXPANDER
         with st.expander("📞 Otwórz Czat Pomocniczy (Support)", expanded=False):
             st.write("Wybierz kod konta użytkownika, aby odpowiedzieć:")
-            
             support_users = []
             all_users_data = st.session_state.global_store.get("user_data", {})
             admins_list = st.session_state.global_store.get("admins", [])
@@ -1031,8 +1105,7 @@ with c2:
                             "text": reply_txt.strip()
                         }
                         current_data = load_global_data()
-                        if "support_chat" not in current_data:
-                            current_data["support_chat"] = []
+                        if "support_chat" not in current_data: current_data["support_chat"] = []
                         current_data["support_chat"].append(new_reply)
                         save_global_data(current_data)
                         st.session_state.global_store = current_data
@@ -1052,49 +1125,34 @@ with c2:
                             else:
                                 st.markdown(f"⏱️ `{msg.get('time')}` | **Użytkownik ({msg_sender})**: {msg.get('text')}")
     else:
-        # B. ZWIJANY CZAT POMOCNICZY DLA ZWYKŁYCH LUDZI (Zgodnie z wymaganiem)
         st.subheader("💬 Centrum Pomocy Technicznej")
-        
-        # Stan rozwijania kontrolowany natywnym widgetem Streamlit (checkbox/toggle działający jako rozwijak)
         chat_expanded = st.toggle("💬 Otwórz czat z konsultantem", value=False, key="user_chat_toggle_state")
         
         if chat_expanded:
             st.markdown('<div class="chat-box-container">', unsafe_allow_html=True)
-            
-            # Formularz nadawania wewnątrz czatu
             with st.form("user_support_send_form", clear_on_submit=True):
                 user_msg_input = st.text_input("Napisz do administracji (Zatwierdź Enterem):", placeholder="Wpisz treść pytania lub problemu tutaj...")
                 if st.form_submit_button("🚀 Wyślij wiadomość"):
                     if user_msg_input.strip():
-                        # Podmiana liter j/J na i/I zgodnie z regułą systemu
                         clean_user_msg = user_msg_input.strip().replace('j', 'i').replace('J', 'I')
                         time_stamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
                         
                         new_user_msg_obj = {
-                            "sender_key": current_user,
-                            "sender_nick": user_saved_nick if user_saved_nick else current_user,
-                            "sender_role": "Użytkownik",
-                            "receiver_key": "ALL_STAFF",
-                            "text": clean_user_msg,
-                            "time": time_stamp
+                            "sender_key": current_user, "sender_nick": user_saved_nick if user_saved_nick else current_user,
+                            "sender_role": "Użytkownik", "receiver_key": "ALL_STAFF", "text": clean_user_msg, "time": time_stamp
                         }
                         
                         current_data = load_global_data()
-                        if "support_chat" not in current_data: 
-                            current_data["support_chat"] = []
+                        if "support_chat" not in current_data: current_data["support_chat"] = []
                         current_data["support_chat"].append(new_user_msg_obj)
                         save_global_data(current_data)
                         st.session_state.global_store = current_data
                         st.success("Wiadomość wysłana!")
                         st.rerun()
             
-            # Historia wiadomości wewnątrz okna czatu pomocniczego
             st.write("📋 **Historia Twojej rozmowy:**")
             global_support_chat = st.session_state.global_store.get("support_chat", [])
-            user_visible_messages = [
-                m for m in global_support_chat 
-                if m.get("sender_key") == current_user or m.get("receiver_key") == current_user
-            ]
+            user_visible_messages = [m for m in global_support_chat if m.get("sender_key") == current_user or m.get("receiver_key") == current_user]
             
             with st.container(height=280):
                 if not user_visible_messages:
@@ -1116,7 +1174,6 @@ with c2:
             st.markdown('</div>', unsafe_allow_html=True)
         else:
             st.caption("Czat jest obecnie zamknięty. Kliknij przełącznik powyżej, aby skontaktować się z administratorem.")
-    # =========================================================================
 
 # --- GLOBALNE POLUBIENIA ---
 st.write("---")
@@ -1143,7 +1200,6 @@ st.write(" ")
 
 # --- PANEL PERSONALIZACJI WYGLĄDU I ZABEZPIECZEŃ ---
 with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
-    
     st.subheader("🔐 Bezpieczeństwo konta")
     saved_password = user_profile.get("password", "").strip()
     my_secure_code = generate_account_secure_code(current_user)
@@ -1214,12 +1270,12 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                 save_global_data(st.session_state.global_store)
                 st.rerun()
 
-    # --- PANEL UPRAWNIEŃ (ADMINISTRACJA) ---
+    # --- PANEL UPRAWNIEŃ (ZARZĄDZANIE SYSTEMEM PRZEZ KADRĘ) ---
     if is_admin:
         st.write("---")
         st.subheader("👑 Panel Admina: Zarządzanie systemem")
-        if is_root_admin: adm_tabs = st.tabs(["👥 Moderatorzy", "🛡️ Administratorzy", "🔑 Resetowanie Haseł"])
-        else: adm_tabs = st.tabs(["👥 Moderatorzy"])
+        if is_root_admin: adm_tabs = st.tabs(["👥 Moderatorzy", "🛡️ Administratorzy", "🌟 Ranga VIP", "🔑 Resetowanie Haseł"])
+        else: adm_tabs = st.tabs(["👥 Moderatorzy", "🌟 Ranga VIP"])
             
         with adm_tabs[0]:
             current_mods = st.session_state.global_store.get("moderators", [])
@@ -1231,16 +1287,14 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                     target_user_profile = st.session_state.global_store.get("user_data", {}).get(target_key, {})
                     target_password = target_user_profile.get("password", "").strip()
                     
-                    if target_key == "admin" or target_key in st.session_state.global_store.get("admins", []): 
-                        st.error("❌ Wyższa ranga.")
-                    elif target_key in current_mods: 
-                        st.warning("⚠️ Już jest mod.")
-                    elif not target_password:
-                        st.error("❌ Błąd bezpieczeństwa: Użytkownik musi najpierw ustawić hasło na swoim koncie, aby otrzymać rangę Moderatora!")
+                    if target_key == "admin" or target_key in st.session_state.global_store.get("admins", []): st.error("❌ Wyższa ranga.")
+                    elif target_key in current_mods: st.warning("⚠️ Już jest mod.")
+                    elif not target_password: st.error("❌ Błąd bezpieczeństwa: Użytkownik musi najpierw ustawić hasło na swoim koncie, aby otrzymać rangę Moderatora!")
                     else:
                         current_data = load_global_data()
                         if "moderators" not in current_data: current_data["moderators"] = []
                         current_data["moderators"].append(target_key)
+                        if "vips" in current_data and target_key in current_data["vips"]: current_data["vips"].remove(target_key)
                         save_global_data(current_data)
                         st.session_state.global_store = current_data
                         st.success(f"✅ Nadano rangę Moderatora dla `{target_key}`")
@@ -1259,11 +1313,51 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                             save_global_data(current_data)
                             st.session_state.global_store = current_data
                             st.rerun()
+
+        # NOWA ZAKŁADKA: ZARZĄDZANIE VIPAMI DLA ADMINA ORAZ ROOT ADMINA
+        with adm_tabs[1] if is_root_admin else adm_tabs[1]:
+            current_vips = st.session_state.global_store.get("vips", [])
+            with st.form("add_vip_form", clear_on_submit=True):
+                vip_key_input = st.text_input("Wklej klucz konta, które chcesz awansować na VIP-a:")
+                submit_vip = st.form_submit_button("🌟 Nadaj uprawnienia VIP")
+                if submit_vip and vip_key_input.strip():
+                    target_key = vip_key_input.strip()
+                    target_user_profile = st.session_state.global_store.get("user_data", {}).get(target_key, {})
+                    target_password = target_user_profile.get("password", "").strip()
+                    
+                    if target_key == "admin" or target_key in st.session_state.global_store.get("admins", []) or target_key in st.session_state.global_store.get("moderators", []):
+                        st.error("❌ Ta osoba posiada już wyższą rangę z wbudowanym dostępem do Kodu 3.")
+                    elif target_key in current_vips:
+                        st.warning("⚠️ Ten użytkownik ma już status VIP.")
+                    elif not target_password:
+                        st.error("❌ Błąd bezpieczeństwa: Użytkownik musi posiadać ustawione hasło na profilu przed nadaniem rangi VIP!")
+                    else:
+                        current_data = load_global_data()
+                        if "vips" not in current_data: current_data["vips"] = []
+                        current_data["vips"].append(target_key)
+                        save_global_data(current_data)
+                        st.session_state.global_store = current_data
+                        st.success(f"✅ Nadano rangę VIP dla `{target_key}`! Uzyskano pełen dostęp do Kodu 3.")
+                        st.rerun()
+                        
+            if current_vips:
+                st.markdown("#### Zarejestrowani członkowie VIP:")
+                for v_idx, v_key in enumerate(current_vips):
+                    v_col1, v_col2 = st.columns([4.0, 2.0])
+                    with v_col1:
+                        v_nick = st.session_state.global_store["user_data"].get(v_key, {}).get("saved_nick", "")
+                        st.markdown(f"🌟 `{v_key}`" + (f" (Podpis: **{v_nick}**)" if v_nick else ""))
+                    with v_col2:
+                        if st.button("❌ Odbierz rangę VIP", key=f"remove_vip_{v_idx}", type="primary", use_container_width=True):
+                            current_data = load_global_data()
+                            if v_key in current_data.get("vips", []): current_data["vips"].remove(v_key)
+                            save_global_data(current_data)
+                            st.session_state.global_store = current_data
+                            st.rerun()
                                 
         if is_root_admin:
             with adm_tabs[1]:
                 current_admins = st.session_state.global_store.get("admins", [])
-                
                 if current_admins:
                     st.markdown("#### 🔑 Przydziel uprawnienia do resetowania haseł")
                     wybrany_admin = st.selectbox("Wybierz administratora z nadania:", current_admins, key="root_select_admin_for_perms")
@@ -1271,7 +1365,6 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                     if wybrany_admin:
                         admin_prof_data = st.session_state.global_store["user_data"].get(wybrany_admin, {})
                         current_reset_perm = admin_prof_data.get("can_reset_passwords", False)
-                        
                         checkbox_reset_perm = st.checkbox("Zezwól temu administratorowi na resetowanie haseł", value=current_reset_perm, key="root_checkbox_reset_perm")
                         
                         if st.button(f"Zapisz uprawnienia dla {wybrany_admin}", key="save_admin_perms_btn"):
@@ -1300,6 +1393,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                                 if "admins" not in current_data: current_data["admins"] = []
                                 current_data["admins"].append(target_key)
                                 if "moderators" in current_data and target_key in current_data["moderators"]: current_data["moderators"].remove(target_key)
+                                if "vips" in current_data and target_key in current_data["vips"]: current_data["vips"].remove(target_key)
                                 save_global_data(current_data)
                                 st.session_state.global_store = current_data
                                 st.success(f"🛡️ Nadano rangę Administratora dla `{target_key}`")
@@ -1324,7 +1418,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
 
         if is_admin:
             if is_root_admin:
-                target_tab = adm_tabs[2]
+                target_tab = adm_tabs[3]
                 access_granted = True
             else:
                 target_tab = adm_tabs[0] 
@@ -1408,7 +1502,7 @@ with st.form("comment_form", clear_on_submit=True):
     
     if wyslij and komentarz_tekst.strip():
         podpis = nick.strip() if nick.strip() else "Anonim"
-        ranga_label = " Właściciel" if current_user == "admin" else (" Admin" if current_user in st.session_state.global_store.get("admins", []) else (" Moderator" if current_user in st.session_state.global_store.get("moderators", []) else ""))
+        ranga_label = " Właściciel" if current_user == "admin" else (" Admin" if current_user in st.session_state.global_store.get("admins", []) else (" Moderator" if current_user in st.session_state.global_store.get("moderators", []) else (" VIP 🌟" if current_user in st.session_state.global_store.get("vips", []) else "")))
         nowy_komentarz_tekst = f"**{podpis}{ranga_label}** | {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}:\n{komentarz_tekst.strip()}"
         nowy_komentarz_obj = {"text": nowy_komentarz_tekst, "author_key": current_user}
         current_data = load_global_data()
