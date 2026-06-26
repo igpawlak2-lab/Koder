@@ -526,7 +526,7 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
-# --- OBSŁUGA ZABEZPIECZENIA HASŁEM W PANELU GŁÓWNYM ---
+# --- OBSŁUGA ZABEZPIECZENIA HASŁEM GŁÓWNYM ---
 url_auth_state = params.get("auth", "")
 if "account_authenticated" not in st.session_state:
     st.session_state.account_authenticated = (url_auth_state == "true")
@@ -726,42 +726,45 @@ def dec_v2(s):
     except ValueError: pass
     return "?"
 
-# --- UNIKALNY ALGORYTM: KOD 3 (DOSTĘPNY OD RANGI VIP) ---
-# Algorytm oparty na zbalansowanej symetrii liczby masowej (A) jako indeks górny i atomowej (Z) jako indeks dolny
+# --- UNIKALNY ALGORYTM: KOD 3 (DUŻY OKRES, KROPKA, MAŁA GRUPA NA DOLE, MAŁA CYFRA 1 LUB 2 NA GÓRZE) ---
 def enc_v3(l):
     for i, (g, o, s) in DATA_MAP.items():
-        if s == l: return f"{i}.{g}.0"
+        if s == l: return f"{o}.{g}.0"
     for i, (g, o, s) in DATA_MAP.items():
-        if s[0] == l and len(s) > 1: return f"{i}.{g}.1"
-        if len(s) > 1 and s[1] == l.lower(): return f"{i}.{g}.2"
+        if s[0] == l and len(s) > 1: return f"{o}.{g}.1"
+        if len(s) > 1 and s[1] == l.lower(): return f"{o}.{g}.2"
     return "?"
 
 def format_v3_unicode(code_str):
     if "." in code_str:
         parts = code_str.split(".")
-        val_z, val_a, sub = parts[0], parts[1], parts[2]
-        unicode_sub = to_subscript(sub) if sub != "0" else ""
-        return f"{to_subscript(val_z)}{to_superscript(val_a)}{unicode_sub}"
+        o_val, g_val, pos = parts[0], parts[1], parts[2]
+        unicode_g = to_subscript(g_val)
+        unicode_pos = to_superscript(pos) if pos in ["1", "2"] else ""
+        return f"{o_val}.{unicode_g}{unicode_pos}"
     return code_str
 
 def dec_v3(s):
     s = s.strip()
-    if not s: return ""
-    z_part, a_part, sub_part = "", "", ""
-    for char in s:
-        if char in REV_SUB:
-            if not a_part: z_part += REV_SUB[char]
-            else: sub_part += REV_SUB[char]
-        elif char in REV_SUP:
-            a_part += REV_SUP[char]
-    if not z_part or not a_part: return "?"
+    if not s or "." not in s: return "?"
     try:
-        z, a, pos = int(z_part), int(a_part), sub_part
-        if pos == "": pos = "0"
+        parts = s.split(".")
+        o_part = parts[0].strip()
+        rest = parts[1].strip()
+        
+        g_str, pos_str = "", ""
+        for char in rest:
+            if char in REV_SUB: g_str += REV_SUB[char]
+            elif char in REV_SUP: pos_str += REV_SUP[char]
+            
+        o = int(o_part)
+        g = int(g_str)
+        pos = pos_str if pos_str in ["1", "2"] else "0"
+        
         for i, (vg, vo, vs) in DATA_MAP.items():
-            if i == z and vg == a:
+            if vo == o and vg == g:
                 return vs[1].upper() if pos == "2" and len(vs) > 1 else vs[0].upper()
-    except ValueError: pass
+    except: pass
     return "?"
 
 
@@ -792,7 +795,6 @@ with c1:
         tab_main = st.tabs(["🎛️ Panel Sterowania"])[0]
         
     with tab_main:
-        # Dynamiczne generowanie opcji w zależności od posiadania rangi VIP lub wyższej
         available_codes = ["Kod 1", "Kod 2"]
         if has_kod3_access:
             available_codes.append("Kod 3")
@@ -807,7 +809,6 @@ with c1:
         txt = st.text_input("Wprowadź dane i zatwierdź Enterem:", placeholder="Wpisz dane tutaj...", key="main_encoder_input_field")
         
         if txt:
-            # Dodatkowe zabezpieczenie logiki na wypadek manipulacji stanem sesji
             if "Kod 3" in proto and not has_kod3_access:
                 st.error("❌ Brak uprawnień! Kod 3 jest dostępny wyłącznie dla użytkowników z rangą VIP lub wyższą.")
             else:
@@ -861,11 +862,8 @@ with c1:
                 
                 if chat_type == "👥 Grupa Ogólna Staffu":
                     st.markdown(f"<h3>🕵️‍♂️ Prywatny kanał komunikacji</h3>", unsafe_allow_html=True)
-                    st.caption("Ten czat jest widoczny wyłącznie dla Administratora oraz zatwierdzonych Moderatorów.")
-                    
                     with st.form("staff_chat_group_form", clear_on_submit=True):
                         chat_msg = st.text_input(f"Wiadomość jako **{staff_nick} ({role_label})**:", placeholder="Wpisz tajną wiadomość do ekipy...")
-                        
                         btn_col1, btn_col2 = st.columns([3.5, 2.5])
                         with btn_col1: send_chat = st.form_submit_button("🚀 Wyślij do Staffu")
                         with btn_col2: refresh_group = st.form_submit_button("🔄 Odśwież wiadomości")
@@ -950,7 +948,6 @@ with c1:
                         
                         with st.form("staff_dm_form", clear_on_submit=True):
                             dm_msg = st.text_input(f"Prywatna wiadomość do **{target_label.split(' ')[0]}**:", placeholder="Wpisz treść...")
-                            
                             dm_btn_col1, dm_btn_col2 = st.columns([3.5, 2.5])
                             with dm_btn_col1: send_dm = st.form_submit_button("🔒 Wyślij bezpieczną wiadomość")
                             with dm_btn_col2: refresh_dms = st.form_submit_button("🔄 Odśwież wiadomości")
@@ -982,7 +979,7 @@ with c1:
                         st.write(" ")
                         with st.container(height=260):
                             if not visible_dms:
-                                st.caption(f"Brak historii z {target_label.split(' ')[0]}.")
+                                        st.caption(f"Brak historii z {target_label.split(' ')[0]}.")
                             else:
                                 for original_dm_idx, dm in reversed(visible_dms):
                                     is_my_own_dm = (dm.get("sender_key") == current_user)
@@ -1314,10 +1311,10 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                             st.session_state.global_store = current_data
                             st.rerun()
 
-        # NOWA ZAKŁADKA: ZARZĄDZANIE VIPAMI DLA ADMINA ORAZ ROOT ADMINA
-        with adm_tabs[1] if is_root_admin else adm_tabs[1]:
+        # ZAKŁADKA: ZARZĄDZANIE VIPAMI (NAPRAWIONE BŁĘDY FORMULARZA)
+        with adm_tabs[2] if is_root_admin else adm_tabs[1]:
             current_vips = st.session_state.global_store.get("vips", [])
-            with st.form("add_vip_form", clear_on_submit=True):
+            with st.form("add_vip_real_fixed_form", clear_on_submit=True):
                 vip_key_input = st.text_input("Wklej klucz konta, które chcesz awansować na VIP-a:")
                 submit_vip = st.form_submit_button("🌟 Nadaj uprawnienia VIP")
                 if submit_vip and vip_key_input.strip():
