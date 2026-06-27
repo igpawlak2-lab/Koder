@@ -88,6 +88,7 @@ if "user_author_key" not in st.session_state:
 # Obsługa powrotu do konta admin2 z emulacji administratora
 if "emulated_from_admin2" in st.session_state and st.sidebar.button("⬅️ Powrót do panelu Admin2", type="primary"):
     del st.session_state["emulated_from_admin2"]
+    if "emulated_role" in st.session_state: del st.session_state["emulated_role"]
     st.session_state.user_author_key = "admin2"
     st.query_params["ak"] = "admin2"
     st.query_params["auth"] = "true"
@@ -443,14 +444,48 @@ if not current_user:
     st.stop()
 
 
-# --- LOGIKA RANGI DLA STANDARDOWYCH KONT ---
-is_root_admin = (current_user == "admin")  
-is_promoted_admin = (current_user in st.session_state.global_store.get("admins", [])) 
-is_admin = is_root_admin or is_promoted_admin
-is_moderator = (current_user in st.session_state.global_store.get("moderators", []))
-is_vip = (current_user in st.session_state.global_store.get("vips", []))
-is_staff = is_admin or is_moderator  
-has_kod3_access = is_vip or is_staff
+# --- LOGIKA RANGI DLA STANDARDOWYCH KONT ORAZ PANEL EMULACJI DLA GEWNEGO ADMINA ---
+is_real_root_admin = (current_user == "admin")  
+is_real_promoted_admin = (current_user in st.session_state.global_store.get("admins", [])) 
+is_real_admin = is_real_root_admin or is_real_promoted_admin
+
+# PASEK BOCZNY (SIDEBAR) DLA WŁAŚCICIELA - WYBÓR WIDOKU (EMULACJA)
+if is_real_admin:
+    st.sidebar.markdown("### 👁️ Tryb Podglądu Rangi")
+    st.sidebar.write("Jako Właściciel/Admin możesz zmienić punkt widzenia aplikacji bez utraty uprawnień.")
+    
+    if "emulated_role" not in st.session_state:
+        st.session_state.emulated_role = "Właściciel/Admin (Domyślny)"
+        
+    preview_options = ["Właściciel/Admin (Domyślny)", "Moderator", "VIP", "Zwykły Użytkownik"]
+    chosen_preview = st.sidebar.radio("Wyświetl stronę jako:", preview_options, index=preview_options.index(st.session_state.emulated_role))
+    
+    if chosen_preview != st.session_state.emulated_role:
+        st.session_state.emulated_role = chosen_preview
+        st.rerun()
+        
+    if st.session_state.emulated_role != "Właściciel/Admin (Domyślny)":
+        st.sidebar.warning(f"⚠️ Aktywna emulacja rangi: **{st.session_state.emulated_role}**")
+
+# Kalkulacja uprawnień końcowych na podstawie wybranego trybu podglądu
+if is_real_admin and st.session_state.get("emulated_role") != "Właściciel/Admin (Domyślny)":
+    current_emulation = st.session_state.emulated_role
+    is_root_admin = is_real_root_admin if current_emulation == "Właściciel/Admin (Domyślny)" else False
+    is_promoted_admin = is_real_promoted_admin if current_emulation == "Właściciel/Admin (Domyślny)" else False
+    is_admin = False
+    is_moderator = (current_emulation == "Moderator")
+    is_vip = (current_emulation == "VIP")
+    is_staff = (current_emulation == "Moderator")
+    has_kod3_access = (current_emulation in ["Moderator", "VIP"])
+else:
+    # Standardowe przypisanie ról dla pozostałych użytkowników
+    is_root_admin = (current_user == "admin")  
+    is_promoted_admin = (current_user in st.session_state.global_store.get("admins", [])) 
+    is_admin = is_root_admin or is_promoted_admin
+    is_moderator = (current_user in st.session_state.global_store.get("moderators", []))
+    is_vip = (current_user in st.session_state.global_store.get("vips", []))
+    is_staff = is_admin or is_moderator  
+    has_kod3_access = is_vip or is_staff
 
 # Zabezpieczenie integralności profilu - POBIERA ISTNIEJĄCE HASŁO ZAMIAST JE ZEROWAĆ
 if current_user not in st.session_state.global_store["user_data"]:
@@ -458,7 +493,7 @@ if current_user not in st.session_state.global_store["user_data"]:
         "history": [], "notepad": "", "has_liked": False, "saved_nick": current_user, 
         "password": st.session_state.get("auth_password", ""),  
         "theme_color": def_theme, "bg_color": def_bg, "clear_btn_color": def_clear,
-        "staff_bar_color": "#FF4B4B" if is_admin else ("#FFA500" if is_moderator else "#1E90FF"),
+        "staff_bar_color": "#FF4B4B" if is_real_admin else ("#FFA500" if is_moderator else "#1E90FF"),
         "can_reset_passwords": False
     }
     save_global_data(st.session_state.global_store)
@@ -468,7 +503,7 @@ user_profile = st.session_state.global_store["user_data"].get(current_user, {})
 theme_color = user_profile.get("theme_color", "#1E90FF")
 bg_color = user_profile.get("bg_color", "#FFFFFF")
 clear_btn_color = user_profile.get("clear_btn_color", "#5cb85c")
-staff_bar_color = user_profile.get("staff_bar_color", "#FF4B4B" if is_admin else ("#FFA500" if is_moderator else "#1E90FF"))
+staff_bar_color = user_profile.get("staff_bar_color", "#FF4B4B" if is_real_admin else ("#FFA500" if is_moderator else "#1E90FF"))
 
 can_user_reset_passwords = is_root_admin or user_profile.get("can_reset_passwords", False)
 
@@ -697,7 +732,6 @@ def enc_v2(l):
         if len(s) > 1 and s[1] == l.lower(): return f"{g}.{o}2"
     return "?"
 
-# NAPRAWIONO: Najpierw normalna duża liczba (g), potem indeks dolny (sub), na końcu indeks górny (sup)
 def format_v2_unicode(code_str):
     if "." in code_str:
         parts = code_str.split(".")
@@ -707,7 +741,6 @@ def format_v2_unicode(code_str):
         return f"{g}{to_subscript(sub)}{to_superscript(o)}"
     return code_str
 
-# NAPRAWIONO: Dekodowanie dopasowane do nowej kolejności wyświetlania (liczba -> dolny -> górny)
 def dec_v2(s):
     s = s.strip()
     if not s: return ""
@@ -743,7 +776,6 @@ def enc_v3(l):
         if len(s) > 1 and s[1] == l.lower(): return f"{o}.{g}.2"
     return "?"
 
-# NAPRAWIONO: Usunięto kropkę z wyjścia Kodu 3
 def format_v3_unicode(code_str):
     if "." in code_str:
         parts = code_str.split(".")
@@ -756,7 +788,6 @@ def format_v3_unicode(code_str):
 def dec_v3(s):
     s = s.strip()
     if not s: return "?"
-    # Obsługa dekodowania w formacie bezkropkowym
     try:
         o_part, g_str, pos_str = "", "", ""
         in_sub, in_sup = False, False
@@ -781,7 +812,7 @@ def dec_v3(s):
     return "?"
 
 
-# --- DYNAMICZNY NAGŁÓWEK Z RANGAMI ---
+# --- DYNAMICZNY NAGŁÓWEK Z RANGAMI ORAZ WIDOKIEM EMULACJI ---
 if is_root_admin:
     st.markdown("<h1 style='margin-bottom: 0;'>📟 KODER <span style='color: #FF4B4B; font-size: 1.2rem; vertical-align: middle; background-color: rgba(255,75,75,0.1); padding: 4px 8px; border-radius: 6px; margin-left: 10px; font-weight: bold;'>Właściciel</span></h1>", unsafe_allow_html=True)
 elif is_promoted_admin:
@@ -870,7 +901,7 @@ with c1:
                 st.radio("Wybierz rodzaj czatu:", ["👥 Grupa Ogólna Staffu", "💬 Wiadomości Prywatne (DM)"], horizontal=True, key="staff_chat_type")
                 chat_type = st.session_state.staff_chat_type
                 
-                role_label = "Admin" if is_admin else "Moderator"
+                role_label = "Admin" if (is_admin or is_real_admin) else "Moderator"
                 staff_nick = user_saved_nick if user_saved_nick else f"User_{current_user[:6]}"
                 
                 if chat_type == "👥 Grupa Ogólna Staffu":
@@ -1036,7 +1067,7 @@ with c1:
         </div>
     """, unsafe_allow_html=True)
     
-    if is_staff:
+    if is_staff or is_real_admin:
         new_announcement_text = st.text_area("Zmień treść ogłoszenia globalnego:", value=current_announcement)
         f_col1, f_col2, f_col3 = st.columns([1.5, 1.5, 1.0])
         with f_col1:
@@ -1109,7 +1140,7 @@ with c2:
                         new_reply = {
                             "sender_key": current_user,
                             "sender_nick": user_saved_nick if user_saved_nick else current_user,
-                            "sender_role": "Właściciel (admin)" if is_admin else "Moderator",
+                            "sender_role": "Właściciel (admin)" if (is_admin or is_real_admin) else "Moderator",
                             "receiver_key": chosen_support_user,
                             "time": time_stamp,
                             "text": reply_txt.strip()
@@ -1166,7 +1197,7 @@ with c2:
             
             with st.container(height=280):
                 if not user_visible_messages:
-                    st.caption("Brak wiadomości w historii. Napisz wyżej, aby rozpocząć konwersację.")
+                    st.caption("Brak wiadomości in historii. Napisz wyżej, aby rozpocząć konwersację.")
                 else:
                     for msg in reversed(user_visible_messages):
                         if msg.get("sender_role") == "Użytkownik":
@@ -1218,6 +1249,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
     if st.button("🚪 Wyloguj się całkowicie z aplikacji", type="primary", key="logout_action_button_trigger"):
         st.session_state.user_author_key = ""
         st.session_state.account_authenticated = False
+        if "emulated_role" in st.session_state: del st.session_state["emulated_role"]
         st.query_params.clear()
         components.html(f"""
             <script>
@@ -1251,7 +1283,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
             
     st.write("---")
     st.subheader("Twoje własne ustawienia kolorów")
-    if is_staff: cc_col1, cc_col2, cc_col3, cc_col4 = st.columns(4)
+    if is_staff or is_real_admin: cc_col1, cc_col2, cc_col3, cc_col4 = st.columns(4)
     else: cc_col1, cc_col2, cc_col3 = st.columns(3); cc_col4 = None
         
     with cc_col1:
@@ -1272,7 +1304,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
             st.session_state.global_store["user_data"][current_user]["clear_btn_color"] = chosen_clear_color
             save_global_data(st.session_state.global_store)
             st.rerun()
-    if cc_col4 and is_staff:
+    if cc_col4 and (is_staff or is_real_admin):
         with cc_col4:
             chosen_bar_color = st.color_picker("Twój pasek na czacie:", value=staff_bar_color, key="user_staff_bar_picker")
             if chosen_bar_color != staff_bar_color:
@@ -1281,10 +1313,10 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                 st.rerun()
 
     # --- PANEL UPRAWNIEŃ (ZARZĄDZANIE SYSTEMEM PRZEZ KADRĘ) ---
-    if is_admin:
+    if is_admin or is_real_admin:
         st.write("---")
         st.subheader("👑 Panel Admina: Zarządzanie systemem")
-        if is_root_admin: adm_tabs = st.tabs(["👥 Moderatorzy", "🛡️ Administratorzy", "🌟 Ranga VIP", "🔑 Resetowanie Haseł"])
+        if is_root_admin or is_real_root_admin: adm_tabs = st.tabs(["👥 Moderatorzy", "🛡️ Administratorzy", "🌟 Ranga VIP", "🔑 Resetowanie Haseł"])
         else: adm_tabs = st.tabs(["👥 Moderatorzy", "🌟 Ranga VIP"])
             
         with adm_tabs[0]:
@@ -1325,7 +1357,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                             st.rerun()
 
         # ZAKŁADKA: ZARZĄDZANIE VIPAMI
-        with adm_tabs[2] if is_root_admin else adm_tabs[1]:
+        with adm_tabs[2] if (is_root_admin or is_real_root_admin) else adm_tabs[1]:
             current_vips = st.session_state.global_store.get("vips", [])
             with st.form("add_vip_real_fixed_form", clear_on_submit=True):
                 vip_key_input = st.text_input("Wklej klucz konta, które chcesz awansować na VIP-a:")
@@ -1365,7 +1397,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                             st.session_state.global_store = current_data
                             st.rerun()
                                 
-        if is_root_admin:
+        if is_root_admin or is_real_root_admin:
             with adm_tabs[1]:
                 current_admins = st.session_state.global_store.get("admins", [])
                 if current_admins:
@@ -1384,7 +1416,6 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                                 save_global_data(current_data)
                                 st.session_state.global_store = current_data
                                 st.success(f"✅ Zaktualizowano uprawnienia dla administratora: **{wybrany_admin}**!")
-                                ranga_label = " Właściciel" if current_user == "admin" else (" Admin" if current_user in st.session_state.global_store.get("admins", []) else (" Moderator" if current_user in st.session_state.global_store.get("moderators", []) else (" VIP 🌟" if current_user in st.session_state.global_store.get("vips", []) else "")))
                                 st.rerun()
                     st.write("---")
                 
@@ -1427,8 +1458,8 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                                 st.session_state.global_store = current_data
                                 st.rerun()
 
-        if is_admin:
-            if is_root_admin:
+        if is_admin or is_real_admin:
+            if is_root_admin or is_real_root_admin:
                 target_tab = adm_tabs[3]
                 access_granted = True
             else:
@@ -1478,7 +1509,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                                 st.session_state.global_store = current_data
                                 st.success("Hasło skasowane!")
                                 st.rerun()
-                elif not is_root_admin:
+                elif not is_root_admin and not is_real_root_admin:
                     st.write("---")
                     st.info("ℹ️ Nie posiadasz uprawnień do resetowania haseł. Tylko Główny Administrator (admin) może Ci je nadać.")
 
@@ -1513,6 +1544,7 @@ with st.form("comment_form", clear_on_submit=True):
     
     if wyslij and komentarz_tekst.strip():
         podpis = nick.strip() if nick.strip() else "Anonim"
+        # dynamiczny badge rangi przy komentarzu zależny od fizycznego konta, nie emulacji
         ranga_label = " Właściciel" if current_user == "admin" else (" Admin" if current_user in st.session_state.global_store.get("admins", []) else (" Moderator" if current_user in st.session_state.global_store.get("moderators", []) else (" VIP 🌟" if current_user in st.session_state.global_store.get("vips", []) else "")))
         nowy_komentarz_tekst = f"**{podpis}{ranga_label}** | {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}:\n{komentarz_tekst.strip()}"
         nowy_komentarz_obj = {"text": nowy_komentarz_tekst, "author_key": current_user}
@@ -1530,7 +1562,7 @@ if comments_list:
             cc1, cc2 = st.columns([4.8, 1.2])
             with cc1: st.info(com["text"])
             with cc2:
-                if is_staff:
+                if is_staff or is_real_admin:
                     if st.button("🗑️ Usuń (STAFF)", key=f"del_com_{idx}", type="primary", use_container_width=True):
                         current_data = load_global_data()
                         current_data["comments"].pop(idx)
