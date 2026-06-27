@@ -444,7 +444,7 @@ if not current_user:
     st.stop()
 
 
-# --- LOGIKA RANGI DLA STANDARDOWYCH KONT ORAZ PANEL EMULACJI DLA GEWNEGO ADMINA ---
+# --- LOGIKA RANGI DLA STANDARDOWYCH KONT ORAZ PANEL EMULACJI DLA GŁÓWNEGO ADMINA ---
 is_real_root_admin = (current_user == "admin")  
 is_real_promoted_admin = (current_user in st.session_state.global_store.get("admins", [])) 
 is_real_admin = is_real_root_admin or is_real_promoted_admin
@@ -505,7 +505,7 @@ bg_color = user_profile.get("bg_color", "#FFFFFF")
 clear_btn_color = user_profile.get("clear_btn_color", "#5cb85c")
 staff_bar_color = user_profile.get("staff_bar_color", "#FF4B4B" if is_real_admin else ("#FFA500" if is_moderator else "#1E90FF"))
 
-can_user_reset_passwords = is_root_admin or user_profile.get("can_reset_passwords", False)
+can_user_reset_passwords = is_real_root_admin or user_profile.get("can_reset_passwords", False)
 
 def get_contrast_text_color(hex_color):
     hex_color = hex_color.lstrip('#')
@@ -1067,7 +1067,9 @@ with c1:
         </div>
     """, unsafe_allow_html=True)
     
-    if is_staff or is_real_admin:
+    # KRYTYCZNA ZMIANA: Edycja ogłoszenia opiera się na is_real_admin, a nie is_staff!
+    if is_real_admin:
+        st.markdown("#### ⚙️ Konfiguracja Tablicy Ogłoszeń (Widoczne tylko dla Ciebie)")
         new_announcement_text = st.text_area("Zmień treść ogłoszenia globalnego:", value=current_announcement)
         f_col1, f_col2, f_col3 = st.columns([1.5, 1.5, 1.0])
         with f_col1:
@@ -1283,8 +1285,12 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
             
     st.write("---")
     st.subheader("Twoje własne ustawienia kolorów")
-    if is_staff or is_real_admin: cc_col1, cc_col2, cc_col3, cc_col4 = st.columns(4)
-    else: cc_col1, cc_col2, cc_col3 = st.columns(3); cc_col4 = None
+    
+    # KRYTYCZNA ZMIANA: Widoczność czwartej kolumny (kolor paska) zależy od niezmiennego fizycznego statusu is_real_admin
+    if is_real_admin or (current_user in st.session_state.global_store.get("moderators", [])): 
+        cc_col1, cc_col2, cc_col3, cc_col4 = st.columns(4)
+    else: 
+        cc_col1, cc_col2, cc_col3 = st.columns(3); cc_col4 = None
         
     with cc_col1:
         chosen_color = st.color_picker("Aktywny przycisk wyboru:", value=theme_color, key="user_theme_picker")
@@ -1304,7 +1310,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
             st.session_state.global_store["user_data"][current_user]["clear_btn_color"] = chosen_clear_color
             save_global_data(st.session_state.global_store)
             st.rerun()
-    if cc_col4 and (is_staff or is_real_admin):
+    if cc_col4:
         with cc_col4:
             chosen_bar_color = st.color_picker("Twój pasek na czacie:", value=staff_bar_color, key="user_staff_bar_picker")
             if chosen_bar_color != staff_bar_color:
@@ -1313,11 +1319,14 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                 st.rerun()
 
     # --- PANEL UPRAWNIEŃ (ZARZĄDZANIE SYSTEMEM PRZEZ KADRĘ) ---
-    if is_admin or is_real_admin:
+    # KRYTYCZNA ZMIANA: Blok opiera się o is_real_admin. Nie zniknie przy emulacji!
+    if is_real_admin:
         st.write("---")
-        st.subheader("👑 Panel Admina: Zarządzanie systemem")
-        if is_root_admin or is_real_root_admin: adm_tabs = st.tabs(["👥 Moderatorzy", "🛡️ Administratorzy", "🌟 Ranga VIP", "🔑 Resetowanie Haseł"])
-        else: adm_tabs = st.tabs(["👥 Moderatorzy", "🌟 Ranga VIP"])
+        st.subheader("👑 Panel Admina: Zarządzanie systemem (Widoczne tylko dla Ciebie)")
+        if is_real_root_admin: 
+            adm_tabs = st.tabs(["👥 Moderatorzy", "🛡️ Administratorzy", "🌟 Ranga VIP", "🔑 Resetowanie Haseł"])
+        else: 
+            adm_tabs = st.tabs(["👥 Moderatorzy", "🌟 Ranga VIP"])
             
         with adm_tabs[0]:
             current_mods = st.session_state.global_store.get("moderators", [])
@@ -1357,7 +1366,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                             st.rerun()
 
         # ZAKŁADKA: ZARZĄDZANIE VIPAMI
-        with adm_tabs[2] if (is_root_admin or is_real_root_admin) else adm_tabs[1]:
+        with adm_tabs[2] if is_real_root_admin else adm_tabs[1]:
             current_vips = st.session_state.global_store.get("vips", [])
             with st.form("add_vip_real_fixed_form", clear_on_submit=True):
                 vip_key_input = st.text_input("Wklej klucz konta, które chcesz awansować na VIP-a:")
@@ -1397,7 +1406,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                             st.session_state.global_store = current_data
                             st.rerun()
                                 
-        if is_root_admin or is_real_root_admin:
+        if is_real_root_admin:
             with adm_tabs[1]:
                 current_admins = st.session_state.global_store.get("admins", [])
                 if current_admins:
@@ -1458,8 +1467,8 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                                 st.session_state.global_store = current_data
                                 st.rerun()
 
-        if is_admin or is_real_admin:
-            if is_root_admin or is_real_root_admin:
+        if is_real_admin:
+            if is_real_root_admin:
                 target_tab = adm_tabs[3]
                 access_granted = True
             else:
@@ -1509,11 +1518,12 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                                 st.session_state.global_store = current_data
                                 st.success("Hasło skasowane!")
                                 st.rerun()
-                elif not is_root_admin and not is_real_root_admin:
+                elif not is_real_root_admin:
                     st.write("---")
                     st.info("ℹ️ Nie posiadasz uprawnień do resetowania haseł. Tylko Główny Administrator (admin) może Ci je nadać.")
 
         st.write("---")
+        st.markdown("#### 🎨 Modyfikacja Domyślnych Barw Aplikacji (Dla nowych użytkowników)")
         adm_cc1, adm_cc2, adm_cc3 = st.columns(3)
         with adm_cc1: new_def_theme = st.color_picker("Domyślny przycisk wyboru:", value=def_theme, key="admin_def_theme")
         with adm_cc2: new_def_bg = st.color_picker("Domyślne tło aplikacji:", value=def_bg, key="admin_def_bg")
