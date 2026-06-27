@@ -1067,8 +1067,8 @@ with c1:
         </div>
     """, unsafe_allow_html=True)
     
-    # KRYTYCZNA ZMIANA: Edycja ogłoszenia opiera się na is_real_admin, a nie is_staff!
-    if is_real_admin:
+    # POPRAWKA 1: Sekcja konfiguracji reaguje teraz na ZMIENIONĄ w emulacji flagę is_admin, zamiast na fizyczne is_real_admin
+    if is_admin:
         st.markdown("#### ⚙️ Konfiguracja Tablicy Ogłoszeń (Widoczne tylko dla Ciebie)")
         new_announcement_text = st.text_area("Zmień treść ogłoszenia globalnego:", value=current_announcement)
         f_col1, f_col2, f_col3 = st.columns([1.5, 1.5, 1.0])
@@ -1286,8 +1286,8 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
     st.write("---")
     st.subheader("Twoje własne ustawienia kolorów")
     
-    # KRYTYCZNA ZMIANA: Widoczność czwartej kolumny (kolor paska) zależy od niezmiennego fizycznego statusu is_real_admin
-    if is_real_admin or (current_user in st.session_state.global_store.get("moderators", [])): 
+    # KRYTYCZNA ZMIANA: Widoczność czwartej kolumny (kolor paska) zależy od zmiennej is_staff uwzględniającej emulację
+    if is_staff: 
         cc_col1, cc_col2, cc_col3, cc_col4 = st.columns(4)
     else: 
         cc_col1, cc_col2, cc_col3 = st.columns(3); cc_col4 = None
@@ -1319,11 +1319,11 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                 st.rerun()
 
     # --- PANEL UPRAWNIEŃ (ZARZĄDZANIE SYSTEMEM PRZEZ KADRĘ) ---
-    # KRYTYCZNA ZMIANA: Blok opiera się o is_real_admin. Nie zniknie przy emulacji!
-    if is_real_admin:
+    # POPRAWKA 2: Blok opiera się o dynamiczne uprawnienie is_admin, aby znikał podczas symulacji "Zwykłego Użytkownika"
+    if is_admin:
         st.write("---")
         st.subheader("👑 Panel Admina: Zarządzanie systemem (Widoczne tylko dla Ciebie)")
-        if is_real_root_admin: 
+        if is_real_root_admin and st.session_state.get("emulated_role") == "Właściciel/Admin (Domyślny)": 
             adm_tabs = st.tabs(["👥 Moderatorzy", "🛡️ Administratorzy", "🌟 Ranga VIP", "🔑 Resetowanie Haseł"])
         else: 
             adm_tabs = st.tabs(["👥 Moderatorzy", "🌟 Ranga VIP"])
@@ -1366,7 +1366,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                             st.rerun()
 
         # ZAKŁADKA: ZARZĄDZANIE VIPAMI
-        with adm_tabs[2] if is_real_root_admin else adm_tabs[1]:
+        with adm_tabs[2] if (is_real_root_admin and st.session_state.get("emulated_role") == "Właściciel/Admin (Domyślny)") else adm_tabs[1]:
             current_vips = st.session_state.global_store.get("vips", [])
             with st.form("add_vip_real_fixed_form", clear_on_submit=True):
                 vip_key_input = st.text_input("Wklej klucz konta, które chcesz awansować na VIP-a:")
@@ -1406,7 +1406,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                             st.session_state.global_store = current_data
                             st.rerun()
                                 
-        if is_real_root_admin:
+        if is_real_root_admin and st.session_state.get("emulated_role") == "Właściciel/Admin (Domyślny)":
             with adm_tabs[1]:
                 current_admins = st.session_state.global_store.get("admins", [])
                 if current_admins:
@@ -1467,8 +1467,8 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                                 st.session_state.global_store = current_data
                                 st.rerun()
 
-        if is_real_admin:
-            if is_real_root_admin:
+        if is_admin:
+            if is_real_root_admin and st.session_state.get("emulated_role") == "Właściciel/Admin (Domyślny)":
                 target_tab = adm_tabs[3]
                 access_granted = True
             else:
