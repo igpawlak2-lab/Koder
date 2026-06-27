@@ -452,10 +452,11 @@ is_vip = (current_user in st.session_state.global_store.get("vips", []))
 is_staff = is_admin or is_moderator  
 has_kod3_access = is_vip or is_staff
 
-# Zabezpieczenie integralności profilu (NAPRAWIONE: pobiera istniejące hasło zamiast je zerować)
+# Zabezpieczenie integralności profilu - POBIERA ISTNIEJĄCE HASŁO ZAMIAST JE ZEROWAĆ
 if current_user not in st.session_state.global_store["user_data"]:
     st.session_state.global_store["user_data"][current_user] = {
-        "history": [], "notepad": "", "has_liked": False, "saved_nick": current_user, "password": "",  
+        "history": [], "notepad": "", "has_liked": False, "saved_nick": current_user, 
+        "password": st.session_state.get("auth_password", ""),  
         "theme_color": def_theme, "bg_color": def_bg, "clear_btn_color": def_clear,
         "staff_bar_color": "#FF4B4B" if is_admin else ("#FFA500" if is_moderator else "#1E90FF"),
         "can_reset_passwords": False
@@ -570,7 +571,7 @@ if account_has_password and not st.session_state.account_authenticated:
                 """, height=0, width=0)
                 st.rerun()
             else:
-                st.error("❌ Nieprawidłowe hasło konta!")
+                st.error("❌ Nieprawidłowe hasło konto!")
     
     st.write("---")
     st.markdown("### 💡 Zapomniałeś hasła?")
@@ -696,15 +697,17 @@ def enc_v2(l):
         if len(s) > 1 and s[1] == l.lower(): return f"{g}.{o}2"
     return "?"
 
+# NAPRAWIONO: Najpierw normalna duża liczba (g), potem indeks dolny (sub), na końcu indeks górny (sup)
 def format_v2_unicode(code_str):
     if "." in code_str:
         parts = code_str.split(".")
         g, rest = parts[0], parts[1]
         o = rest[0]
         sub = rest[1] if len(rest) > 1 else ""
-        return f"{g}{to_superscript(o)}{to_subscript(sub)}"
+        return f"{g}{to_subscript(sub)}{to_superscript(o)}"
     return code_str
 
+# NAPRAWIONO: Dekodowanie dopasowane do nowej kolejności wyświetlania (liczba -> dolny -> górny)
 def dec_v2(s):
     s = s.strip()
     if not s: return ""
@@ -718,12 +721,11 @@ def dec_v2(s):
                 if vg == g and vo == o: return vs[1].upper() if pos == "2" and len(vs) > 1 else vs[0].upper()
         except ValueError: pass
         return "?"
-    g_part, o_part, sub_part, in_o = "", "", "", False
+    g_part, o_part, sub_part = "", "", ""
     for char in s:
-        if char in REV_SUP: o_part += REV_SUP[char]; in_o = True
+        if char in REV_SUP: o_part += REV_SUP[char]
         elif char in REV_SUB: sub_part += REV_SUB[char]
-        else:
-            if not in_o: g_part += char
+        else: g_part += char
     if not g_part or not o_part: return "?"
     try:
         g, o, pos = int(g_part), int(o_part), sub_part
@@ -741,28 +743,33 @@ def enc_v3(l):
         if len(s) > 1 and s[1] == l.lower(): return f"{o}.{g}.2"
     return "?"
 
+# NAPRAWIONO: Usunięto kropkę z wyjścia Kodu 3
 def format_v3_unicode(code_str):
     if "." in code_str:
         parts = code_str.split(".")
         o_val, g_val, pos = parts[0], parts[1], parts[2]
         unicode_g = to_subscript(g_val)
         unicode_pos = to_superscript(pos) if pos in ["1", "2"] else ""
-        return f"{o_val}.{unicode_g}{unicode_pos}"
+        return f"{o_val}{unicode_g}{unicode_pos}"
     return code_str
 
 def dec_v3(s):
     s = s.strip()
-    if not s or "." not in s: return "?"
+    if not s: return "?"
+    # Obsługa dekodowania w formacie bezkropkowym
     try:
-        parts = s.split(".")
-        o_part = parts[0].strip()
-        rest = parts[1].strip()
-        
-        g_str, pos_str = "", ""
-        for char in rest:
-            if char in REV_SUB: g_str += REV_SUB[char]
-            elif char in REV_SUP: pos_str += REV_SUP[char]
-            
+        o_part, g_str, pos_str = "", "", ""
+        in_sub, in_sup = False, False
+        for char in s:
+            if char in REV_SUB: 
+                g_str += REV_SUB[char]
+                in_sub = True
+            elif char in REV_SUP: 
+                pos_str += REV_SUP[char]
+                in_sup = True
+            else:
+                if not in_sub and not in_sup:
+                    o_part += char
         o = int(o_part)
         g = int(g_str)
         pos = pos_str if pos_str in ["1", "2"] else "0"
@@ -1377,6 +1384,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                                 save_global_data(current_data)
                                 st.session_state.global_store = current_data
                                 st.success(f"✅ Zaktualizowano uprawnienia dla administratora: **{wybrany_admin}**!")
+                                ranga_label = " Właściciel" if current_user == "admin" else (" Admin" if current_user in st.session_state.global_store.get("admins", []) else (" Moderator" if current_user in st.session_state.global_store.get("moderators", []) else (" VIP 🌟" if current_user in st.session_state.global_store.get("vips", []) else "")))
                                 st.rerun()
                     st.write("---")
                 
