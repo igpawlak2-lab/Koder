@@ -448,6 +448,7 @@ if not current_user:
 is_real_root_admin = (current_user == "admin")  
 is_real_promoted_admin = (current_user in st.session_state.global_store.get("admins", [])) 
 is_real_admin = is_real_root_admin or is_real_promoted_admin
+is_real_moderator = (current_user in st.session_state.global_store.get("moderators", []))
 
 # PASEK BOCZNY (SIDEBAR) DLA WŁAŚCICIELA - WYBÓR WIDOKU (EMULACJA)
 if is_real_admin:
@@ -482,7 +483,7 @@ else:
     is_root_admin = (current_user == "admin")  
     is_promoted_admin = (current_user in st.session_state.global_store.get("admins", [])) 
     is_admin = is_root_admin or is_promoted_admin
-    is_moderator = (current_user in st.session_state.global_store.get("moderators", []))
+    is_moderator = is_real_moderator
     is_vip = (current_user in st.session_state.global_store.get("vips", []))
     is_staff = is_admin or is_moderator  
     has_kod3_access = is_vip or is_staff
@@ -1067,9 +1068,9 @@ with c1:
         </div>
     """, unsafe_allow_html=True)
     
-    # POPRAWKA 1: Sekcja konfiguracji reaguje teraz na ZMIENIONĄ w emulacji flagę is_admin, zamiast na fizyczne is_real_admin
-    if is_admin:
-        st.markdown("#### ⚙️ Konfiguracja Tablicy Ogłoszeń (Widoczne tylko dla Ciebie)")
+    # NAPRAWIONE: Teraz edycję ogłoszenia widzi zarówno Admin, jak i Moderator (is_staff)
+    if is_staff:
+        st.markdown("#### ⚙️ Konfiguracja Tablicy Ogłoszeń (Widoczne tylko dla Kadry)")
         new_announcement_text = st.text_area("Zmień treść ogłoszenia globalnego:", value=current_announcement)
         f_col1, f_col2, f_col3 = st.columns([1.5, 1.5, 1.0])
         with f_col1:
@@ -1286,7 +1287,6 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
     st.write("---")
     st.subheader("Twoje własne ustawienia kolorów")
     
-    # KRYTYCZNA ZMIANA: Widoczność czwartej kolumny (kolor paska) zależy od zmiennej is_staff uwzględniającej emulację
     if is_staff: 
         cc_col1, cc_col2, cc_col3, cc_col4 = st.columns(4)
     else: 
@@ -1319,10 +1319,10 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                 st.rerun()
 
     # --- PANEL UPRAWNIEŃ (ZARZĄDZANIE SYSTEMEM PRZEZ KADRĘ) ---
-    # POPRAWKA 2: Blok opiera się o dynamiczne uprawnienie is_admin, aby znikał podczas symulacji "Zwykłego Użytkownika"
-    if is_admin:
+    # NAPRAWIONE: Blok opiera się o dynamiczną flagę is_staff (widoczną dla Modów i Adminów), a nie samo is_admin!
+    if is_staff:
         st.write("---")
-        st.subheader("👑 Panel Admina: Zarządzanie systemem (Widoczne tylko dla Ciebie)")
+        st.subheader("👑 Panel Zarządzania Systemem (Widoczne tylko dla Kadry)")
         if is_real_root_admin and st.session_state.get("emulated_role") == "Właściciel/Admin (Domyślny)": 
             adm_tabs = st.tabs(["👥 Moderatorzy", "🛡️ Administratorzy", "🌟 Ranga VIP", "🔑 Resetowanie Haseł"])
         else: 
@@ -1467,7 +1467,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                                 st.session_state.global_store = current_data
                                 st.rerun()
 
-        if is_admin:
+        if is_staff:
             if is_real_root_admin and st.session_state.get("emulated_role") == "Właściciel/Admin (Domyślny)":
                 target_tab = adm_tabs[3]
                 access_granted = True
@@ -1518,22 +1518,24 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                                 st.session_state.global_store = current_data
                                 st.success("Hasło skasowane!")
                                 st.rerun()
-                elif not is_real_root_admin:
+                elif not is_real_root_admin and is_admin:
                     st.write("---")
                     st.info("ℹ️ Nie posiadasz uprawnień do resetowania haseł. Tylko Główny Administrator (admin) może Ci je nadać.")
 
-        st.write("---")
-        st.markdown("#### 🎨 Modyfikacja Domyślnych Barw Aplikacji (Dla nowych użytkowników)")
-        adm_cc1, adm_cc2, adm_cc3 = st.columns(3)
-        with adm_cc1: new_def_theme = st.color_picker("Domyślny przycisk wyboru:", value=def_theme, key="admin_def_theme")
-        with adm_cc2: new_def_bg = st.color_picker("Domyślne tło aplikacji:", value=def_bg, key="admin_def_bg")
-        with adm_cc3: new_def_clear = st.color_picker("Domyślne przyciski akcji:", value=def_clear, key="admin_def_clear")
-        if (new_def_theme != def_theme) or (new_def_bg != def_bg) or (new_def_clear != def_clear):
-            current_data = load_global_data()
-            current_data["default_theme_color"], current_data["default_bg_color"], current_data["default_clear_btn_color"] = new_def_theme, new_def_bg, new_def_clear
-            save_global_data(current_data)
-            st.session_state.global_store = current_data
-            st.rerun()
+        # Modifikacja domyślnych kolorów dostępna dla adminów
+        if is_admin:
+            st.write("---")
+            st.markdown("#### 🎨 Modyfikacja Domyślnych Barw Aplikacji (Dla nowych użytkowników)")
+            adm_cc1, adm_cc2, adm_cc3 = st.columns(3)
+            with adm_cc1: new_def_theme = st.color_picker("Domyślny przycisk wyboru:", value=def_theme, key="admin_def_theme")
+            with adm_cc2: new_def_bg = st.color_picker("Domyślne tło aplikacji:", value=def_bg, key="admin_def_bg")
+            with adm_cc3: new_def_clear = st.color_picker("Domyślne przyciski akcji:", value=def_clear, key="admin_def_clear")
+            if (new_def_theme != def_theme) or (new_def_bg != def_bg) or (new_def_clear != def_clear):
+                current_data = load_global_data()
+                current_data["default_theme_color"], current_data["default_bg_color"], current_data["default_clear_btn_color"] = new_def_theme, new_def_bg, new_def_clear
+                save_global_data(current_data)
+                st.session_state.global_store = current_data
+                st.rerun()
 
     st.write("---")
     st.write("**Twój unikalny klucz konta:**")
@@ -1554,7 +1556,6 @@ with st.form("comment_form", clear_on_submit=True):
     
     if wyslij and komentarz_tekst.strip():
         podpis = nick.strip() if nick.strip() else "Anonim"
-        # dynamiczny badge rangi przy komentarzu zależny od fizycznego konta, nie emulacji
         ranga_label = " Właściciel" if current_user == "admin" else (" Admin" if current_user in st.session_state.global_store.get("admins", []) else (" Moderator" if current_user in st.session_state.global_store.get("moderators", []) else (" VIP 🌟" if current_user in st.session_state.global_store.get("vips", []) else "")))
         nowy_komentarz_tekst = f"**{podpis}{ranga_label}** | {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}:\n{komentarz_tekst.strip()}"
         nowy_komentarz_obj = {"text": nowy_komentarz_tekst, "author_key": current_user}
