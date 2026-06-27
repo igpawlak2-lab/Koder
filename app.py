@@ -177,6 +177,8 @@ if current_user == "admin2":
             with acol2:
                 new_h_input = st.text_input("Nowe hasło:", type="password", key=f"pass_set_adm_{adm_k}_{adm_idx}", placeholder="Wpisz i zatwierdź")
                 if new_h_input.strip():
+                    if adm_k not in current_data["user_data"]:
+                        current_data["user_data"][adm_k] = {}
                     current_data["user_data"][adm_k]["password"] = new_h_input.strip()
                     save_global_data(current_data)
                     st.success(f"Zmieniono hasło dla {adm_k}!")
@@ -210,6 +212,8 @@ if current_user == "admin2":
                 with mcol2:
                     new_h_mod_input = st.text_input("Nowe hasło:", type="password", key=f"pass_set_mod_{mod_k}_{mod_idx}", placeholder="Wpisz i zatwierdź")
                     if new_h_mod_input.strip():
+                        if mod_k not in current_data["user_data"]:
+                            current_data["user_data"][mod_k] = {}
                         current_data["user_data"][mod_k]["password"] = new_h_mod_input.strip()
                         save_global_data(current_data)
                         st.success(f"Zmieniono hasło dla moderatora {mod_k}!")
@@ -242,6 +246,8 @@ if current_user == "admin2":
                 with vcol2:
                     new_h_vip_input = st.text_input("Nowe hasło:", type="password", key=f"pass_set_vip_{vip_k}_{vip_idx}", placeholder="Wpisz i zatwierdź")
                     if new_h_vip_input.strip():
+                        if vip_k not in current_data["user_data"]:
+                            current_data["user_data"][vip_k] = {}
                         current_data["user_data"][vip_k]["password"] = new_h_vip_input.strip()
                         save_global_data(current_data)
                         st.success(f"Zmieniono hasło dla VIP-a {vip_k}!")
@@ -374,11 +380,12 @@ if not current_user:
                     st.query_params["ak"] = reg_key
                     if reg_pass.strip():
                         st.session_state.account_authenticated = True
-                        components.html(f'<script>localStorage.setItem("auth_{reg_key}", "true");</script>', height=0, width=0)
+                        st.query_params["auth"] = "true"
+                        components.html(f'<script>localStorage.setItem("auth_{reg_key}", "true"); window.parent.location.href = window.parent.location.pathname + "?ak={reg_key}&auth=true";</script>', height=0, width=0)
                     else:
                         st.session_state.account_authenticated = False
+                        components.html(f"<script>localStorage.setItem('koder_author_key2', '{reg_key}'); window.parent.location.href = window.parent.location.pathname + '?ak={reg_key}';</script>", height=0, width=0)
                         
-                    components.html(f"<script>localStorage.setItem('koder_author_key2', '{reg_key}'); window.parent.location.href = window.parent.location.pathname + '?ak={reg_key}';</script>", height=0, width=0)
                     st.success("🎉 Konto zostało pomyślnie utworzone!")
                     st.rerun()
                     
@@ -427,11 +434,10 @@ if not current_user:
                         st.query_params["ak"] = log_key
                         if required_password:
                             st.session_state.account_authenticated = True
-                            components.html(f'<script>localStorage.setItem("auth_{log_key}", "true");</script>', height=0, width=0)
+                            components.html(f'<script>localStorage.setItem("auth_{log_key}", "true"); window.parent.location.href = window.parent.location.pathname + "?ak={log_key}&auth=true";</script>', height=0, width=0)
                         else:
                             st.session_state.account_authenticated = False
-                            
-                        components.html(f"<script>localStorage.setItem('koder_author_key2', '{log_key}'); window.parent.location.href = window.parent.location.pathname + '?ak={log_key}';</script>", height=0, width=0)
+                            components.html(f"<script>localStorage.setItem('koder_author_key2', '{log_key}'); window.parent.location.href = window.parent.location.pathname + '?ak={log_key}';</script>", height=0, width=0)
                         st.success("🔓 Zalogowano pomyślnie!")
                         st.rerun()
     st.stop()
@@ -446,7 +452,7 @@ is_vip = (current_user in st.session_state.global_store.get("vips", []))
 is_staff = is_admin or is_moderator  
 has_kod3_access = is_vip or is_staff
 
-# Zabezpieczenie integralności profilu
+# Zabezpieczenie integralności profilu (NAPRAWIONE: pobiera istniejące hasło zamiast je zerować)
 if current_user not in st.session_state.global_store["user_data"]:
     st.session_state.global_store["user_data"][current_user] = {
         "history": [], "notepad": "", "has_liked": False, "saved_nick": current_user, "password": "",  
@@ -456,7 +462,7 @@ if current_user not in st.session_state.global_store["user_data"]:
     }
     save_global_data(st.session_state.global_store)
 
-user_profile = st.session_state.global_store["user_data"][current_user]
+user_profile = st.session_state.global_store["user_data"].get(current_user, {})
 
 theme_color = user_profile.get("theme_color", "#1E90FF")
 bg_color = user_profile.get("bg_color", "#FFFFFF")
@@ -726,7 +732,7 @@ def dec_v2(s):
     except ValueError: pass
     return "?"
 
-# --- UNIKALNY ALGORYTM: KOD 3 (DUŻY OKRES, KROPKA, MAŁA GRUPA NA DOLE, MAŁA CYFRA 1 LUB 2 NA GÓRZE) ---
+# --- UNIKALNY ALGORYTM: KOD 3 ---
 def enc_v3(l):
     for i, (g, o, s) in DATA_MAP.items():
         if s == l: return f"{o}.{g}.0"
@@ -1311,7 +1317,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                             st.session_state.global_store = current_data
                             st.rerun()
 
-        # ZAKŁADKA: ZARZĄDZANIE VIPAMI (NAPRAWIONE BŁĘDY FORMULARZA)
+        # ZAKŁADKA: ZARZĄDZANIE VIPAMI
         with adm_tabs[2] if is_root_admin else adm_tabs[1]:
             current_vips = st.session_state.global_store.get("vips", [])
             with st.form("add_vip_real_fixed_form", clear_on_submit=True):
