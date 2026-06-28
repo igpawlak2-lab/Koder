@@ -1318,9 +1318,8 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                 st.rerun()
 
     # --- PANEL UPRAWNIEŃ (ZARZĄDZANIE SYSTEMEM PRZEZ KADRĘ) ---
-    # KLUCZOWA ZMIANA: Tylko PRAWDZIWY Administrator/Właściciel ma fizyczny dostęp do zarządzania rangami i resetami!
-    # Jeśli admin włączy emulację "Moderator", ta sekcja zostanie przed nim bezpiecznie ukryta.
-    if is_admin and st.session_state.get("emulated_role") == "Właściciel/Admin (Domyślny)":
+    # KLUCZOWA ZMIANA: Zarówno Admin jak i Moderator mają tu dostęp do odpowiednich zakładek (Moderator widzi Modów i VIP)
+    if (is_admin or is_moderator) and st.session_state.get("emulated_role") == "Właściciel/Admin (Domyślny)":
         st.write("---")
         st.subheader("👑 Panel Zarządzania Systemem (Widoczne tylko dla Kadry)")
         
@@ -1331,26 +1330,30 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
             
         with adm_tabs[0]:
             current_mods = st.session_state.global_store.get("moderators", [])
-            with st.form("add_moderator_form", clear_on_submit=True):
-                mod_key_input = st.text_input("Wklej klucz konta, które chcesz awansować na Moderatora:")
-                submit_mod = st.form_submit_button("➕ Nadaj uprawnienia moderatora")
-                if submit_mod and mod_key_input.strip():
-                    target_key = mod_key_input.strip()
-                    target_user_profile = st.session_state.global_store.get("user_data", {}).get(target_key, {})
-                    target_password = target_user_profile.get("password", "").strip()
-                    
-                    if target_key == "admin" or target_key in st.session_state.global_store.get("admins", []): st.error("❌ Wyższa ranga.")
-                    elif target_key in current_mods: st.warning("⚠️ Już jest mod.")
-                    elif not target_password: st.error("❌ Błąd bezpieczeństwa: Użytkownik musi najpierw ustawić hasło na swoim koncie, aby otrzymać rangę Moderatora!")
-                    else:
-                        current_data = load_global_data()
-                        if "moderators" not in current_data: current_data["moderators"] = []
-                        current_data["moderators"].append(target_key)
-                        if "vips" in current_data and target_key in current_data["vips"]: current_data["vips"].remove(target_key)
-                        save_global_data(current_data)
-                        st.session_state.global_store = current_data
-                        st.success(f"✅ Nadano rangę Moderatora dla `{target_key}`")
-                        st.rerun()
+            # Zarządzanie moderatorami widoczne tylko dla wyższych rangą (Admin / Root)
+            if is_admin:
+                with st.form("add_moderator_form", clear_on_submit=True):
+                    mod_key_input = st.text_input("Wklej klucz konta, które chcesz awansować na Moderatora:")
+                    submit_mod = st.form_submit_button("➕ Nadaj uprawnienia moderatora")
+                    if submit_mod and mod_key_input.strip():
+                        target_key = mod_key_input.strip()
+                        target_user_profile = st.session_state.global_store.get("user_data", {}).get(target_key, {})
+                        target_password = target_user_profile.get("password", "").strip()
+                        
+                        if target_key == "admin" or target_key in st.session_state.global_store.get("admins", []): st.error("❌ Wyższa ranga.")
+                        elif target_key in current_mods: st.warning("⚠️ Już jest mod.")
+                        elif not target_password: st.error("❌ Błąd bezpieczeństwa: Użytkownik musi najpierw ustawić hasło na swoim koncie, aby otrzymać rangę Moderatora!")
+                        else:
+                            current_data = load_global_data()
+                            if "moderators" not in current_data: current_data["moderators"] = []
+                            current_data["moderators"].append(target_key)
+                            if "vips" in current_data and target_key in current_data["vips"]: current_data["vips"].remove(target_key)
+                            save_global_data(current_data)
+                            st.session_state.global_store = current_data
+                            st.success(f"✅ Nadano rangę Moderatora dla `{target_key}`")
+                            st.rerun()
+            else:
+                st.info("ℹ️ Jako Moderator możesz przeglądać listę moderatorów, lecz nie możesz ich dodawać ani usuwać.")
                         
             if current_mods:
                 for m_idx, m_key in enumerate(current_mods):
@@ -1359,14 +1362,17 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                         u_nick = st.session_state.global_store["user_data"].get(m_key, {}).get("saved_nick", "")
                         st.markdown(f"🔑 `{m_key}`" + (f" (Podpis: **{u_nick}**)" if u_nick else ""))
                     with m_col2:
-                        if st.button("❌ Odbierz rangę MOD", key=f"remove_mod_{m_idx}", type="primary", use_container_width=True):
-                            current_data = load_global_data()
-                            if m_key in current_data.get("moderators", []): current_data["moderators"].remove(m_key)
-                            save_global_data(current_data)
-                            st.session_state.global_store = current_data
-                            st.rerun()
+                        if is_admin:
+                            if st.button("❌ Odbierz rangę MOD", key=f"remove_mod_{m_idx}", type="primary", use_container_width=True):
+                                current_data = load_global_data()
+                                if m_key in current_data.get("moderators", []): current_data["moderators"].remove(m_key)
+                                save_global_data(current_data)
+                                st.session_state.global_store = current_data
+                                st.rerun()
+                        else:
+                            st.button("🔒 Brak uprawnień", key=f"no_perm_mod_{m_idx}", disabled=True, use_container_width=True)
 
-        # ZAKŁADKA: ZARZĄDZANIE VIPAMI
+        # ZAKŁADKA: ZARZĄDZANIE VIPAMI (Dostępna dla Admina i Moderatora)
         with adm_tabs[2] if is_real_root_admin else adm_tabs[1]:
             current_vips = st.session_state.global_store.get("vips", [])
             with st.form("add_vip_real_fixed_form", clear_on_submit=True):
