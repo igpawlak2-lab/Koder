@@ -1316,22 +1316,24 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                 st.session_state.global_store["user_data"][current_user]["staff_bar_color"] = chosen_bar_color
                 save_global_data(st.session_state.global_store)
                 st.rerun()
-
-               # --- PANEL UPRAWNIEŃ (ZARZĄDZANIE SYSTEMEM PRZEZ KADRĘ) ---
-    if (is_admin or is_moderator) and st.session_state.get("emulated_role") == "Właściciel/Admin (Domyślny)":
+        # --- PANEL UPRAWNIEŃ (ZARZĄDZANIE SYSTEMEM PRZEZ KADRĘ) ---
+    # POPRAWIONY WARUNEK: Wpuszcza admina z rolą admina LUB moderatora z rolą moderatora
+    current_role = st.session_state.get("emulated_role", "")
+    if (is_admin and current_role == "Właściciel/Admin (Domyślny)") or (is_moderator and current_role == "Moderator"):
         st.write("---")
         st.subheader("👑 Panel Zarządzania Systemem (Widoczne tylko dla Kadry)")
         
+        # Definiujemy zakładki w zależności od tego, czy patrzy Root Admin, czy Moderator
         if is_real_root_admin: 
             adm_tabs = st.tabs(["👥 Moderatorzy", "🛡️ Administratorzy", "🌟 Ranga VIP", "🔑 Resetowanie Haseł"])
         else: 
-            # Moderator widzi tylko zakładkę VIP (oraz podgląd listy moderatorów dla kontekstu)
+            # Moderator widzi listę ekipy oraz zakładkę do nadawania VIP
             adm_tabs = st.tabs(["👥 Lista Moderatorów", "🌟 Zarządzanie VIP"])
             
         # --- ZAKŁADKA 1: MODERATORZY ---
         with adm_tabs[0]:
             current_mods = st.session_state.global_store.get("moderators", [])
-            if is_real_root_admin: # Tylko Główny Admin (Właściciel) może zarządzać Moderatorami
+            if is_real_root_admin: # Tylko Główny Admin (Właściciel) może dodawać Moderatorów
                 with st.form("add_moderator_form", clear_on_submit=True):
                     mod_key_input = st.text_input("Wklej klucz konta, które chcesz awansować na Moderatora:")
                     submit_mod = st.form_submit_button("➕ Nadaj uprawnienia moderatora")
@@ -1372,13 +1374,11 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                         else:
                             st.button("🔒 Brak uprawnień", key=f"no_perm_mod_{m_idx}", disabled=True, use_container_width=True)
 
-        # --- ZAKŁADKA: ZARZĄDZANIE VIPAMI (Dostępna w pełni dla Admina ORAZ MODERATORA) ---
-        # Przypisanie do odpowiedniego indeksu zakładki w zależności od roli
+        # --- ZAKŁADKA: ZARZĄDZANIE VIPAMI (Dostępna dla Admina ORAZ MODERATORA) ---
         vip_tab_index = 2 if is_real_root_admin else 1
         with adm_tabs[vip_tab_index]:
             current_vips = st.session_state.global_store.get("vips", [])
             
-            # Formularz przyznawania VIP - teraz działa zarówno dla Admina, jak i Moderatora
             with st.form("add_vip_real_fixed_form", clear_on_submit=True):
                 st.markdown("#### 🌟 Nadaj rangę VIP (Uprawnienie Kadry)")
                 vip_key_input = st.text_input("Wklej klucz konta, które chcesz awansować na VIP-a:")
@@ -1413,7 +1413,6 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                         v_nick = st.session_state.global_store["user_data"].get(v_key, {}).get("saved_nick", "")
                         st.markdown(f"🌟 `{v_key}`" + (f" (Podpis: **{v_nick}**)" if v_nick else ""))
                     with v_col2:
-                        # Moderator oraz Admin mogą bez przeszkód odbierać przyznanego VIP-a
                         if st.button("❌ Odbierz rangę VIP", key=f"remove_vip_act_{v_idx}", type="primary", use_container_width=True):
                             current_data = load_global_data()
                             if v_key in current_data.get("vips", []): current_data["vips"].remove(v_key)
@@ -1528,7 +1527,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                             st.rerun()
 
         elif not is_real_root_admin and is_admin:
-            # Widok dla adminów pomocniczych (z nadania) sprawdzający can_reset_passwords
+            # Widok pomocniczy dla adminów z nadania sprawdzający can_reset_passwords
             if user_profile.get("can_reset_passwords", False):
                 st.write("---")
                 st.markdown("### 🔒 Skrzynka próśb o reset haseł")
@@ -1574,7 +1573,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                 st.write("---")
                 st.info("ℹ️ Nie posiadasz uprawnień do resetowania haseł. Tylko Główny Administrator (admin) może Ci je nadać.")
 
-        # Modyfikacja domyślnych kolorów dostępna dla adminów
+        # Zmiana kolorów domyślnych – tylko dla Admina
         if is_admin:
             st.write("---")
             st.markdown("#### 🎨 Modyfikacja Domyślnych Barw Aplikacji (Dla nowych użytkowników)")
