@@ -38,23 +38,9 @@ def load_global_data():
             with open(DATA_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 if not isinstance(data, dict): return default_data
-                if "likes" not in data: data["likes"] = 0
-                if "comments" not in data: data["comments"] = []
-                if "user_data" not in data: data["user_data"] = {}
-                if "moderators" not in data: data["moderators"] = []
-                if "admins" not in data: data["admins"] = []
-                if "vips" not in data: data["vips"] = []
-                if "staff_chat" not in data: data["staff_chat"] = [] 
-                if "staff_dms" not in data: data["staff_dms"] = []
-                if "support_chat" not in data: data["support_chat"] = [] 
-                if "password_resets" not in data: data["password_resets"] = []
-                if "announcement" not in data: data["announcement"] = "Brak aktualnych ogłoszeń."
-                if "announcement_font" not in data: data["announcement_font"] = "sans-serif"
-                if "announcement_size" not in data: data["announcement_size"] = 16
-                if "announcement_bg_color" not in data: data["announcement_bg_color"] = "#e7f3fe"
-                if "default_theme_color" not in data: data["default_theme_color"] = "#1E90FF"
-                if "default_bg_color" not in data: data["default_bg_color"] = "#FFFFFF"
-                if "default_clear_btn_color" not in data: data["default_clear_btn_color"] = "#5cb85c"
+                for key, val in default_data.items():
+                    if key not in data:
+                        data[key] = val
                 return data
         except:
             return default_data
@@ -67,7 +53,7 @@ def save_global_data(data):
     except:
         pass
 
-# Inicjalizacja głównego magazynu w stanu sesji
+# Inicjalizacja głównego magazynu w stanie sesji
 if "global_store" not in st.session_state:
     st.session_state.global_store = load_global_data()
 
@@ -75,7 +61,7 @@ def_theme = st.session_state.global_store.get("default_theme_color", "#1E90FF")
 def_bg = st.session_state.global_store.get("default_bg_color", "#FFFFFF")
 def_clear = st.session_state.global_store.get("default_clear_btn_color", "#5cb85c")
 
-# --- SYNC Z URL I LOCALSTORAGE ---
+# --- SYNC Z URL ---
 params = st.query_params
 url_key = params.get("ak", "").strip()
 
@@ -123,12 +109,7 @@ if current_user == "admin2":
                 if input_pass_admin2 == "Przyrodnik1" and input_pass2_admin2 == "Ignacy":
                     st.session_state.admin2_authenticated = True
                     st.query_params["auth"] = "true"
-                    components.html(f"""
-                        <script>
-                            localStorage.setItem("auth_admin2", "true");
-                            window.parent.location.href = window.parent.location.pathname + "?ak=admin2&auth=true";
-                        </script>
-                    """, height=0, width=0)
+                    st.query_params["ak"] = "admin2"
                     st.rerun()
                 else:
                     st.error("❌ Błędne hasła ratunkowe! Odmowa dostępu.")
@@ -141,7 +122,6 @@ if current_user == "admin2":
                 st.session_state.user_author_key = ek
                 st.query_params["ak"] = ek
                 if "admin2_authenticated" in st.session_state: del st.session_state.admin2_authenticated
-                components.html(f"<script>localStorage.setItem('koder_author_key2', '{ek}'); window.parent.location.href = window.parent.location.pathname + '?ak={ek}';</script>", height=0, width=0)
                 st.rerun()
         st.stop()
 
@@ -151,11 +131,9 @@ if current_user == "admin2":
     with rc1:
         current_data = load_global_data()
         
-        # --- ZMIANA / USUWANIE HASŁEM ADMINÓW I MODERATORÓW ORAZ SZYBKIE PRZEŁĄCZANIE ---
         st.markdown("### 🛠️ Szybkie przełączanie oraz Zarządzanie Hasłami Kadry")
         st.write("Jako `admin2` możesz automatycznie zalogować się na konto dowolnego Administratora lub zmienić/usunąć zabezpieczenie hasłem wybranego członka kadry.")
         
-        # Lista adminów do szybkiego przełączania i edycji
         st.markdown("#### 🛡️ Administratorzy (`admins`)")
         current_admins_list = current_data.get("admins", [])
         all_admins_to_manage = ["admin"] + [a for a in current_admins_list if a != "admin"]
@@ -182,17 +160,20 @@ if current_user == "admin2":
                         current_data["user_data"][adm_k] = {}
                     current_data["user_data"][adm_k]["password"] = new_h_input.strip()
                     save_global_data(current_data)
+                    st.session_state.global_store = current_data
                     st.success(f"Zmieniono hasło dla {adm_k}!")
                     st.rerun()
             with acol3:
                 if has_p and st.button("Usuń hasło", key=f"a2_clear_pass_adm_{adm_k}_{adm_idx}", use_container_width=True):
                     current_data["user_data"][adm_k]["password"] = ""
                     save_global_data(current_data)
+                    st.session_state.global_store = current_data
                     st.rerun()
                 if adm_k != "admin" and st.button("💥 Usuń rangę", key=f"a2_strip_adm_{adm_idx}", type="primary", use_container_width=True):
                     if adm_k in current_data.get("admins", []):
                         current_data["admins"].remove(adm_k)
                         save_global_data(current_data)
+                        st.session_state.global_store = current_data
                         st.rerun()
                         
         st.write("---")
@@ -217,17 +198,20 @@ if current_user == "admin2":
                             current_data["user_data"][mod_k] = {}
                         current_data["user_data"][mod_k]["password"] = new_h_mod_input.strip()
                         save_global_data(current_data)
+                        st.session_state.global_store = current_data
                         st.success(f"Zmieniono hasło dla moderatora {mod_k}!")
                         st.rerun()
                 with mcol3:
                     if has_p and st.button("Usuń hasło", key=f"a2_clear_pass_mod_{mod_k}_{mod_idx}", use_container_width=True):
                         current_data["user_data"][mod_k]["password"] = ""
                         save_global_data(current_data)
+                        st.session_state.global_store = current_data
                         st.rerun()
                     if st.button("💥 Usuń rangę", key=f"a2_strip_mod_{mod_idx}", type="primary", use_container_width=True):
                         if mod_k in current_data.get("moderators", []):
                             current_data["moderators"].remove(mod_k)
                             save_global_data(current_data)
+                            st.session_state.global_store = current_data
                             st.rerun()
 
         st.write("---")
@@ -251,22 +235,24 @@ if current_user == "admin2":
                             current_data["user_data"][vip_k] = {}
                         current_data["user_data"][vip_k]["password"] = new_h_vip_input.strip()
                         save_global_data(current_data)
+                        st.session_state.global_store = current_data
                         st.success(f"Zmieniono hasło dla VIP-a {vip_k}!")
                         st.rerun()
                 with vcol3:
                     if has_p and st.button("Usuń hasło", key=f"a2_clear_pass_vip_{vip_k}_{vip_idx}", use_container_width=True):
                         current_data["user_data"][vip_k]["password"] = ""
                         save_global_data(current_data)
+                        st.session_state.global_store = current_data
                         st.rerun()
                     if st.button("💥 Usuń rangę", key=f"a2_strip_vip_{vip_idx}", type="primary", use_container_width=True):
                         if vip_k in current_data.get("vips", []):
                             current_data["vips"].remove(vip_k)
                             save_global_data(current_data)
+                            st.session_state.global_store = current_data
                             st.rerun()
 
         st.write("---")
         
-        # --- USUWANIE KONT TAK JAKBY NIE ISTNIAŁY (WIPE) ---
         st.markdown("### 🚨 Permanentne Wymazywanie Kont (Wipe)")
         st.write("Funkcja ta pozwala na całkowite usunięcie profilu użytkownika z bazy strukturalnej aplikacji (plik JSON). Konto znika bezpowrotnie.")
         
@@ -297,7 +283,6 @@ if current_user == "admin2":
                         st.rerun()
 
         st.write("---")
-        # Podgląd Kodu Bezpieczeństwa konta
         st.markdown("#### 🔍 Podgląd Kodu Bezpieczeństwa konta")
         with st.form("admin2_check_secure_code_form"):
             search_account_key = st.text_input("Wpisz klucz konta (ID) użytkownika:", placeholder="np. mojekonto123").strip()
@@ -322,13 +307,6 @@ if current_user == "admin2":
                 st.session_state.user_author_key = tbk
                 st.query_params["ak"] = tbk
                 if "admin2_authenticated" in st.session_state: del st.session_state.admin2_authenticated
-                components.html(f"""
-                    <script>
-                        localStorage.removeItem("auth_admin2");
-                        localStorage.setItem("koder_author_key2", "{tbk}");
-                        window.parent.location.href = window.parent.location.pathname + "?ak={tbk}";
-                    </script>
-                """, height=0, width=0)
                 st.rerun()
     st.stop()
 
@@ -338,17 +316,6 @@ if not current_user:
     st.title("📟 Witamy w aplikacji Koder")
     st.write("Aby korzystać z systemu kodowania oraz paneli społecznościowych, musisz posiadać konto.")
     
-    components.html("""
-        <script>
-            var savedKey = localStorage.getItem("koder_author_key2");
-            if (savedKey) {
-                var currentUrl = new URL(window.parent.location.href);
-                currentUrl.searchParams.set("ak", savedKey);
-                window.parent.location.href = currentUrl.href;
-            }
-        </script>
-    """, height=0, width=0)
-
     tab_login, tab_register = st.tabs(["🔑 Zaloguj się", "📝 Załóż nowe konto"])
     
     with tab_register:
@@ -382,10 +349,8 @@ if not current_user:
                     if reg_pass.strip():
                         st.session_state.account_authenticated = True
                         st.query_params["auth"] = "true"
-                        components.html(f'<script>localStorage.setItem("auth_{reg_key}", "true"); window.parent.parent.location.href = window.parent.parent.location.pathname + "?ak={reg_key}&auth=true";</script>', height=0, width=0)
                     else:
                         st.session_state.account_authenticated = False
-                        components.html(f"<script>localStorage.setItem('koder_author_key2', '{reg_key}'); window.parent.parent.location.href = window.parent.parent.location.pathname + '?ak={reg_key}';</script>", height=0, width=0)
                         
                     st.success("🎉 Konto zostało pomyślnie utworzone!")
                     st.rerun()
@@ -412,13 +377,6 @@ if not current_user:
                         st.session_state.admin2_authenticated = True
                         st.query_params["ak"] = "admin2"
                         st.query_params["auth"] = "true"
-                        components.html("""
-                            <script>
-                                localStorage.setItem("koder_author_key2", "admin2");
-                                localStorage.setItem("auth_admin2", "true");
-                                window.parent.location.href = window.parent.location.pathname + "?ak=admin2&auth=true";
-                            </script>
-                        """, height=0, width=0)
                         st.rerun()
                     else:
                         st.error("❌ Błędne hasła ratunkowe dla konta admin2!")
@@ -435,10 +393,9 @@ if not current_user:
                         st.query_params["ak"] = log_key
                         if required_password:
                             st.session_state.account_authenticated = True
-                            components.html(f'<script>localStorage.setItem("auth_{log_key}", "true"); window.parent.location.href = window.parent.location.pathname + "?ak={log_key}&auth=true";</script>', height=0, width=0)
+                            st.query_params["auth"] = "true"
                         else:
                             st.session_state.account_authenticated = False
-                            components.html(f"<script>localStorage.setItem('koder_author_key2', '{log_key}'); window.parent.location.href = window.parent.location.pathname + '?ak={log_key}';</script>", height=0, width=0)
                         st.success("🔓 Zalogowano pomyślnie!")
                         st.rerun()
     st.stop()
@@ -479,7 +436,6 @@ if is_real_admin and st.session_state.get("emulated_role") != "Właściciel/Admi
     is_staff = (current_emulation == "Moderator")
     has_kod3_access = (current_emulation in ["Moderator", "VIP"])
 else:
-    # Standardowe przypisanie ról dla pozostałych użytkowników
     is_root_admin = (current_user == "admin")  
     is_promoted_admin = (current_user in st.session_state.global_store.get("admins", [])) 
     is_admin = is_root_admin or is_promoted_admin
@@ -488,7 +444,7 @@ else:
     is_staff = is_admin or is_moderator  
     has_kod3_access = is_vip or is_staff
 
-# Zabezpieczenie integralności profilu - POBIERA ISTNIEJĄCE HASŁO ZAMIAST JE ZEROWAĆ
+# Zabezpieczenie integralności profilu
 if current_user not in st.session_state.global_store["user_data"]:
     st.session_state.global_store["user_data"][current_user] = {
         "history": [], "notepad": "", "has_liked": False, "saved_nick": current_user, 
@@ -580,17 +536,6 @@ if account_has_password and not st.session_state.account_authenticated:
     st.title("🔒 Konto zabezpieczone hasłem")
     st.write("Ten klucz konta ma przypisane hasło. Wprowadź je, aby uzyskać dostęp.")
     
-    components.html(f"""
-        <script>
-            var localAuthState = localStorage.getItem("auth_{current_user}");
-            var currentUrl = new URL(window.parent.location.href);
-            if (localAuthState === "true" && currentUrl.searchParams.get("auth") !== "true") {{
-                currentUrl.searchParams.set("auth", "true");
-                window.parent.location.href = currentUrl.href;
-            }}
-        </script>
-    """, height=0, width=0)
-    
     with st.form("login_password_form"):
         input_pass = st.text_input("Podaj hasło do profilu:", type="password", placeholder="Wpisz hasło...")
         submit_login = st.form_submit_button("🔒 Odblokuj dostęp")
@@ -599,15 +544,9 @@ if account_has_password and not st.session_state.account_authenticated:
             if input_pass.strip() == user_profile.get("password"):
                 st.session_state.account_authenticated = True
                 st.query_params["auth"] = "true"
-                components.html(f"""
-                    <script>
-                        localStorage.setItem("auth_{current_user}", "true");
-                        window.parent.location.href = window.parent.location.pathname + "?ak={current_user}&auth=true";
-                    </script>
-                """, height=0, width=0)
                 st.rerun()
             else:
-                st.error("❌ Nieprawidłowe hasło konto!")
+                st.error("❌ Nieprawidłowe hasło konta!")
     
     st.write("---")
     st.markdown("### 💡 Zapomniałeś hasła?")
@@ -651,8 +590,8 @@ if account_has_password and not st.session_state.account_authenticated:
     with st.expander("🔄 Chcesz zalogować się na inne konto?"):
         if st.button("🚪 Przejdź do ekranu wyboru konta"):
             st.session_state.user_author_key = ""
+            st.session_state.account_authenticated = False
             st.query_params.clear()
-            components.html("<script>localStorage.removeItem('koder_author_key2'); window.parent.location.href = window.parent.location.pathname;</script>", height=0, width=0)
             st.rerun()
     st.stop()
 
@@ -971,7 +910,7 @@ with c1:
                                         st.button("🔒 Zablokowane", key=f"lock_gmsg_{original_idx}", disabled=True, use_container_width=True)
 
                 else:
-                    st.subheader("💬 Prywatne Wiadomości 1 na 1")
+                    st.subheader("💬 Crywatne Wiadomości 1 na 1")
                     all_users = st.session_state.global_store.get("user_data", {})
                     mod_list = st.session_state.global_store.get("moderators", [])
                     admin_list = st.session_state.global_store.get("admins", [])
@@ -1024,7 +963,7 @@ with c1:
                         st.write(" ")
                         with st.container(height=260):
                             if not visible_dms:
-                                        st.caption(f"Brak historii z {target_label.split(' ')[0]}.")
+                                st.caption(f"Brak historii z {target_label.split(' ')[0]}.")
                             else:
                                 for original_dm_idx, dm in reversed(visible_dms):
                                     is_my_own_dm = (dm.get("sender_key") == current_user)
@@ -1199,7 +1138,7 @@ with c2:
             
             with st.container(height=280):
                 if not user_visible_messages:
-                    st.caption("Brak wiadomości in historii. Napisz wyżej, aby rozpocząć konwersację.")
+                    st.caption("Brak wiadomości w historii. Napisz wyżej, aby rozpocząć konwersację.")
                 else:
                     for msg in reversed(user_visible_messages):
                         if msg.get("sender_role") == "Użytkownik":
@@ -1226,15 +1165,13 @@ with col_like1:
     if not user_has_liked:
         if st.button("👍 Polub stronę", key="btn_like_page"):
             st.session_state.global_store["user_data"][current_user]["has_liked"] = True
-            total_likes = sum(1 for u in st.session_state.global_store["user_data"].values() if u.get("has_liked", False))
-            st.session_state.global_store["likes"] = total_likes
+            st.session_state.global_store["likes"] += 1
             save_global_data(st.session_state.global_store)
             st.rerun()
     else:
         if st.button("❌ Cofnij polubienie", type="primary", key="btn_unlike_page"):
             st.session_state.global_store["user_data"][current_user]["has_liked"] = False
-            total_likes = sum(1 for u in st.session_state.global_store["user_data"].values() if u.get("has_liked", False))
-            st.session_state.global_store["likes"] = total_likes
+            st.session_state.global_store["likes"] = max(0, st.session_state.global_store["likes"] - 1)
             save_global_data(st.session_state.global_store)
             st.rerun()
 with col_like2: st.write(f"Ta strona została polubiona już **{st.session_state.global_store.get('likes', 0)}** razy!")
@@ -1253,13 +1190,6 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
         st.session_state.account_authenticated = False
         if "emulated_role" in st.session_state: del st.session_state["emulated_role"]
         st.query_params.clear()
-        components.html(f"""
-            <script>
-                localStorage.removeItem("auth_{current_user}");
-                localStorage.removeItem("koder_author_key2");
-                window.parent.location.href = window.parent.location.pathname;
-            </script>
-        """, height=0, width=0)
         st.rerun()
             
     if not saved_password:
@@ -1271,7 +1201,6 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                 st.session_state.global_store["user_data"][current_user]["password"] = new_pass.strip()
                 save_global_data(st.session_state.global_store)
                 st.session_state.account_authenticated = True
-                components.html(f'<script>localStorage.setItem("auth_{current_user}", "true");</script>', height=0, width=0)
                 st.success("Hasło zostało pomyślnie ustawione!")
                 st.rerun()
     else:
@@ -1280,7 +1209,6 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
             st.session_state.global_store["user_data"][current_user]["password"] = ""
             save_global_data(st.session_state.global_store)
             st.session_state.account_authenticated = False
-            components.html(f'<script>localStorage.removeItem("auth_{current_user}");</script>', height=0, width=0)
             st.rerun()
             
     st.write("---")
@@ -1317,7 +1245,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                 save_global_data(st.session_state.global_store)
                 st.rerun()
 
-        # --- PANEL UPRAWNIEŃ (ZARZĄDZANIE SYSTEMEM PRZEZ KADRĘ) ---
+    # --- PANEL UPRAWNIEŃ (ZARZĄDZANIE SYSTEMEM PRZEZ KADRĘ) ---
     if (is_admin or is_moderator) and st.session_state.get("emulated_role") == "Właściciel/Admin (Domyślny)":
         st.write("---")
         st.subheader("👑 Panel Zarządzania Systemem (Widoczne tylko dla Kadry)")
@@ -1327,7 +1255,6 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
         else: 
             adm_tabs = st.tabs(["👥 Moderatorzy", "🌟 Ranga VIP"])
             
-        # --- ZAKŁADKA: MODERATORZY ---
         with adm_tabs[0]:
             current_mods = st.session_state.global_store.get("moderators", [])
             if is_admin:
@@ -1371,11 +1298,9 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                         else:
                             st.button("🔒 Brak uprawnień", key=f"no_perm_mod_{m_idx}", disabled=True, use_container_width=True)
 
-        # --- ZAKŁADKA: ZARZĄDZANIE VIPAMI (Dostępna dla Admina i MODERATORA) ---
+        # ZAKŁADKA: ZARZĄDZANIE VIPAMI
         with adm_tabs[2] if is_real_root_admin else adm_tabs[1]:
             current_vips = st.session_state.global_store.get("vips", [])
-            
-            # Formularz dostępny dla każdego członka kadry (Admin i Moderator)
             with st.form("add_vip_real_fixed_form", clear_on_submit=True):
                 vip_key_input = st.text_input("Wklej klucz konta, które chcesz awansować na VIP-a:")
                 submit_vip = st.form_submit_button("🌟 Nadaj uprawnienia VIP")
@@ -1398,23 +1323,6 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                         st.session_state.global_store = current_data
                         st.success(f"✅ Nadano rangę VIP dla `{target_key}`! Uzyskano pełen dostęp do Kodu 3.")
                         st.rerun()
-                        
-            if current_vips:
-                st.markdown("#### Zarejestrowani członkowie VIP:")
-                for v_idx, v_key in enumerate(current_vips):
-                    v_col1, v_col2 = st.columns([4.0, 2.0])
-                    with v_col1:
-                        v_nick = st.session_state.global_store["user_data"].get(v_key, {}).get("saved_nick", "")
-                        st.markdown(f"🌟 `{v_key}`" + (f" (Podpis: **{v_nick}**)" if v_nick else ""))
-                    with v_col2:
-                        # Przycisk usuwania również jest teraz aktywny dla obu ról
-                        if st.button("❌ Odbierz rangę VIP", key=f"remove_vip_{v_idx}", type="primary", use_container_width=True):
-                            current_data = load_global_data()
-                            if v_key in current_data.get("vips", []): current_data["vips"].remove(v_key)
-                            save_global_data(current_data)
-                            st.session_state.global_store = current_data
-                            st.rerun()
-
                         
             if current_vips:
                 st.markdown("#### Zarejestrowani członkowie VIP:")
@@ -1535,7 +1443,6 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                             st.rerun()
 
         elif not is_real_root_admin and is_admin:
-            # Widok dla adminów pomocniczych (z nadania) sprawdzający can_reset_passwords
             if user_profile.get("can_reset_passwords", False):
                 st.write("---")
                 st.markdown("### 🔒 Skrzynka próśb o reset haseł")
@@ -1581,7 +1488,6 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                 st.write("---")
                 st.info("ℹ️ Nie posiadasz uprawnień do resetowania haseł. Tylko Główny Administrator (admin) może Ci je nadać.")
 
-        # Modyfikacja domyślnych kolorów dostępna dla adminów
         if is_admin:
             st.write("---")
             st.markdown("#### 🎨 Modyfikacja Domyślnych Barw Aplikacji (Dla nowych użytkowników)")
