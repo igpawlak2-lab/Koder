@@ -1317,23 +1317,23 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                 save_global_data(st.session_state.global_store)
                 st.rerun()
 
-               # --- PANEL UPRAWNIEŃ (ZARZĄDZANIE SYSTEMEM PRZEZ KADRĘ) ---
+                       # --- PANEL UPRAWNIEŃ (ZARZĄDZANIE SYSTEMEM PRZEZ KADRĘ) ---
     current_role = st.session_state.get("emulated_role", "")
     
-    # Warunek wejściowy: wpuszczamy admina (gdy emuluje admina) LUB moderatora (gdy emuluje moderatora)
-    if (is_admin and current_role == "Właściciel/Admin (Domyślny)") or (is_moderator and current_role == "Moderator"):
+    # NOWY WARUNEK: Wpuszczamy jeśli użytkownik JEST adminem LUB jeśli JEST prawdziwym moderatorem
+    if is_admin or is_moderator:
         st.write("---")
         st.subheader("👑 Panel Zarządzania Systemem (Widoczne tylko dla Kadry)")
         
-        # POPRAWKA LOGIKI ZAKŁADEK: Sprawdzamy wybraną AKTUALNIE rolę, a nie sztywne uprawnienia konta
-        if current_role == "Właściciel/Admin (Domyślny)": 
+        # Ustalamy widok: Tylko główny admin w trybie admina widzi pełne zakładki. 
+        # Każdy inny przypadek (prawdziwy Moderator lub Admin w trybie Moderatora) widzi TYLKO VIP.
+        if is_admin and current_role == "Właściciel/Admin (Domyślny)": 
             adm_tabs = st.tabs(["👥 Moderatorzy", "🛡️ Administratorzy", "🌟 Ranga VIP", "🔑 Resetowanie Haseł"])
         else: 
-            # Gdy wybrano rolę "Moderator", tworzymy TYLKO JEDNĄ zakładkę wyłącznie dla VIP-ów
             adm_tabs = st.tabs(["🌟 Zarządzanie VIP"])
             
-        # --- BLOK DLA WŁAŚCICIELA / ADMINA ---
-        if current_role == "Właściciel/Admin (Domyślny)":
+        # --- BLOK PEŁNEGO ADMINISTRATORA (Właściciel / Admin w trybie domyślnym) ---
+        if is_admin and current_role == "Właściciel/Admin (Domyślny)":
             # --- ZAKŁADKA 1: MODERATORZY ---
             with adm_tabs[0]:
                 current_mods = st.session_state.global_store.get("moderators", [])
@@ -1431,7 +1431,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                                 if a_key in current_data["user_data"]: current_data["user_data"][a_key]["can_reset_passwords"] = False
                                 save_global_data(current_data)
                                 st.session_state.global_store = current_data
-                                st.rerun()
+                                r_rerun()
 
             # --- ZAKŁADKA 4: RESETOWANIE HASEŁ ---
             with adm_tabs[3]:
@@ -1476,9 +1476,9 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                             st.success("Hasło skasowane!")
                             st.rerun()
 
-        # --- SEKCJA WSPÓLNA LUB WYŁĄCZNA DLA MODERATORA (ZARZĄDZANIE VIP) ---
-        # Dla Admina to indeks 2, dla Moderatora to jedyny dostępny indeks 0
-        vip_tab_target = adm_tabs[2] if current_role == "Właściciel/Admin (Domyślny)" else adm_tabs[0]
+        # --- SEKCJA DLA MODERATORÓW ORAZ EMULACJI MODERATORA (ZARZĄDZANIE VIP) ---
+        # Przypisanie do odpowiedniej zakładki: dla pełnego admina to indeks 2, dla moderatora jedyny indeks 0
+        vip_tab_target = adm_tabs[2] if (is_admin and current_role == "Właściciel/Admin (Domyślny)") else adm_tabs[0]
         
         with vip_tab_target:
             current_vips = st.session_state.global_store.get("vips", [])
@@ -1525,7 +1525,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                             st.rerun()
 
         # --- MODYFIKACJA KOLORÓW (Tylko dla Admina) ---
-        if current_role == "Właściciel/Admin (Domyślny)" and is_admin:
+        if is_admin and current_role == "Właściciel/Admin (Domyślny)":
             st.write("---")
             st.markdown("#### 🎨 Modyfikacja Domyślnych Barw Aplikacji (Dla nowych użytkowników)")
             adm_cc1, adm_cc2, adm_cc3 = st.columns(3)
