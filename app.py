@@ -1323,7 +1323,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
     # Warunek wejściowy: Wpuszczamy jeśli użytkownik JEST adminem LUB jeśli JEST prawdziwym moderatorem
     if is_admin or is_moderator:
         st.write("---")
-        st.subheader("👑 Panel Zarządzania Systemem (Widoczne tylko dla Kadry)")
+        st.subheader("👑 Panel Zarządzania Systemem ")
         
         # Ustalamy widok: Tylko główny admin w trybie admina widzi pełne zakładki. 
         # Każdy inny przypadek (prawdziwy Moderator lub Admin w trybie Moderatora) widzi TYLKO VIP.
@@ -1526,7 +1526,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
 
         # --- POPRAWIONA SEKCJA: MODYFIKACJA KOLORÓW (Teraz widoczna dla całej kadry: Admin i Mod) ---
         st.write("---")
-        st.markdown("#### 🎨 Modyfikacja Domyślnych Barw Aplikacji (Dla nowych użytkowników)")
+        st.markdown("#### 🎨 Modyfikacja Domyślnych Barw Aplikacji ")
         adm_cc1, adm_cc2, adm_cc3 = st.columns(3)
         with adm_cc1: new_def_theme = st.color_picker("Domyślny przycisk wyboru:", value=def_theme, key="staff_def_theme")
         with adm_cc2: new_def_bg = st.color_picker("Domyślne tło aplikacji:", value=def_bg, key="staff_def_bg")
