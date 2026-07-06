@@ -67,6 +67,23 @@ def save_global_data(data):
     except:
         pass
 
+# --- AUTOMATYCZNE CZYSZCZENIE KONT TESTOWYCH PO 1 GODZINIE ---
+now = time.time()
+db_changed = False
+current_data = load_global_data()
+
+if "user_data" in current_data:
+    expired_keys = [k for k, v in current_data["user_data"].items() if v.get("is_temporary") and now > v.get("expire_at", 0)]
+    for k in expired_keys:
+        del current_data["user_data"][k]
+        if "admins" in current_data and k in current_data["admins"]: current_data["admins"].remove(k)
+        if "moderators" in current_data and k in current_data["moderators"]: current_data["moderators"].remove(k)
+        if "vips" in current_data and k in current_data["vips"]: current_data["vips"].remove(k)
+        db_changed = True
+
+if db_changed:
+    save_global_data(current_data)
+    st.session_state.global_store = current_data
 # Inicjalizacja głównego magazynu w stanu sesji
 if "global_store" not in st.session_state:
     st.session_state.global_store = load_global_data()
@@ -1317,13 +1334,16 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                 save_global_data(st.session_state.global_store)
                 st.rerun()
 
-                               # --- PANEL UPRAWNIEŃ (ZARZĄDZANIE SYSTEMEM PRZEZ KADRĘ) ---
+                                     # --- PANEL UPRAWNIEŃ (ZARZĄDZANIE SYSTEMEM PRZEZ KADRĘ) ---
     current_role = st.session_state.get("emulated_role", "")
+    current_user_key = st.session_state.get("user_key", "") # Pobieramy klucz aktualnie zalogowanego konta
     
+    import time # Potrzebne do obsługi kont czasowych (1h)
+
     # Warunek wejściowy: Wpuszczamy jeśli użytkownik JEST adminem LUB jeśli JEST prawdziwym moderatorem
     if is_admin or is_moderator:
         st.write("---")
-        st.subheader("👑 Panel Zarządzania Systemem ")
+        st.subheader("👑 Panel Zarządzania Systemem (Widoczne tylko dla Kadry)")
         
         # Ustalamy widok: Tylko główny admin w trybie admina widzi pełne zakładki. 
         # Każdy inny przypadek (prawdziwy Moderator lub Admin w trybie Moderatora) widzi TYLKO VIP.
@@ -1334,9 +1354,31 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
             
         # --- BLOK PEŁNEGO ADMINISTRATORA (Właściciel / Admin w trybie domyślnym) ---
         if is_admin and current_role == "Właściciel/Admin (Domyślny)":
+            
             # --- ZAKŁADKA 1: MODERATORZY ---
             with adm_tabs[0]:
                 current_mods = st.session_state.global_store.get("moderators", [])
+                
+                # PRZYCISK TESTOWY: Mod Test (Wygasa po 1h)
+                if st.button("🧪 Stwórz konto: MOD TEST (Ważne 1h)", key="btn_mod_test_gen"):
+                    test_mod_key = f"mod_test_{int(time.time())}"
+                    current_data = load_global_data()
+                    if "user_data" not in current_data: current_data["user_data"] = {}
+                    if "moderators" not in current_data: current_data["moderators"] = []
+                    
+                    # Tworzenie tymczasowego profilu
+                    current_data["user_data"][test_mod_key] = {
+                        "password": "test",
+                        "saved_nick": "Mod Testowy (1h)",
+                        "is_temporary": True,
+                        "expire_at": time.time() + 3600
+                    }
+                    current_data["moderators"].append(test_mod_key)
+                    save_global_data(current_data)
+                    st.session_state.global_store = current_data
+                    st.success(f"✅ Stworzono konto tymczasowe MOD. Klucz: `{test_mod_key}` (Hasło: `test`)")
+                    st.rerun()
+
                 with st.form("add_moderator_form", clear_on_submit=True):
                     mod_key_input = st.text_input("Wklej klucz konta, które chcesz awansować na Moderatora:")
                     submit_mod = st.form_submit_button("➕ Nadaj uprawnienia moderatora")
@@ -1363,7 +1405,9 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                         m_col1, m_col2 = st.columns([4.0, 2.0])
                         with m_col1:
                             u_nick = st.session_state.global_store["user_data"].get(m_key, {}).get("saved_nick", "")
-                            st.markdown(f"🔑 `{m_key}`" + (f" (Podpis: **{u_nick}**)" if u_nick else ""))
+                            is_temp = st.session_state.global_store["user_data"].get(m_key, {}).get("is_temporary", False)
+                            badge_temp = " ⏳ [KONTO TESTOWE]" if is_temp else ""
+                            st.markdown(f"🔑 `{m_key}`" + (f" (Podpis: **{u_nick}**)" if u_nick else "") + badge_temp)
                         with m_col2:
                             if st.button("❌ Odbierz rangę MOD", key=f"remove_mod_{m_idx}", type="primary", use_container_width=True):
                                 current_data = load_global_data()
@@ -1372,9 +1416,47 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                                 st.session_state.global_store = current_data
                                 st.rerun()
 
-            # --- ZAKŁADKA 2: ADMINISTRATORZY ---
+            # --- ZAKŁADKA 2: ADMINISTRATORZY (W tym Funkcje dla admin2) ---
             with adm_tabs[1]:
                 current_admins = st.session_state.global_store.get("admins", [])
+                
+                # PRZYCISK TESTOWY: Admin Test (Wygasa po 1h)
+                if st.button("🧪 Stwórz konto: ADMIN TEST (Ważne 1h)", key="btn_admin_test_gen"):
+                    test_adm_key = f"admin_test_{int(time.time())}"
+                    current_data = load_global_data()
+                    if "user_data" not in current_data: current_data["user_data"] = {}
+                    if "admins" not in current_data: current_data["admins"] = []
+                    
+                    current_data["user_data"][test_adm_key] = {
+                        "password": "test",
+                        "saved_nick": "Admin Testowy (1h)",
+                        "is_temporary": True,
+                        "expire_at": time.time() + 3600
+                    }
+                    current_data["admins"].append(test_adm_key)
+                    save_global_data(current_data)
+                    st.session_state.global_store = current_data
+                    st.success(f"✅ Stworzono konto tymczasowe ADMIN. Klucz: `{test_adm_key}` (Hasło: `test`)")
+                    st.rerun()
+
+                # --- 👑 SYSTEM PRZESIADKI DLA ADMIN2 ---
+                if current_user_key == "admin2":
+                    st.info("⚡ **Panel Autoryzacji admin2:** Masz uprawnienia do natychmiastowego logowania i zarządzania innymi administratorami.")
+                    
+                    # Lista kont adminów, na które admin2 może się przełączyć (w tym główny 'admin')
+                    switch_targets = ["admin"] + [a for a in current_admins if a != "admin2"]
+                    
+                    st.markdown("##### 🚀 Szybkie logowanie na konto administratora:")
+                    chosen_target = st.selectbox("Wybierz konto do przejęcia kontroli:", switch_targets, key="admin2_switch_select")
+                    
+                    if st.button(f"🔄 Zaloguj natychmiast jako: {chosen_target}", key="admin2_switch_execute_btn", type="primary"):
+                        st.session_state["user_key"] = chosen_target
+                        st.session_state["is_logged_in"] = True
+                        st.session_state["emulated_role"] = "Właściciel/Admin (Domyślny)"
+                        st.success(f"Przełączono! Sesja zmieniona na: **{chosen_target}**")
+                        st.rerun()
+                    st.write("---")
+
                 if current_admins:
                     st.markdown("#### 🔑 Przydziel uprawnienia do resetowania haseł")
                     wybrany_admin = st.selectbox("Wybierz administratora z nadania:", current_admins, key="root_select_admin_for_perms")
@@ -1422,8 +1504,10 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                         a_col1, a_col2 = st.columns([4.0, 2.0])
                         with a_col1:
                             u_nick = st.session_state.global_store["user_data"].get(a_key, {}).get("saved_nick", "")
+                            is_temp = st.session_state.global_store["user_data"].get(a_key, {}).get("is_temporary", False)
+                            badge_temp = " ⏳ [TEST]" if is_temp else ""
                             has_reset_badge = " [🔑 Ma dostęp do resetu]" if st.session_state.global_store["user_data"].get(a_key, {}).get("can_reset_passwords", False) else ""
-                            st.markdown(f"🛡️ `{a_key}`" + (f" (Podpis: **{u_nick}**)" if u_nick else "") + f"<span style='color: #5cb85c; font-weight: bold;'>{has_reset_badge}</span>", unsafe_allow_html=True)
+                            st.markdown(f"🛡️ `{a_key}`" + (f" (Podpis: **{u_nick}**)" if u_nick else "") + f"<span style='color: #5cb85c; font-weight: bold;'>{has_reset_badge}</span>" + badge_temp, unsafe_allow_html=True)
                         with a_col2:
                             if st.button("❌ Odbierz rangę ADMIN", key=f"remove_adm_{a_idx}", type="primary", use_container_width=True):
                                 current_data = load_global_data()
@@ -1477,12 +1561,49 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                             st.rerun()
 
         # --- SEKCJA DLA MODERATORÓW ORAZ EMULACJI MODERATORA (ZARZĄDZANIE VIP) ---
-        # Przypisanie do odpowiedniej zakładki: dla pełnego admina to indeks 2, dla moderatora jedyny indeks 0
         vip_tab_target = adm_tabs[2] if (is_admin and current_role == "Właściciel/Admin (Domyślny)") else adm_tabs[0]
         
         with vip_tab_target:
             current_vips = st.session_state.global_store.get("vips", [])
             
+            # PRZYCISKI TESTOWE DLA VIP I UŻYTKOWNIKA
+            v_btn_col1, v_btn_col2 = st.columns(2)
+            with v_btn_col1:
+                if st.button("🧪 Stwórz konto: VIP TEST (Ważne 1h)", key="btn_vip_test_gen", use_container_width=True):
+                    test_vip_key = f"vip_test_{int(time.time())}"
+                    current_data = load_global_data()
+                    if "user_data" not in current_data: current_data["user_data"] = {}
+                    if "vips" not in current_data: current_data["vips"] = []
+                    
+                    current_data["user_data"][test_vip_key] = {
+                        "password": "test",
+                        "saved_nick": "VIP Testowy (1h)",
+                        "is_temporary": True,
+                        "expire_at": time.time() + 3600
+                    }
+                    current_data["vips"].append(test_vip_key)
+                    save_global_data(current_data)
+                    st.session_state.global_store = current_data
+                    st.success(f"✅ Stworzono konto VIP TEST! Klucz: `{test_vip_key}`")
+                    st.rerun()
+                    
+            with v_btn_col2:
+                if st.button("🧪 Stwórz konto: UŻYTKOWNIK TEST (Ważne 1h)", key="btn_user_test_gen", use_container_width=True):
+                    test_user_key = f"user_test_{int(time.time())}"
+                    current_data = load_global_data()
+                    if "user_data" not in current_data: current_data["user_data"] = {}
+                    
+                    current_data["user_data"][test_user_key] = {
+                        "password": "test",
+                        "saved_nick": "Zwykły User Test (1h)",
+                        "is_temporary": True,
+                        "expire_at": time.time() + 3600
+                    }
+                    save_global_data(current_data)
+                    st.session_state.global_store = current_data
+                    st.success(f"✅ Stworzono zwykłe konto testowe! Klucz: `{test_user_key}`")
+                    st.rerun()
+
             with st.form("add_vip_real_fixed_form", clear_on_submit=True):
                 st.markdown("#### 🌟 Nadaj rangę VIP (Uprawnienie Kadry)")
                 vip_key_input = st.text_input("Wklej klucz konta, które chcesz awansować na VIP-a:")
@@ -1515,7 +1636,9 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                     v_col1, v_col2 = st.columns([4.0, 2.0])
                     with v_col1:
                         v_nick = st.session_state.global_store["user_data"].get(v_key, {}).get("saved_nick", "")
-                        st.markdown(f"🌟 `{v_key}`" + (f" (Podpis: **{v_nick}**)" if v_nick else ""))
+                        is_temp = st.session_state.global_store["user_data"].get(v_key, {}).get("is_temporary", False)
+                        badge_temp = " ⏳ [TEST]" if is_temp else ""
+                        st.markdown(f"🌟 `{v_key}`" + (f" (Podpis: **{v_nick}**)" if v_nick else "") + badge_temp)
                     with v_col2:
                         if st.button("❌ Odbierz rangę VIP", key=f"remove_vip_act_{v_idx}", type="primary", use_container_width=True):
                             current_data = load_global_data()
@@ -1524,9 +1647,9 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                             st.session_state.global_store = current_data
                             st.rerun()
 
-        # --- POPRAWIONA SEKCJA: MODYFIKACJA KOLORÓW (Teraz widoczna dla całej kadry: Admin i Mod) ---
+        # --- SEKCJA: MODYFIKACJA KOLORÓW (Widoczna dla całej kadry: Admin i Mod) ---
         st.write("---")
-        st.markdown("#### 🎨 Modyfikacja Domyślnych Barw Aplikacji ")
+        st.markdown("#### 🎨 Modyfikacja Domyślnych Barw Aplikacji (Dla nowych użytkowników)")
         adm_cc1, adm_cc2, adm_cc3 = st.columns(3)
         with adm_cc1: new_def_theme = st.color_picker("Domyślny przycisk wyboru:", value=def_theme, key="staff_def_theme")
         with adm_cc2: new_def_bg = st.color_picker("Domyślne tło aplikacji:", value=def_bg, key="staff_def_bg")
