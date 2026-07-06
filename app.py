@@ -1317,10 +1317,10 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                 save_global_data(st.session_state.global_store)
                 st.rerun()
 
-                       # --- PANEL UPRAWNIEŃ (ZARZĄDZANIE SYSTEMEM PRZEZ KADRĘ) ---
+                               # --- PANEL UPRAWNIEŃ (ZARZĄDZANIE SYSTEMEM PRZEZ KADRĘ) ---
     current_role = st.session_state.get("emulated_role", "")
     
-    # NOWY WARUNEK: Wpuszczamy jeśli użytkownik JEST adminem LUB jeśli JEST prawdziwym moderatorem
+    # Warunek wejściowy: Wpuszczamy jeśli użytkownik JEST adminem LUB jeśli JEST prawdziwym moderatorem
     if is_admin or is_moderator:
         st.write("---")
         st.subheader("👑 Panel Zarządzania Systemem (Widoczne tylko dla Kadry)")
@@ -1431,7 +1431,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                                 if a_key in current_data["user_data"]: current_data["user_data"][a_key]["can_reset_passwords"] = False
                                 save_global_data(current_data)
                                 st.session_state.global_store = current_data
-                                r_rerun()
+                                st.rerun()
 
             # --- ZAKŁADKA 4: RESETOWANIE HASEŁ ---
             with adm_tabs[3]:
@@ -1524,20 +1524,20 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                             st.session_state.global_store = current_data
                             st.rerun()
 
-        # --- MODYFIKACJA KOLORÓW (Tylko dla Admina) ---
-        if is_admin and current_role == "Właściciel/Admin (Domyślny)":
-            st.write("---")
-            st.markdown("#### 🎨 Modyfikacja Domyślnych Barw Aplikacji (Dla nowych użytkowników)")
-            adm_cc1, adm_cc2, adm_cc3 = st.columns(3)
-            with adm_cc1: new_def_theme = st.color_picker("Domyślny przycisk wyboru:", value=def_theme, key="admin_def_theme")
-            with adm_cc2: new_def_bg = st.color_picker("Domyślne tło aplikacji:", value=def_bg, key="admin_def_bg")
-            with adm_cc3: new_def_clear = st.color_picker("Domyślne przyciski akcji:", value=def_clear, key="admin_def_clear")
-            if (new_def_theme != def_theme) or (new_def_bg != def_bg) or (new_def_clear != def_clear):
-                current_data = load_global_data()
-                current_data["default_theme_color"], current_data["default_bg_color"], current_data["default_clear_btn_color"] = new_def_theme, new_def_bg, new_def_clear
-                save_global_data(current_data)
-                st.session_state.global_store = current_data
-                st.rerun()
+        # --- POPRAWIONA SEKCJA: MODYFIKACJA KOLORÓW (Teraz widoczna dla całej kadry: Admin i Mod) ---
+        st.write("---")
+        st.markdown("#### 🎨 Modyfikacja Domyślnych Barw Aplikacji (Dla nowych użytkowników)")
+        adm_cc1, adm_cc2, adm_cc3 = st.columns(3)
+        with adm_cc1: new_def_theme = st.color_picker("Domyślny przycisk wyboru:", value=def_theme, key="staff_def_theme")
+        with adm_cc2: new_def_bg = st.color_picker("Domyślne tło aplikacji:", value=def_bg, key="staff_def_bg")
+        with adm_cc3: new_def_clear = st.color_picker("Domyślne przyciski akcji:", value=def_clear, key="staff_def_clear")
+        
+        if (new_def_theme != def_theme) or (new_def_bg != def_bg) or (new_def_clear != def_clear):
+            current_data = load_global_data()
+            current_data["default_theme_color"], current_data["default_bg_color"], current_data["default_clear_btn_color"] = new_def_theme, new_def_bg, new_def_clear
+            save_global_data(current_data)
+            st.session_state.global_store = current_data
+            st.rerun()
 
     st.write("---")
     st.write("**Twój unikalny klucz konta:**")
