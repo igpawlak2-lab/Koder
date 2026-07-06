@@ -69,9 +69,7 @@ def save_global_data(data):
 
 
 
-if db_changed:
-    save_global_data(current_data)
-    st.session_state.global_store = current_data
+
 # Inicjalizacja głównego magazynu w stanu sesji
 if "global_store" not in st.session_state:
     st.session_state.global_store = load_global_data()
