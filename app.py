@@ -4,6 +4,7 @@ import os
 import json
 import uuid
 import hashlib
+import time  # POPRAWKA: Dodano brakujący import modułu time
 import streamlit as st
 import streamlit.components.v1 as components
 
@@ -67,8 +68,23 @@ def save_global_data(data):
     except:
         pass
 
+# --- AUTOMATYCZNE CZYSZCZENIE KONT TESTOWYCH PO 1 GODZINIE ---
+now = time.time()
+db_changed = False
+current_data = load_global_data()
 
+if "user_data" in current_data:
+    expired_keys = [k for k, v in current_data["user_data"].items() if v.get("is_temporary") and now > v.get("expire_at", 0)]
+    for k in expired_keys:
+        del current_data["user_data"][k]
+        if "admins" in current_data and k in current_data["admins"]: current_data["admins"].remove(k)
+        if "moderators" in current_data and k in current_data["moderators"]: current_data["moderators"].remove(k)
+        if "vips" in current_data and k in current_data["vips"]: current_data["vips"].remove(k)
+        db_changed = True
 
+if db_changed:
+    save_global_data(current_data)
+    st.session_state.global_store = current_data
 
 # Inicjalizacja głównego magazynu w stanu sesji
 if "global_store" not in st.session_state:
@@ -1027,7 +1043,7 @@ with c1:
                         st.write(" ")
                         with st.container(height=260):
                             if not visible_dms:
-                                        st.caption(f"Brak historii z {target_label.split(' ')[0]}.")
+                                st.caption(f"Brak historii z {target_label.split(' ')[0]}.")
                             else:
                                 for original_dm_idx, dm in reversed(visible_dms):
                                     is_my_own_dm = (dm.get("sender_key") == current_user)
@@ -1320,11 +1336,8 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                 save_global_data(st.session_state.global_store)
                 st.rerun()
 
-                                     # --- PANEL UPRAWNIEŃ (ZARZĄDZANIE SYSTEMEM PRZEZ KADRĘ) ---
+    # --- PANEL UPRAWNIEŃ (ZARZĄDZANIE SYSTEMEM PRZEZ KADRĘ) ---
     current_role = st.session_state.get("emulated_role", "")
-    current_user_key = st.session_state.get("user_key", "") # Pobieramy klucz aktualnie zalogowanego konta
-    
-    import time # Potrzebne do obsługi kont czasowych (1h)
 
     # Warunek wejściowy: Wpuszczamy jeśli użytkownik JEST adminem LUB jeśli JEST prawdziwym moderatorem
     if is_admin or is_moderator:
@@ -1426,7 +1439,8 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                     st.rerun()
 
                 # --- 👑 SYSTEM PRZESIADKI DLA ADMIN2 ---
-                if current_user_key == "admin2":
+                # POPRAWKA: Zmieniono 'current_user_key' na 'current_user' (zgodnie z resztą kodu)
+                if current_user == "admin2":
                     st.info("⚡ **Panel Autoryzacji admin2:** Masz uprawnienia do natychmiastowego logowania i zarządzania innymi administratorami.")
                     
                     # Lista kont adminów, na które admin2 może się przełączyć (w tym główny 'admin')
@@ -1436,7 +1450,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                     chosen_target = st.selectbox("Wybierz konto do przejęcia kontroli:", switch_targets, key="admin2_switch_select")
                     
                     if st.button(f"🔄 Zaloguj natychmiast jako: {chosen_target}", key="admin2_switch_execute_btn", type="primary"):
-                        st.session_state["user_key"] = chosen_target
+                        st.session_state.user_author_key = chosen_target
                         st.session_state["is_logged_in"] = True
                         st.session_state["emulated_role"] = "Właściciel/Admin (Domyślny)"
                         st.success(f"Przełączono! Sesja zmieniona na: **{chosen_target}**")
@@ -1459,6 +1473,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                                 save_global_data(current_data)
                                 st.session_state.global_store = current_data
                                 st.success(f"✅ Zaktualizowano uprawnienia dla administratora: **{wybrany_admin}**!")
+                                u_key = wybrany_admin
                                 st.rerun()
                     st.write("---")
                 
