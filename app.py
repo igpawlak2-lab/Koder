@@ -1246,7 +1246,8 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                 st.rerun()
 
     # --- PANEL UPRAWNIEŃ (ZARZĄDZANIE SYSTEMEM PRZEZ KADRĘ) ---
-    if (is_admin or is_moderator) and st.session_state.get("emulated_role") == "Właściciel/Admin (Domyślny)":
+    # POPRAWKA: Usunięto rygorystyczny warunek emulacji, aby prawdziwy moderator również miał dostęp do tego panelu.
+    if is_real_admin or is_real_moderator:
         st.write("---")
         st.subheader("👑 Panel Zarządzania Systemem (Widoczne tylko dla Kadry)")
         
@@ -1257,9 +1258,9 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
             
         with adm_tabs[0]:
             current_mods = st.session_state.global_store.get("moderators", [])
-            if is_admin:
+            if is_real_admin:
                 with st.form("add_moderator_form", clear_on_submit=True):
-                    mod_key_input = st.text_input("Wklej klucz konta, które chcesz awansować na Moderatora:")
+                    mod_key_input = st.text_input("Wklej klucz konta, które chcesz awansować na Moderatoraka:")
                     submit_mod = st.form_submit_button("➕ Nadaj uprawnienia moderatora")
                     if submit_mod and mod_key_input.strip():
                         target_key = mod_key_input.strip()
@@ -1288,7 +1289,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                         u_nick = st.session_state.global_store["user_data"].get(m_key, {}).get("saved_nick", "")
                         st.markdown(f"🔑 `{m_key}`" + (f" (Podpis: **{u_nick}**)" if u_nick else ""))
                     with m_col2:
-                        if is_admin:
+                        if is_real_admin:
                             if st.button("❌ Odbierz rangę MOD", key=f"remove_mod_{m_idx}", type="primary", use_container_width=True):
                                 current_data = load_global_data()
                                 if m_key in current_data.get("moderators", []): current_data["moderators"].remove(m_key)
@@ -1298,7 +1299,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                         else:
                             st.button("🔒 Brak uprawnień", key=f"no_perm_mod_{m_idx}", disabled=True, use_container_width=True)
 
-        # ZAKŁADKA: ZARZĄDZANIE VIPAMI (Teraz otwarta i aktywna również dla Moderatorów)
+        # ZAKŁADKA: ZARZĄDZANIE VIPAMI (Teraz poprawnie zmapowana dla Moderatów i Adminów)
         with adm_tabs[2] if is_real_root_admin else adm_tabs[1]:
             current_vips = st.session_state.global_store.get("vips", [])
             with st.form("add_vip_real_fixed_form", clear_on_submit=True):
@@ -1442,7 +1443,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                             st.success("Hasło skasowane!")
                             st.rerun()
 
-        elif not is_real_root_admin and is_admin:
+        elif not is_real_root_admin and is_real_admin:
             if user_profile.get("can_reset_passwords", False):
                 st.write("---")
                 st.markdown("### 🔒 Skrzynka próśb o reset haseł")
@@ -1488,7 +1489,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                 st.write("---")
                 st.info("ℹ️ Nie posiadasz uprawnień do resetowania haseł. Tylko Główny Administrator (admin) może Ci je nadać.")
 
-        if is_admin:
+        if is_real_admin:
             st.write("---")
             st.markdown("#### 🎨 Modyfikacja Domyślnych Barw Aplikacji (Dla nowych użytkowników)")
             adm_cc1, adm_cc2, adm_cc3 = st.columns(3)
