@@ -67,19 +67,7 @@ def save_global_data(data):
     except:
         pass
 
-# --- AUTOMATYCZNE CZYSZCZENIE KONT TESTOWYCH PO 1 GODZINIE ---
-now = time.time()
-db_changed = False
-current_data = load_global_data()
 
-if "user_data" in current_data:
-    expired_keys = [k for k, v in current_data["user_data"].items() if v.get("is_temporary") and now > v.get("expire_at", 0)]
-    for k in expired_keys:
-        del current_data["user_data"][k]
-        if "admins" in current_data and k in current_data["admins"]: current_data["admins"].remove(k)
-        if "moderators" in current_data and k in current_data["moderators"]: current_data["moderators"].remove(k)
-        if "vips" in current_data and k in current_data["vips"]: current_data["vips"].remove(k)
-        db_changed = True
 
 if db_changed:
     save_global_data(current_data)
