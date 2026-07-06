@@ -205,6 +205,67 @@ if current_user == "admin2":
                 st.success(f"Dodano! Klucz: `{test_key}`"); st.rerun()
                 
         st.write("---")
+
+        # --- NOWOŚĆ: ZARZĄDZANIE RANGAMI BEZPOŚREDNIO Z PANELU ADMIN2 ---
+        st.markdown("### 👑 Zarządzanie Rangami z Poziomu Awaryjnego")
+        with st.form("admin2_grant_roles_form", clear_on_submit=True):
+            target_key_a2 = st.text_input("Wpisz klucz konta (ID) użytkownika do nadania/zmiany rangi:").strip()
+            chosen_role_a2 = st.selectbox("Wybierz rangę docelową:", ["Zwykły Użytkownik", "VIP", "Moderator", "Administrator"])
+            submit_role_a2 = st.form_submit_button("⚡ Zatwierdź rangę w systemie")
+            
+            if submit_role_a2 and target_key_a2:
+                if target_key_a2 in current_data.get("user_data", {}):
+                    # Czyszczenie starych rang
+                    if target_key_a2 in current_data.get("admins", []): current_data["admins"].remove(target_key_a2)
+                    if target_key_a2 in current_data.get("moderators", []): current_data["moderators"].remove(target_key_a2)
+                    if target_key_a2 in current_data.get("vips", []): current_data["vips"].remove(target_key_a2)
+                    
+                    # Nadawanie nowej rangi
+                    if chosen_role_a2 == "Administrator":
+                        if "admins" not in current_data: current_data["admins"] = []
+                        current_data["admins"].append(target_key_a2)
+                    elif chosen_role_a2 == "Moderator":
+                        if "moderators" not in current_data: current_data["moderators"] = []
+                        current_data["moderators"].append(target_key_a2)
+                    elif chosen_role_a2 == "VIP":
+                        if "vips" not in current_data: current_data["vips"] = []
+                        current_data["vips"].append(target_key_a2)
+                        
+                    save_global_data(current_data)
+                    st.session_state.global_store = current_data
+                    st.success(f"✅ Zaktualizowano rangę dla konta `{target_key_a2}` na status: **{chosen_role_a2}**")
+                    st.rerun()
+                else:
+                    st.error("❌ Podane konto nie istnieje w bazie danych profilu.")
+
+        st.write("---")
+
+        # --- NOWOŚĆ: NIEZALEŻNY PANEL RESETU HASEŁ DLA ADMIN2 ---
+        st.markdown("### 🔑 Awaryjne Resetowanie Haseł Użytkowników")
+        resets_list_a2 = current_data.get("password_resets", [])
+        if resets_list_a2:
+            st.markdown("💬 *Oczekujące prośby o reset od użytkowników:*")
+            for r_idx_a2, req_a2 in enumerate(resets_list_a2):
+                st.warning(f"Konto: `{req_a2.get('author_key')}` ({req_a2.get('sender_nick')}) zgłosiło kod: **{req_a2.get('text')}**")
+        
+        with st.form("admin2_direct_reset_password_form", clear_on_submit=True):
+            input_reset_key_a2 = st.text_input("Wpisz klucz konta (ID) do skasowania hasła:")
+            input_reset_code_a2 = st.text_input("Wpisz 6-cyfrowy Kod Bezpieczeństwa konta:")
+            submit_reset_a2 = st.form_submit_button("💥 Całkowicie usuń hasło wybranego profilu")
+            
+            if submit_reset_a2:
+                rk_a2, rc_a2 = input_reset_key_a2.strip(), input_reset_code_a2.strip()
+                if rk_a2 in current_data.get("user_data", {}) and rc_a2 == generate_account_secure_code(rk_a2):
+                    current_data["user_data"][rk_a2]["password"] = ""
+                    current_data["password_resets"] = [m for m in current_data["password_resets"] if m.get("author_key") != rk_a2]
+                    save_global_data(current_data)
+                    st.session_state.global_store = current_data
+                    st.success(f"✅ Hasło profilu `{rk_a2}` zostało wyzerowane pomyślnie!")
+                    st.rerun()
+                else:
+                    st.error("❌ Błędny klucz konta lub nieprawidłowy przypisany Kod Bezpieczeństwa!")
+
+        st.write("---")
         
         # --- ZMIANA / USUWANIE HASŁEM ADMINÓW I MODERATORÓW ORAZ SZYBKIE PRZEŁĄCZANIE ---
         st.markdown("### 🛠️ Szybkie przełączanie oraz Zarządzanie Hasłami Kadry")
@@ -1399,18 +1460,20 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
     # --- PANEL UPRAWNIEŃ (ZARZĄDZANIE SYSTEMEM PRZEZ KADRĘ) ---
     current_role = st.session_state.get("emulated_role", "")
 
-    # Warunek wejściowy: Wpuszczamy jeśli użytkownik JEST adminem LUB jeśli JEST prawdziwym moderatorem
     if is_admin or is_moderator:
         st.write("---")
         st.subheader("👑 Panel Zarządzania Systemem (Widoczne tylko dla Kadry)")
         
-        # POPRAWKA: Usunięto z widoku kadry przyciski tworzenia kont testowych (przeniesione wyłącznie do admin2)
+        # Ograniczenie zakładek dla promowanych adminów z nadania oraz moderatorów
         if is_admin and current_role == "Właściciel/Admin (Domyślny)": 
-            adm_tabs = st.tabs(["👥 Moderatorzy", "🛡️ Administratorzy", "🌟 Ranga VIP", "🔑 Resetowanie Haseł"])
+            if can_user_reset_passwords:
+                adm_tabs = st.tabs(["👥 Moderatorzy", "🛡️ Administratorzy", "🌟 Ranga VIP", "🔑 Resetowanie Haseł"])
+            else:
+                adm_tabs = st.tabs(["👥 Moderatorzy", "🛡️ Administratorzy", "🌟 Ranga VIP"])
         else: 
             adm_tabs = st.tabs(["🌟 Zarządzanie VIP"])
             
-        # --- BLOK PEŁNEGO ADMINISTRATORA (Właściciel / Admin w trybie domyślnym) ---
+        # --- BLOK DLA PEŁNEGO / WYŻSZEGO STAFFU (Właściciel / Admin w trybie domyślnym) ---
         if is_admin and current_role == "Właściciel/Admin (Domyślny)":
             
             # --- ZAKŁADKA 1: MODERATORZY ---
@@ -1458,7 +1521,8 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
             with adm_tabs[1]:
                 current_admins = st.session_state.global_store.get("admins", [])
 
-                if current_admins:
+                # Blok przydzielania uprawnień (Tylko dla głównego konta "admin")
+                if is_real_root_admin and current_admins:
                     st.markdown("#### 🔑 Przydziel uprawnienia do resetowania haseł")
                     wybrany_admin = st.selectbox("Wybierz administratora z nadania:", current_admins, key="root_select_admin_for_perms")
                     
@@ -1477,27 +1541,31 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                                 st.rerun()
                     st.write("---")
                 
-                with st.form("add_admin_form", clear_on_submit=True):
-                    adm_key_input = st.text_input("Wklej klucz konta, które chcesz awansować na Administratora:")
-                    submit_adm = st.form_submit_button("👑 Nadaj uprawnienia administratora")
-                    if submit_adm and adm_key_input.strip():
-                        target_key = adm_key_input.strip()
-                        target_user_profile = st.session_state.global_store.get("user_data", {}).get(target_key, {})
-                        target_password = target_user_profile.get("password", "").strip()
-                        
-                        if target_key != "admin" and target_key not in current_admins:
-                            if not target_password:
-                                st.error("❌ Błąd bezpieczeństwa: Użytkownik musi najpierw ustawić hasło na swoim koncie, aby otrzymać rangę Administratora!")
-                            else:
-                                current_data = load_global_data()
-                                if "admins" not in current_data: current_data["admins"] = []
-                                current_data["admins"].append(target_key)
-                                if "moderators" in current_data and target_key in current_data["moderators"]: current_data["moderators"].remove(target_key)
-                                if "vips" in current_data and target_key in current_data["vips"]: current_data["vips"].remove(target_key)
-                                save_global_data(current_data)
-                                st.session_state.global_store = current_data
-                                st.success(f"🛡️ Nadano rangę Administratora dla `{target_key}`")
-                                st.rerun()
+                # Formularz nadawania rangi ADMIN (Ukryty dla adminów z nadania)
+                if is_real_root_admin:
+                    with st.form("add_admin_form", clear_on_submit=True):
+                        adm_key_input = st.text_input("Wklej klucz konta, które chcesz awansować na Administratora:")
+                        submit_adm = st.form_submit_button("👑 Nadaj uprawnienia administratora")
+                        if submit_adm and adm_key_input.strip():
+                            target_key = adm_key_input.strip()
+                            target_user_profile = st.session_state.global_store.get("user_data", {}).get(target_key, {})
+                            target_password = target_user_profile.get("password", "").strip()
+                            
+                            if target_key != "admin" and target_key not in current_admins:
+                                if not target_password:
+                                    st.error("❌ Błąd bezpieczeństwa: Użytkownik musi najpierw ustawić hasło na swoim koncie, aby otrzymać rangę Administratora!")
+                                else:
+                                    current_data = load_global_data()
+                                    if "admins" not in current_data: current_data["admins"] = []
+                                    current_data["admins"].append(target_key)
+                                    if "moderators" in current_data and target_key in current_data["moderators"]: current_data["moderators"].remove(target_key)
+                                    if "vips" in current_data and target_key in current_data["vips"]: current_data["vips"].remove(target_key)
+                                    save_global_data(current_data)
+                                    st.session_state.global_store = current_data
+                                    st.success(f"🛡️ Nadano rangę Administratora dla `{target_key}`")
+                                    st.rerun()
+                else:
+                    st.info("ℹ️ Jako administrator z nadania nie posiadasz uprawnień do tworzenia oraz mianowania nowych administratorów.")
                             
                 if current_admins:
                     st.markdown("#### Zarejestrowani Administratorzy:")
@@ -1510,58 +1578,62 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                             has_reset_badge = " [🔑 Ma dostęp do resetu]" if st.session_state.global_store["user_data"].get(a_key, {}).get("can_reset_passwords", False) else ""
                             st.markdown(f"🛡️ `{a_key}`" + (f" (Podpis: **{u_nick}**)" if u_nick else "") + f"<span style='color: #5cb85c; font-weight: bold;'>{has_reset_badge}</span>" + badge_temp, unsafe_allow_html=True)
                         with a_col2:
-                            if st.button("❌ Odbierz rangę ADMIN", key=f"remove_adm_{a_idx}", type="primary", use_container_width=True):
+                            if is_real_root_admin:
+                                if st.button("❌ Odbierz rangę ADMIN", key=f"remove_adm_{a_idx}", type="primary", use_container_width=True):
+                                    current_data = load_global_data()
+                                    if a_key in current_data.get("admins", []): current_data["admins"].remove(a_key)
+                                    if a_key in current_data["user_data"]: current_data["user_data"][a_key]["can_reset_passwords"] = False
+                                    save_global_data(current_data)
+                                    st.session_state.global_store = current_data
+                                    st.rerun()
+                            else:
+                                st.button("🔒 Zablokowane", key=f"disabled_strip_adm_{a_idx}", disabled=True, use_container_width=True)
+
+            # --- ZAKŁADKA 4: RESETOWANIE HASEŁ (Dynamicznie ukrywana) ---
+            if can_user_reset_passwords:
+                with adm_tabs[3]:
+                    st.markdown("### 🔒 Skrzynka próśb o reset haseł")
+                    resets_list = st.session_state.global_store.get("password_resets", [])
+                    with st.container(height=220):
+                        if not resets_list: st.caption("Brak nowych próśb.")
+                        else:
+                            for r_reversed_idx, req in enumerate(reversed(resets_list)):
+                                orig_req_idx = len(resets_list) - 1 - r_reversed_idx
+                                r_col1, r_col2 = st.columns([4.2, 1.8])
+                                with r_col1:
+                                    st.markdown(f"""
+                                        <div style="background-color: rgba(255,0,0,0.06); padding: 8px 12px; border-radius: 6px; margin-bottom: 8px; border-left: 4px solid #FF0000;">
+                                            <span style="color: #FF0000; font-weight: bold;">👤 Kto: {req.get('sender_nick')}</span>
+                                            <span style="font-size: 0.75rem; opacity: 0.5; margin-left: 10px;">Klucz: `{req.get('author_key')}`</span>
+                                            <p style="margin: 4px 0 0 0; font-size: 0.95rem;">{req.get('text')}</p>
+                                        </div>
+                                    """, unsafe_allow_html=True)
+                                with r_col2:
+                                    if st.button("🗑️ Odrzuć / Usuń", key=f"del_req_{orig_req_idx}", type="primary", use_container_width=True):
+                                        current_data = load_global_data()
+                                        if orig_req_idx < len(current_data["password_resets"]):
+                                            current_data["password_resets"].pop(orig_req_idx)
+                                            save_global_data(current_data)
+                                            st.session_state.global_store = current_data
+                                            st.rerun()
+
+                    st.write("---")
+                    with st.form("reset_user_password_form", clear_on_submit=True):
+                        reset_key = st.text_input("1. Klucz konta użytkownika (ID):")
+                        reset_code = st.text_input("2. Przepisany 6-cyfrowy Kod Bezpieczeństwa:")
+                        submit_reset = st.form_submit_button("💥 Całkowicie usuń hasło profilu")
+                        if submit_reset:
+                            rk, rc = reset_key.strip(), reset_code.strip()
+                            if rk in st.session_state.global_store.get("user_data", {}) and rc == generate_account_secure_code(rk):
                                 current_data = load_global_data()
-                                if a_key in current_data.get("admins", []): current_data["admins"].remove(a_key)
-                                if a_key in current_data["user_data"]: current_data["user_data"][a_key]["can_reset_passwords"] = False
+                                current_data["user_data"][rk]["password"] = ""
+                                current_data["password_resets"] = [m for m in current_data["password_resets"] if m.get("author_key") != rk]
                                 save_global_data(current_data)
                                 st.session_state.global_store = current_data
+                                st.success("Hasło skasowane!")
                                 st.rerun()
 
-            # --- ZAKŁADKA 4: RESETOWANIE HASEŁ ---
-            with adm_tabs[3]:
-                st.markdown("### 🔒 Skrzynka próśb o reset haseł")
-                resets_list = st.session_state.global_store.get("password_resets", [])
-                with st.container(height=220):
-                    if not resets_list: st.caption("Brak nowych próśb.")
-                    else:
-                        for r_reversed_idx, req in enumerate(reversed(resets_list)):
-                            orig_req_idx = len(resets_list) - 1 - r_reversed_idx
-                            r_col1, r_col2 = st.columns([4.2, 1.8])
-                            with r_col1:
-                                st.markdown(f"""
-                                    <div style="background-color: rgba(255,0,0,0.06); padding: 8px 12px; border-radius: 6px; margin-bottom: 8px; border-left: 4px solid #FF0000;">
-                                        <span style="color: #FF0000; font-weight: bold;">👤 Kto: {req.get('sender_nick')}</span>
-                                        <span style="font-size: 0.75rem; opacity: 0.5; margin-left: 10px;">Klucz: `{req.get('author_key')}`</span>
-                                        <p style="margin: 4px 0 0 0; font-size: 0.95rem;">{req.get('text')}</p>
-                                    </div>
-                                """, unsafe_allow_html=True)
-                            with r_col2:
-                                if st.button("🗑️ Odrzuć / Usuń", key=f"del_req_{orig_req_idx}", type="primary", use_container_width=True):
-                                    current_data = load_global_data()
-                                    if orig_req_idx < len(current_data["password_resets"]):
-                                        current_data["password_resets"].pop(orig_req_idx)
-                                        save_global_data(current_data)
-                                        st.session_state.global_store = current_data
-                                        st.rerun()
-
-                st.write("---")
-                with st.form("reset_user_password_form", clear_on_submit=True):
-                    reset_key = st.text_input("1. Klucz konta użytkownika (ID):")
-                    reset_code = st.text_input("2. Przepisany 6-cyfrowy Kod Bezpieczeństwa:")
-                    submit_reset = st.form_submit_button("💥 Całkowicie usuń hasło profilu")
-                    if submit_reset:
-                        rk, rc = reset_key.strip(), reset_code.strip()
-                        if rk in st.session_state.global_store.get("user_data", {}) and rc == generate_account_secure_code(rk):
-                            current_data = load_global_data()
-                            current_data["user_data"][rk]["password"] = ""
-                            current_data["password_resets"] = [m for m in current_data["password_resets"] if m.get("author_key") != rk]
-                            save_global_data(current_data)
-                            st.session_state.global_store = current_data
-                            st.success("Hasło skasowane!")
-                            st.rerun()
-
-        # --- SEKCJA DLA MODERATORÓW ORAZ EMULACJI MODERATORA (ZARZĄDZANIE VIP) ---
+        # --- SEKCJA: ZARZĄDZANIE VIP (Widoczne dla całej kadry) ---
         vip_tab_target = adm_tabs[2] if (is_admin and current_role == "Właściciel/Admin (Domyślny)") else adm_tabs[0]
         
         with vip_tab_target:
@@ -1653,7 +1725,7 @@ with st.form("comment_form", clear_on_submit=True):
         st.session_state.global_store = current_data
         st.rerun()
 
-# --- WYŚWIETLANIE KOMENTARZY ---
+# --- WYŚWIETLANIE KOMENTARZY (POPRAWKA: Usunięto przycisk masowego usuwania) ---
 comments_list = st.session_state.global_store.get("comments", [])
 if comments_list:
     for idx, com in enumerate(comments_list):
