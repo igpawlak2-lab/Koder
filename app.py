@@ -1316,24 +1316,27 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                 st.session_state.global_store["user_data"][current_user]["staff_bar_color"] = chosen_bar_color
                 save_global_data(st.session_state.global_store)
                 st.rerun()
-        # --- PANEL UPRAWNIEŃ (ZARZĄDZANIE SYSTEMEM PRZEZ KADRĘ) ---
-    # POPRAWIONY WARUNEK: Wpuszcza admina z rolą admina LUB moderatora z rolą moderatora
+
+               # --- PANEL UPRAWNIEŃ (ZARZĄDZANIE SYSTEMEM PRZEZ KADRĘ) ---
     current_role = st.session_state.get("emulated_role", "")
+    
+    # Warunek wejściowy: wpuszczamy admina (gdy emuluje admina) LUB moderatora (gdy emuluje moderatora)
     if (is_admin and current_role == "Właściciel/Admin (Domyślny)") or (is_moderator and current_role == "Moderator"):
         st.write("---")
         st.subheader("👑 Panel Zarządzania Systemem (Widoczne tylko dla Kadry)")
         
-        # Definiujemy zakładki w zależności od tego, czy patrzy Root Admin, czy Moderator
-        if is_real_root_admin: 
+        # POPRAWKA LOGIKI ZAKŁADEK: Sprawdzamy wybraną AKTUALNIE rolę, a nie sztywne uprawnienia konta
+        if current_role == "Właściciel/Admin (Domyślny)": 
             adm_tabs = st.tabs(["👥 Moderatorzy", "🛡️ Administratorzy", "🌟 Ranga VIP", "🔑 Resetowanie Haseł"])
         else: 
-            # Moderator widzi listę ekipy oraz zakładkę do nadawania VIP
-            adm_tabs = st.tabs(["👥 Lista Moderatorów", "🌟 Zarządzanie VIP"])
+            # Gdy wybrano rolę "Moderator", tworzymy TYLKO JEDNĄ zakładkę wyłącznie dla VIP-ów
+            adm_tabs = st.tabs(["🌟 Zarządzanie VIP"])
             
-        # --- ZAKŁADKA 1: MODERATORZY ---
-        with adm_tabs[0]:
-            current_mods = st.session_state.global_store.get("moderators", [])
-            if is_real_root_admin: # Tylko Główny Admin (Właściciel) może dodawać Moderatorów
+        # --- BLOK DLA WŁAŚCICIELA / ADMINA ---
+        if current_role == "Właściciel/Admin (Domyślny)":
+            # --- ZAKŁADKA 1: MODERATORZY ---
+            with adm_tabs[0]:
+                current_mods = st.session_state.global_store.get("moderators", [])
                 with st.form("add_moderator_form", clear_on_submit=True):
                     mod_key_input = st.text_input("Wklej klucz konta, które chcesz awansować na Moderatora:")
                     submit_mod = st.form_submit_button("➕ Nadaj uprawnienia moderatora")
@@ -1354,75 +1357,22 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                             st.session_state.global_store = current_data
                             st.success(f"✅ Nadano rangę Moderatora dla `{target_key}`")
                             st.rerun()
-            else:
-                st.info("ℹ️ Jako Moderator możesz przeglądać listę zespołu, ale nie możesz edytować rangi innych Moderatorów.")
-                        
-            if current_mods:
-                for m_idx, m_key in enumerate(current_mods):
-                    m_col1, m_col2 = st.columns([4.0, 2.0])
-                    with m_col1:
-                        u_nick = st.session_state.global_store["user_data"].get(m_key, {}).get("saved_nick", "")
-                        st.markdown(f"🔑 `{m_key}`" + (f" (Podpis: **{u_nick}**)" if u_nick else ""))
-                    with m_col2:
-                        if is_real_root_admin:
+                            
+                if current_mods:
+                    for m_idx, m_key in enumerate(current_mods):
+                        m_col1, m_col2 = st.columns([4.0, 2.0])
+                        with m_col1:
+                            u_nick = st.session_state.global_store["user_data"].get(m_key, {}).get("saved_nick", "")
+                            st.markdown(f"🔑 `{m_key}`" + (f" (Podpis: **{u_nick}**)" if u_nick else ""))
+                        with m_col2:
                             if st.button("❌ Odbierz rangę MOD", key=f"remove_mod_{m_idx}", type="primary", use_container_width=True):
                                 current_data = load_global_data()
                                 if m_key in current_data.get("moderators", []): current_data["moderators"].remove(m_key)
                                 save_global_data(current_data)
                                 st.session_state.global_store = current_data
                                 st.rerun()
-                        else:
-                            st.button("🔒 Brak uprawnień", key=f"no_perm_mod_{m_idx}", disabled=True, use_container_width=True)
 
-        # --- ZAKŁADKA: ZARZĄDZANIE VIPAMI (Dostępna dla Admina ORAZ MODERATORA) ---
-        vip_tab_index = 2 if is_real_root_admin else 1
-        with adm_tabs[vip_tab_index]:
-            current_vips = st.session_state.global_store.get("vips", [])
-            
-            with st.form("add_vip_real_fixed_form", clear_on_submit=True):
-                st.markdown("#### 🌟 Nadaj rangę VIP (Uprawnienie Kadry)")
-                vip_key_input = st.text_input("Wklej klucz konta, które chcesz awansować na VIP-a:")
-                submit_vip = st.form_submit_button("🌟 Zatwierdź status VIP")
-                
-                if submit_vip and vip_key_input.strip():
-                    target_key = vip_key_input.strip()
-                    target_user_profile = st.session_state.global_store.get("user_data", {}).get(target_key, {})
-                    target_password = target_user_profile.get("password", "").strip()
-                    
-                    if target_key == "admin" or target_key in st.session_state.global_store.get("admins", []) or target_key in st.session_state.global_store.get("moderators", []):
-                        st.error("❌ Ta osoba posiada już rangę w strukturze kadry (posiada już wbudowany dostęp do Kodu 3).")
-                    elif target_key in current_vips:
-                        st.warning("⚠️ Ten użytkownik ma już status VIP.")
-                    elif not target_password:
-                        st.error("❌ Błąd bezpieczeństwa: Użytkownik musi posiadać ustawione hasło na profilu przed nadaniem rangi VIP!")
-                    else:
-                        current_data = load_global_data()
-                        if "vips" not in current_data: current_data["vips"] = []
-                        current_data["vips"].append(target_key)
-                        save_global_data(current_data)
-                        st.session_state.global_store = current_data
-                        st.success(f"✅ Sukces! Nadano rangę VIP dla `{target_key}`. Użytkownik uzyskał dostęp do Kodu 3.")
-                        st.rerun()
-                        
-            if current_vips:
-                st.markdown("---")
-                st.markdown("#### Zarejestrowani członkowie VIP:")
-                for v_idx, v_key in enumerate(current_vips):
-                    v_col1, v_col2 = st.columns([4.0, 2.0])
-                    with v_col1:
-                        v_nick = st.session_state.global_store["user_data"].get(v_key, {}).get("saved_nick", "")
-                        st.markdown(f"🌟 `{v_key}`" + (f" (Podpis: **{v_nick}**)" if v_nick else ""))
-                    with v_col2:
-                        if st.button("❌ Odbierz rangę VIP", key=f"remove_vip_act_{v_idx}", type="primary", use_container_width=True):
-                            current_data = load_global_data()
-                            if v_key in current_data.get("vips", []): current_data["vips"].remove(v_key)
-                            save_global_data(current_data)
-                            st.session_state.global_store = current_data
-                            st.rerun()
-
-        # --- ZAKŁADKI WYŁĄCZNE DLA ADMINISTRATORA ROOT ---
-        if is_real_root_admin:
-            # Zakładka: Administratorzy
+            # --- ZAKŁADKA 2: ADMINISTRATORZY ---
             with adm_tabs[1]:
                 current_admins = st.session_state.global_store.get("admins", [])
                 if current_admins:
@@ -1483,7 +1433,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                                 st.session_state.global_store = current_data
                                 st.rerun()
 
-            # Zakładka: Skrzynka resetów
+            # --- ZAKŁADKA 4: RESETOWANIE HASEŁ ---
             with adm_tabs[3]:
                 st.markdown("### 🔒 Skrzynka próśb o reset haseł")
                 resets_list = st.session_state.global_store.get("password_resets", [])
@@ -1526,55 +1476,56 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                             st.success("Hasło skasowane!")
                             st.rerun()
 
-        elif not is_real_root_admin and is_admin:
-            # Widok pomocniczy dla adminów z nadania sprawdzający can_reset_passwords
-            if user_profile.get("can_reset_passwords", False):
-                st.write("---")
-                st.markdown("### 🔒 Skrzynka próśb o reset haseł")
-                resets_list = st.session_state.global_store.get("password_resets", [])
-                with st.container(height=220):
-                    if not resets_list: st.caption("Brak nowych próśb.")
+        # --- SEKCJA WSPÓLNA LUB WYŁĄCZNA DLA MODERATORA (ZARZĄDZANIE VIP) ---
+        # Dla Admina to indeks 2, dla Moderatora to jedyny dostępny indeks 0
+        vip_tab_target = adm_tabs[2] if current_role == "Właściciel/Admin (Domyślny)" else adm_tabs[0]
+        
+        with vip_tab_target:
+            current_vips = st.session_state.global_store.get("vips", [])
+            
+            with st.form("add_vip_real_fixed_form", clear_on_submit=True):
+                st.markdown("#### 🌟 Nadaj rangę VIP (Uprawnienie Kadry)")
+                vip_key_input = st.text_input("Wklej klucz konta, które chcesz awansować na VIP-a:")
+                submit_vip = st.form_submit_button("🌟 Zatwierdź status VIP")
+                
+                if submit_vip and vip_key_input.strip():
+                    target_key = vip_key_input.strip()
+                    target_user_profile = st.session_state.global_store.get("user_data", {}).get(target_key, {})
+                    target_password = target_user_profile.get("password", "").strip()
+                    
+                    if target_key == "admin" or target_key in st.session_state.global_store.get("admins", []) or target_key in st.session_state.global_store.get("moderators", []):
+                        st.error("❌ Ta osoba posiada już rangę w strukturze kadry (posiada już wbudowany dostęp do Kodu 3).")
+                    elif target_key in current_vips:
+                        st.warning("⚠️ Ten użytkownik ma już status VIP.")
+                    elif not target_password:
+                        st.error("❌ Błąd bezpieczeństwa: Użytkownik musi posiadać ustawione hasło na profilu przed nadaniem rangi VIP!")
                     else:
-                        for r_reversed_idx, req in enumerate(reversed(resets_list)):
-                            orig_req_idx = len(resets_list) - 1 - r_reversed_idx
-                            r_col1, r_col2 = st.columns([4.2, 1.8])
-                            with r_col1:
-                                st.markdown(f"""
-                                    <div style="background-color: rgba(255,0,0,0.06); padding: 8px 12px; border-radius: 6px; margin-bottom: 8px; border-left: 4px solid #FF0000;">
-                                        <span style="color: #FF0000; font-weight: bold;">👤 Kto: {req.get('sender_nick')}</span>
-                                        <span style="font-size: 0.75rem; opacity: 0.5; margin-left: 10px;">Klucz: `{req.get('author_key')}`</span>
-                                        <p style="margin: 4px 0 0 0; font-size: 0.95rem;">{req.get('text')}</p>
-                                    </div>
-                                """, unsafe_allow_html=True)
-                            with r_col2:
-                                if st.button("🗑️ Odrzuć / Usuń", key=f"del_req_helper_{orig_req_idx}", type="primary", use_container_width=True):
-                                    current_data = load_global_data()
-                                    if orig_req_idx < len(current_data["password_resets"]):
-                                        current_data["password_resets"].pop(orig_req_idx)
-                                        save_global_data(current_data)
-                                        st.session_state.global_store = current_data
-                                        st.rerun()
-                st.write("---")
-                with st.form("reset_user_password_form_helper", clear_on_submit=True):
-                    reset_key = st.text_input("1. Klucz konta użytkownika (ID):")
-                    reset_code = st.text_input("2. Przepisany 6-cyfrowy Kod Bezpieczeństwa:")
-                    submit_reset = st.form_submit_button("💥 Całkowicie usuń hasło profilu")
-                    if submit_reset:
-                        rk, rc = reset_key.strip(), reset_code.strip()
-                        if rk in st.session_state.global_store.get("user_data", {}) and rc == generate_account_secure_code(rk):
+                        current_data = load_global_data()
+                        if "vips" not in current_data: current_data["vips"] = []
+                        current_data["vips"].append(target_key)
+                        save_global_data(current_data)
+                        st.session_state.global_store = current_data
+                        st.success(f"✅ Sukces! Nadano rangę VIP dla `{target_key}`. Użytkownik uzyskał dostęp do Kodu 3.")
+                        st.rerun()
+                        
+            if current_vips:
+                st.markdown("---")
+                st.markdown("#### Zarejestrowani członkowie VIP:")
+                for v_idx, v_key in enumerate(current_vips):
+                    v_col1, v_col2 = st.columns([4.0, 2.0])
+                    with v_col1:
+                        v_nick = st.session_state.global_store["user_data"].get(v_key, {}).get("saved_nick", "")
+                        st.markdown(f"🌟 `{v_key}`" + (f" (Podpis: **{v_nick}**)" if v_nick else ""))
+                    with v_col2:
+                        if st.button("❌ Odbierz rangę VIP", key=f"remove_vip_act_{v_idx}", type="primary", use_container_width=True):
                             current_data = load_global_data()
-                            current_data["user_data"][rk]["password"] = ""
-                            current_data["password_resets"] = [m for m in current_data["password_resets"] if m.get("author_key") != rk]
+                            if v_key in current_data.get("vips", []): current_data["vips"].remove(v_key)
                             save_global_data(current_data)
                             st.session_state.global_store = current_data
-                            st.success("Hasło skasowane!")
                             st.rerun()
-            else:
-                st.write("---")
-                st.info("ℹ️ Nie posiadasz uprawnień do resetowania haseł. Tylko Główny Administrator (admin) może Ci je nadać.")
 
-        # Zmiana kolorów domyślnych – tylko dla Admina
-        if is_admin:
+        # --- MODYFIKACJA KOLORÓW (Tylko dla Admina) ---
+        if current_role == "Właściciel/Admin (Domyślny)" and is_admin:
             st.write("---")
             st.markdown("#### 🎨 Modyfikacja Domyślnych Barw Aplikacji (Dla nowych użytkowników)")
             adm_cc1, adm_cc2, adm_cc3 = st.columns(3)
