@@ -910,7 +910,7 @@ with c1:
                                         st.button("🔒 Zablokowane", key=f"lock_gmsg_{original_idx}", disabled=True, use_container_width=True)
 
                 else:
-                    st.subheader("💬 Crywatne Wiadomości 1 na 1")
+                    st.subheader("💬 Prywatne Wiadomości 1 na 1")
                     all_users = st.session_state.global_store.get("user_data", {})
                     mod_list = st.session_state.global_store.get("moderators", [])
                     admin_list = st.session_state.global_store.get("admins", [])
@@ -1298,7 +1298,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                         else:
                             st.button("🔒 Brak uprawnień", key=f"no_perm_mod_{m_idx}", disabled=True, use_container_width=True)
 
-        # ZAKŁADKA: ZARZĄDZANIE VIPAMI
+        # ZAKŁADKA: ZARZĄDZANIE VIPAMI (Teraz otwarta i aktywna również dla Moderatorów)
         with adm_tabs[2] if is_real_root_admin else adm_tabs[1]:
             current_vips = st.session_state.global_store.get("vips", [])
             with st.form("add_vip_real_fixed_form", clear_on_submit=True):
@@ -1310,7 +1310,7 @@ with st.expander("🎨 Personalizacja Wyglądu i Zarządzanie Kontem"):
                     target_password = target_user_profile.get("password", "").strip()
                     
                     if target_key == "admin" or target_key in st.session_state.global_store.get("admins", []) or target_key in st.session_state.global_store.get("moderators", []):
-                        st.error("❌ Ta osoba posiada już wyższą rangę z wbudowanym dostępem do Kodu 3.")
+                        st.error("❌ Ta osoba posiada już rangę administracyjną/moderatorską z wbudowanym dostępem do Kodu 3.")
                     elif target_key in current_vips:
                         st.warning("⚠️ Ten użytkownik ma już status VIP.")
                     elif not target_password:
