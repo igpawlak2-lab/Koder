@@ -4,7 +4,7 @@ import os
 import json  
 import uuid  
 import hashlib  
-[span_3](start_span)import time  # POPRAWKA: Dodano brakujący import modułu time[span_3](end_span)
+import time  # POPRAWKA: Dodano brakujący import modułu time[span_3](end_span)
 import streamlit as st  
 import streamlit.components.v1 as components  
   
