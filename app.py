@@ -383,23 +383,6 @@ if current_user == "admin2":
         # (Tutaj dalej idzie Twój kod od resetu haseł i sprawdzania kodów bezpieczeństwa...)
         st.write("---")  
   
-        # --- NIEZALEŻNY PANEL RESETU HASEŁ (DLA KAŻDEJ RANGI) ---  
-        st.markdown("### 🔑 Awaryjne Resetowanie Haseł (Dla każdego konta)")  
-        st.info("Ta opcja pozwala zresetować hasło dowolnemu użytkownikowi (w tym Adminom/Modom), jeśli znasz jego kod bezpieczeństwa.")
-        
-        with st.form("admin2_direct_reset_password_form", clear_on_submit=True):  
-            input_reset_key_a2 = st.text_input("Wpisz klucz konta (ID) do wyzerowania hasła:")  
-            input_reset_code_a2 = st.text_input("Wpisz 6-cyfrowy Kod Bezpieczeństwa konta:")  
-            submit_reset_a2 = st.form_submit_button("💥 Wymuś usunięcie hasła")  
-              
-            if submit_reset_a2:  
-                rk_a2, rc_a2 = input_reset_key_a2.strip(), input_reset_code_a2.strip()  
-                if rk_a2 in current_data.get("user_data", {}) and rc_a2 == generate_account_secure_code(rk_a2):  
-                    current_data["user_data"][rk_a2]["password"] = ""  
-                    save_global_data(current_data); st.session_state.global_store = current_data  
-                    st.success(f"✅ Hasło profilu `{rk_a2}` zostało wyzerowane!")  
-                else:  
-                    st.error("❌ Błędny klucz konta lub nieprawidłowy Kod Bezpieczeństwa!") 
         st.write("---")  
           
                 # --- ROZWIJANA LISTA USUWANIA KONT WIPE (ALFABETYCZNIE) ---  
