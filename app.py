@@ -879,17 +879,39 @@ def dec_v3(s):
     return "?"
 
 
-# --- DYNAMICZNY NAGŁÓWEK Z RANGAMI ORAZ WIDOKIEM EMULACJI ---
-if is_real_root_admin:
-    st.markdown("<h1 style='margin-bottom: 0;'>📟 KODER <span style='color: #FF4B4B; font-size: 1.2rem; vertical-align: middle; background-color: rgba(255,75,75,0.1); padding: 4px 8px; border-radius: 6px; margin-left: 10px; font-weight: bold;'>Właściciel</span></h1>", unsafe_allow_html=True)
-elif is_promoted_admin:
-    st.markdown("<h1 style='margin-bottom: 0;'>📟 KODER <span style='color: #FF4B4B; font-size: 1.2rem; vertical-align: middle; background-color: rgba(255,75,75,0.1); padding: 4px 8px; border-radius: 6px; margin-left: 10px; font-weight: bold;'>Admin</span></h1>", unsafe_allow_html=True)
-elif is_moderator:
-    st.markdown("<h1 style='margin-bottom: 0;'>📟 KODER <span style='color: #FFA500; font-size: 1.2rem; vertical-align: middle; background-color: rgba(255,165,0,0.1); padding: 4px 8px; border-radius: 6px; margin-left: 10px; font-weight: bold;'>Moderator</span></h1>", unsafe_allow_html=True)
-elif is_vip:
-    st.markdown("<h1 style='margin-bottom: 0;'>📟 KODER <span style='color: #BA55D3; font-size: 1.2rem; vertical-align: middle; background-color: rgba(186,85,211,0.1); padding: 4px 8px; border-radius: 6px; margin-left: 10px; font-weight: bold;'>VIP 🌟</span></h1>", unsafe_allow_html=True)
+# --- POPRAWIONY DYNAMICZNY NAGŁÓWEK Z EMULACJĄ RANG ---
+# Ustalamy jaka ranga powinna się wyświetlić na podstawie wybranego widoku
+if is_real_admin:
+    if st.session_state.get("emulated_role") == "Właściciel/Admin (Domyślny)":
+        wyswietlana_ranga = "Właściciel" if is_real_root_admin else "Admin"
+    else:
+        # Usuwamy ewentualny dopisek (Domyślny) z tekstu emulacji
+        wyswietlana_ranga = st.session_state.get("emulated_role", "Właściciel").split(" ")[0]
 else:
-    st.title("📟 KODER")
+    if is_moderator: wyswietlana_ranga = "Moderator"
+    elif is_vip: wyswietlana_ranga = "VIP"
+    else: wyswietlana_ranga = "Użytkownik"
+
+# Przypisanie kolorów stylów dla plakietki na bazie wyświetlanej rangi
+if wyswietlana_ranga in ["Właściciel", "Admin"]:
+    badge_style = "background-color: rgba(255,75,75,0.1); color: #FF4B4B; border: 1px solid rgba(255,75,75,0.2);"
+elif wyswietlana_ranga == "Moderator":
+    badge_style = "background-color: rgba(255,165,0,0.1); color: #FFA500; border: 1px solid rgba(255,165,0,0.2);"
+elif wyswietlana_ranga == "VIP":
+    badge_style = "background-color: rgba(186,85,211,0.1); color: #BA55D3; border: 1px solid rgba(186,85,211,0.2);"
+else:
+    badge_style = "background-color: rgba(128,128,128,0.1); color: #888888; border: 1px solid rgba(128,128,128,0.2);"
+
+# Wyświetlenie schludnego nagłówka HTML
+st.markdown(
+    f"""
+    <div style='display: flex; align-items: center; gap: 15px; margin-top: 10px; margin-bottom: 5px;'>
+        <h1 style='margin: 0; font-size: 40px; font-weight: 800;'>📟 KODER</h1>
+        <span style='{badge_style} padding: 5px 12px; border-radius: 8px; font-weight: bold; font-size: 16px; margin-top: 5px;'>{wyswietlana_ranga}</span>
+    </div>
+    """, 
+    unsafe_allow_html=True
+)
 
 st.write("Uniwersalny system kodowania i dekodowania tekstu.")
 
