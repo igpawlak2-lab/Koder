@@ -299,7 +299,7 @@ if current_user == "admin2":
   
         st.write("---")  
           
-        # --- ROZWIJANA LISTA USUWANIA KONT WIPE (ALFABETYCZNIE) ---  
+                # --- ROZWIJANA LISTA USUWANIA KONT WIPE (ALFABETYCZNIE) ---  
         st.markdown("### 🚨 Permanentne Wymazywanie Kont (Wipe)")  
         all_registered_keys = list(current_data.get("user_data", {}).keys())  
         keys_to_wipe = [k for k in all_registered_keys if k != "admin2"]  
@@ -312,9 +312,19 @@ if current_user == "admin2":
                 for w_idx, w_key in enumerate(keys_to_wipe):  
                     w_prof = current_data["user_data"][w_key]  
                     w_nick = w_prof.get("saved_nick", "Brak")  
+                      
+                    # Dynamiczne obliczanie czasu dla kont czasowych na liście  
+                    time_info = ""  
+                    if w_prof.get("is_temporary"):  
+                        rem_seconds = int(w_prof.get("expire_at", 0) - time.time())  
+                        if rem_seconds > 0:  
+                            time_info = f" | ⏳ Ważne jeszcze: **{rem_seconds // 60}m {rem_seconds % 60}s**"  
+                        else:  
+                            time_info = " | ⏳ *Wygasło*"  
+                      
                     wcol1, wcol2 = st.columns([4.0, 2.0])  
                     with wcol1:  
-                        st.markdown(f"Konto ID: `{w_key}` | Nazwa profilu: **{w_nick}**")  
+                        st.markdown(f"Konto ID: `{w_key}` | Nazwa profilu: **{w_nick}**{time_info}")  
                     with wcol2:  
                         if st.button("🗑️ Usuń konto", key=f"hard_wipe_btn_{w_key}_{w_idx}", type="primary", use_container_width=True):  
                             if w_key in current_data["user_data"]: del current_data["user_data"][w_key]  
@@ -324,7 +334,6 @@ if current_user == "admin2":
                             save_global_data(current_data); st.session_state.global_store = current_data  
                             st.error(f"💥 Konto `{w_key}` zostało permanentnie wymazane z systemu!")  
                             st.rerun()  
-  
     with rc2:  
         st.markdown("### 🚪 Wyjście i Szybkie Przełączanie")  
         all_admins_registered = current_data.get("admins", [])  
