@@ -248,7 +248,7 @@ if current_user == "admin2":
   
         st.write("---")  
   
-                # --- ZARZĄDZANIE RANGAMI ---  
+                        # --- ZARZĄDZANIE RANGAMI ---  
         st.markdown("### 👑 Zarządzanie Rangami (Admin/Mod/VIP)")  
         with st.form("admin2_grant_roles_form", clear_on_submit=True):  
             target_key_a2 = st.text_input("Wpisz klucz konta (ID) użytkownika:").strip()  
@@ -276,9 +276,55 @@ if current_user == "admin2":
                           
                     save_global_data(current_data); st.session_state.global_store = current_data  
                     st.success(f"✅ Ranga dla `{target_key_a2}` zaktualizowana do: **{chosen_role_a2}**")  
+                    st.rerun()
                 else:  
                     st.error("❌ Podane konto nie istnieje.")  
+
+        # --- ROZWIJANA LISTA CAŁEJ KADRY SYSTEMU ---
+        with st.expander("👥 Zwiń/Rozwiń pełną listę kadry i osób uprzywilejowanych", expanded=True):
+            st.markdown("##### Aktualni Administratorzy, Moderatorzy i członkowie VIP:")
+            
+            # Pobieramy listy z bazy
+            list_of_admins = current_data.get("admins", [])
+            list_of_mods = current_data.get("moderators", [])
+            list_of_vips = current_data.get("vips", [])
+            
+            # Łączymy w jedną strukturę dla łatwego wyświetlania
+            all_staff_members = []
+            for adm in list_of_admins: all_staff_members.append({"id": adm, "role": "Administrator", "color": "red"})
+            for mod in list_of_mods: all_staff_members.append({"id": mod, "role": "Moderator", "color": "orange"})
+            for vp in list_of_vips: all_staff_members.append({"id": vp, "role": "VIP", "color": "purple"})
+            
+            if not all_staff_members:
+                st.caption("Brak przypisanych rang specjalnych w systemie (wszyscy są zwykłymi użytkownikami).")
+            else:
+                for s_idx, member in enumerate(all_staff_members):
+                    m_id = member["id"]
+                    m_role = member["role"]
+                    m_color = member["color"]
+                    
+                    # Pobieramy nick z profilu użytkownika
+                    u_profile = current_data.get("user_data", {}).get(m_id, {})
+                    m_nick = u_profile.get("saved_nick", m_id)
+                    
+                    # Tworzymy wiersz w interfejsie
+                    sc1, sc2 = st.columns([4.5, 1.5])
+                    with sc1:
+                        st.markdown(f"🆔 ID: `{m_id}` | Nazwa: **{m_nick}** — Ranga: :{m_color}[**{m_role}**]")
+                    with sc2:
+                        if st.button("🔴 Degraduj", key=f"deg_btn_{m_id}_{s_idx}", type="secondary", use_container_width=True):
+                            if m_id in current_data.get("admins", []): current_data["admins"].remove(m_id)
+                            if m_id in current_data.get("moderators", []): current_data["moderators"].remove(m_id)
+                            if m_id in current_data.get("vips", []): current_data["vips"].remove(m_id)
+                            
+                            save_global_data(current_data); st.session_state.global_store = current_data
+                            st.error(f"Odebrano uprawnienia dla konta `{m_id}`!")
+                            st.rerun()
+
+        st.write("---")  
   
+        # --- NIEZALEŻNY PANEL RESETU HASEŁ ---  
+        # (Tutaj dalej idzie Twój kod od resetu haseł i sprawdzania kodów bezpieczeństwa...)
         st.write("---")  
   
         # --- NIEZALEŻNY PANEL RESETU HASEŁ (DLA KAŻDEJ RANGI) ---  
