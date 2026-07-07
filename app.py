@@ -7,7 +7,7 @@ import hashlib
 import time  # POPRAWKA: Dodano brakujący import modułu time
 import streamlit as st
 import streamlit.components.v1 as components
-from streamlit_autorefresh import st_autorefresh
+from streamlit_autorefresh import st_autorefresh # <-- DODAJ TĘ LINIJKĘ
 
 # Czysty interfejs aplikacji
 st.set_page_config(page_title="Koder", page_icon="📟", layout="wide")
