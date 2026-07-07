@@ -212,36 +212,39 @@ if current_user == "admin2":
                 st.session_state.last_created_test_key = test_key  
                 st.rerun()  
                   
-              # Szybkie automatyczne logowanie na istniejące, aktywne konta czasowe
+             
+                    # Szybkie automatyczne logowanie na istniejące, aktywne konta czasowe
         active_temporary_accounts = [k for k, v in current_data.get("user_data", {}).items() if v.get("is_temporary")]
         
         if active_temporary_accounts:
             st.markdown("##### ⏱️ Szybkie logowanie na konta testowe (odliczanie na żywo):")
-            to_log_cols = st.columns(min(len(active_temporary_accounts), 3))
             
-            for t_idx, t_key in enumerate(active_temporary_accounts):
-                col_target = to_log_cols[t_idx % 3]
-                
-                # OBLICZANIE CZASU DLA LICZNIKA
-                t_prof = current_data["user_data"][t_key]
-                rem_seconds = int(t_prof.get("expire_at", 0) - time.time())
-                
-                if rem_seconds > 0:
-                    time_label = f"{rem_seconds // 60}m {rem_seconds % 60}s"
-                else:
-                    time_label = "Wygasło"
-                
-                with col_target:
-                    if st.button(f"👤 {t_key}\n⏳ {time_label}", key=f"quick_log_tmp_{t_key}_{t_idx}", use_container_width=True):
-                        st.session_state["emulated_from_admin2"] = True
-                        st.session_state.user_author_key = t_key
-                        st.query_params["ak"] = t_key
-                        st.query_params["auth"] = "true"
-                        st.rerun()
+            # Tworzymy izolowany fragment, który odświeża tylko przyciski czasowe
+            @st.fragment(run_every=1.0)
+            def render_countdown_buttons(accounts, data):
+                to_log_cols = st.columns(min(len(accounts), 3))
+                for t_idx, t_key in enumerate(accounts):
+                    col_target = to_log_cols[t_idx % 3]
+                    
+                    # OBLICZANIE CZASU
+                    t_prof = data["user_data"][t_key]
+                    rem_seconds = int(t_prof.get("expire_at", 0) - time.time())
+                    
+                    if rem_seconds > 0:
+                        time_label = f"{rem_seconds // 60}m {rem_seconds % 60}s"
+                    else:
+                        time_label = "Wygasło"
+                    
+                    with col_target:
+                        if st.button(f"👤 {t_key}\n⏳ {time_label}", key=f"quick_log_tmp_{t_key}_{t_idx}", use_container_width=True):
+                            st.session_state["emulated_from_admin2"] = True
+                            st.session_state.user_author_key = t_key
+                            st.query_params["ak"] = t_key
+                            st.query_params["auth"] = "true"
+                            st.rerun()
 
-            # WBUDOWANY AUTOMATYCZNY ZEGAR (Odświeża stronę co sekundę)
-            time.sleep(1)
-            st.rerun()
+            # Wywołanie fragmentu
+            render_countdown_buttons(active_temporary_accounts, current_data)
   
         st.write("---")  
   
