@@ -248,19 +248,22 @@ if current_user == "admin2":
   
         st.write("---")  
   
-        # --- ZARZĄDZANIE RANGAMI ---  
-        st.markdown("### 👑 Zarządzanie Rangami z Poziomu Awaryjnego")  
+                # --- ZARZĄDZANIE RANGAMI ---  
+        st.markdown("### 👑 Zarządzanie Rangami (Admin/Mod/VIP)")  
         with st.form("admin2_grant_roles_form", clear_on_submit=True):  
-            target_key_a2 = st.text_input("Wpisz klucz konta (ID) użytkownika do nadania/zmiany rangi:").strip()  
-            chosen_role_a2 = st.selectbox("Wybierz rangę docelową:", ["Zwykły Użytkownik", "VIP", "Moderator", "Administrator"])  
-            submit_role_a2 = st.form_submit_button("⚡ Zatwierdź rangę w systemie")  
+            target_key_a2 = st.text_input("Wpisz klucz konta (ID) użytkownika:").strip()  
+            chosen_role_a2 = st.selectbox("Wybierz docelową rangę:", 
+                                         ["Odbierz wszystkie rangi (Zwykły Użytkownik)", "VIP", "Moderator", "Administrator"])  
+            submit_role_a2 = st.form_submit_button("⚡ Zastosuj zmiany w rangach")  
               
             if submit_role_a2 and target_key_a2:  
                 if target_key_a2 in current_data.get("user_data", {}):  
+                    # Czyszczenie ze wszystkich list ról (zawsze wykonujemy jako reset)
                     if target_key_a2 in current_data.get("admins", []): current_data["admins"].remove(target_key_a2)  
                     if target_key_a2 in current_data.get("moderators", []): current_data["moderators"].remove(target_key_a2)  
                     if target_key_a2 in current_data.get("vips", []): current_data["vips"].remove(target_key_a2)  
                       
+                    # Nadawanie nowej rangi
                     if chosen_role_a2 == "Administrator":  
                         if "admins" not in current_data: current_data["admins"] = []  
                         current_data["admins"].append(target_key_a2)  
@@ -272,74 +275,29 @@ if current_user == "admin2":
                         current_data["vips"].append(target_key_a2)  
                           
                     save_global_data(current_data); st.session_state.global_store = current_data  
-                    st.success(f"✅ Zaktualizowano rangę dla konta `{target_key_a2}` na status: **{chosen_role_a2}**")  
-                    st.rerun()  
+                    st.success(f"✅ Ranga dla `{target_key_a2}` zaktualizowana do: **{chosen_role_a2}**")  
                 else:  
-                    st.error("❌ Podane konto nie istnieje w bazie danych profilu.")  
+                    st.error("❌ Podane konto nie istnieje.")  
   
         st.write("---")  
   
-        # --- NIEZALEŻNY PANEL RESETU HASEŁ DLA ADMIN2 ---  
-        st.markdown("### 🔑 Awaryjne Resetowanie Haseł Użytkowników")  
-        resets_list_a2 = current_data.get("password_resets", [])  
-        if resets_list_a2:  
-            st.markdown("💬 *Oczekujące prośby o reset od użytkowników:*")  
-            for r_idx_a2, req_a2 in enumerate(resets_list_a2):  
-                st.warning(f"Konto: `{req_a2.get('author_key')}` ({req_a2.get('sender_nick')}) zgłosiło kod: **{req_a2.get('text')}**")  
-          
+        # --- NIEZALEŻNY PANEL RESETU HASEŁ (DLA KAŻDEJ RANGI) ---  
+        st.markdown("### 🔑 Awaryjne Resetowanie Haseł (Dla każdego konta)")  
+        st.info("Ta opcja pozwala zresetować hasło dowolnemu użytkownikowi (w tym Adminom/Modom), jeśli znasz jego kod bezpieczeństwa.")
+        
         with st.form("admin2_direct_reset_password_form", clear_on_submit=True):  
-            input_reset_key_a2 = st.text_input("Wpisz klucz konta (ID) do skasowania hasła:")  
+            input_reset_key_a2 = st.text_input("Wpisz klucz konta (ID) do wyzerowania hasła:")  
             input_reset_code_a2 = st.text_input("Wpisz 6-cyfrowy Kod Bezpieczeństwa konta:")  
-            submit_reset_a2 = st.form_submit_button("💥 Całkowicie usuń hasło wybranego profilu")  
+            submit_reset_a2 = st.form_submit_button("💥 Wymuś usunięcie hasła")  
               
             if submit_reset_a2:  
                 rk_a2, rc_a2 = input_reset_key_a2.strip(), input_reset_code_a2.strip()  
                 if rk_a2 in current_data.get("user_data", {}) and rc_a2 == generate_account_secure_code(rk_a2):  
                     current_data["user_data"][rk_a2]["password"] = ""  
-                    current_data["password_resets"] = [m for m in current_data["password_resets"] if m.get("author_key") != rk_a2]  
                     save_global_data(current_data); st.session_state.global_store = current_data  
-                    st.success(f"✅ Hasło profilu `{rk_a2}` zostało wyzerowane pomyślnie!")  
-                    st.rerun()  
+                    st.success(f"✅ Hasło profilu `{rk_a2}` zostało wyzerowane!")  
                 else:  
-                    st.error("❌ Błędny klucz konta lub nieprawidłowy przypisany Kod Bezpieczeństwa!")  
-          # 2. ZINTEGROWANA OPCJA: Sprawdzanie kodu bezpieczeństwa oraz weryfikacja próśb o reset haseł
-        st.write("")
-        st.markdown("##### 🔑 Sprawdzanie kodu bezpieczeństwa i statusu resetu konta:")
-        
-        # Pole do wpisania loginu konta, którego kod chcemy poznać/zweryfikować
-        chk_user_key = st.text_input("Wpisz klucz użytkownika (login) do sprawdzenia:", key="admin2_check_sec_user")
-        
-        if st.button("🔍 Sprawdź kod i zgłoszenia resetu", key="admin2_btn_check_sec", type="secondary"):
-            if chk_user_key:
-                all_users = current_data.get("user_data", {})
-                if chk_user_key in all_users:
-                    u_prof = all_users[chk_user_key]
-                    
-                    # 1. Obliczanie poprawnego systemowego kodu bezpieczeństwa
-                    expected_sec_code = generate_account_secure_code(chk_user_key)
-                    st.success(f"👤 Konto: **{chk_user_key}** | Prawidłowy kod bezpieczeństwa: ` {expected_sec_code} `")
-                    
-                    # 2. Automatyczne sprawdzanie pola zgłoszeń resetu haseł dla tego użytkownika
-                    resets_list_a2 = current_data.get("password_resets", [])
-                    user_requests = [req for req in resets_list_a2 if req.get('author_key') == chk_user_key]
-                    
-                    if user_requests:
-                        st.info("📩 **Znaleziono aktywne zgłoszenie resetu hasła dla tego konta!**")
-                        for req in user_requests:
-                            user_submitted_code = str(req.get('text', '')).strip()
-                            
-                            # Weryfikacja: Czy kod podany przez użytkownika w formularzu zgłoszenia jest poprawny?
-                            if user_submitted_code == expected_sec_code:
-                                st.success(f"✅ Kod podany w zgłoszeniu przez użytkownika (`{user_submitted_code}`) jest **PRAWIDŁOWY**.")
-                            else:
-                                st.error(f"❌ Kod podany w zgłoszeniu przez użytkownika (`{user_submitted_code}`) jest **BŁĘDNY**! (Oszustwo / pomyłka)")
-                    else:
-                        st.caption("ℹ️ Ten użytkownik nie wysłał obecnie żadnej prośby o awaryjny reset hasła.")
-                        
-                else:
-                    st.error(f"Nie znaleziono w bazie użytkownika o loginie: {chk_user_key}")
-            else:
-                st.warning("Najpierw wpisz login konta!")
+                    st.error("❌ Błędny klucz konta lub nieprawidłowy Kod Bezpieczeństwa!") 
         st.write("---")  
           
                 # --- ROZWIJANA LISTA USUWANIA KONT WIPE (ALFABETYCZNIE) ---  
