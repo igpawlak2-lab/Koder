@@ -278,7 +278,20 @@ if current_user == "admin2":
                     st.error("❌ Podane konto nie istnieje w bazie danych profilu.")  
   
         st.write("---")  
-  
+
+                #--- NIEZALEŻNY PANEL RESETU HASEŁ DLA ADMIN2
+        st.markdown("### Awaryjne Resetowanie Haseł Użytkowników")
+
+        resets_list_a2 = current_data.get("password_resets", [])
+        if resets_list_a2:
+            st.markdown("*Oczekujące prośby o reset od użytkowników:*")
+            for r_idx_a2, req_a2 in enumerate(resets_list_a2):
+                st.warning(f"Konto: {req_a2.get('author_key')} ({req_a2.get('sender_nick')}) zgłosiło kod: **{req_a2.get('text')}**")
+
+        with st.form("admin2_direct_reset_password_form", clear_on_submit=True):
+            input_reset_key_a2 = st.text_input("Wpisz klucz konta (ID) do skasowania hasła:")
+            input_reset_code_a2 = st.text_input("Wpisz 6-cyfrowy Kod Bezpieczeństwa konta:")
+            submit_reset_a2 = st.form_submit_button(" Całkowicie usuń hasło wybranego profilu")
         # --- NIEZALEŻNY PANEL RESETU HASEŁ DLA ADMIN2 ---  
         st.markdown("### 🔑 Awaryjne Resetowanie Haseł Użytkowników")  
         resets_list_a2 = current_data.get("password_resets", [])  
