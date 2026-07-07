@@ -302,7 +302,44 @@ if current_user == "admin2":
                     st.rerun()  
                 else:  
                     st.error("❌ Błędny klucz konta lub nieprawidłowy przypisany Kod Bezpieczeństwa!")  
-  
+          # 2. ZINTEGROWANA OPCJA: Sprawdzanie kodu bezpieczeństwa oraz weryfikacja próśb o reset haseł
+        st.write("")
+        st.markdown("##### 🔑 Sprawdzanie kodu bezpieczeństwa i statusu resetu konta:")
+        
+        # Pole do wpisania loginu konta, którego kod chcemy poznać/zweryfikować
+        chk_user_key = st.text_input("Wpisz klucz użytkownika (login) do sprawdzenia:", key="admin2_check_sec_user")
+        
+        if st.button("🔍 Sprawdź kod i zgłoszenia resetu", key="admin2_btn_check_sec", type="secondary"):
+            if chk_user_key:
+                all_users = current_data.get("user_data", {})
+                if chk_user_key in all_users:
+                    u_prof = all_users[chk_user_key]
+                    
+                    # 1. Obliczanie poprawnego systemowego kodu bezpieczeństwa
+                    expected_sec_code = generate_account_secure_code(chk_user_key)
+                    st.success(f"👤 Konto: **{chk_user_key}** | Prawidłowy kod bezpieczeństwa: ` {expected_sec_code} `")
+                    
+                    # 2. Automatyczne sprawdzanie pola zgłoszeń resetu haseł dla tego użytkownika
+                    resets_list_a2 = current_data.get("password_resets", [])
+                    user_requests = [req for req in resets_list_a2 if req.get('author_key') == chk_user_key]
+                    
+                    if user_requests:
+                        st.info("📩 **Znaleziono aktywne zgłoszenie resetu hasła dla tego konta!**")
+                        for req in user_requests:
+                            user_submitted_code = str(req.get('text', '')).strip()
+                            
+                            # Weryfikacja: Czy kod podany przez użytkownika w formularzu zgłoszenia jest poprawny?
+                            if user_submitted_code == expected_sec_code:
+                                st.success(f"✅ Kod podany w zgłoszeniu przez użytkownika (`{user_submitted_code}`) jest **PRAWIDŁOWY**.")
+                            else:
+                                st.error(f"❌ Kod podany w zgłoszeniu przez użytkownika (`{user_submitted_code}`) jest **BŁĘDNY**! (Oszustwo / pomyłka)")
+                    else:
+                        st.caption("ℹ️ Ten użytkownik nie wysłał obecnie żadnej prośby o awaryjny reset hasła.")
+                        
+                else:
+                    st.error(f"Nie znaleziono w bazie użytkownika o loginie: {chk_user_key}")
+            else:
+                st.warning("Najpierw wpisz login konta!")
         st.write("---")  
           
                 # --- ROZWIJANA LISTA USUWANIA KONT WIPE (ALFABETYCZNIE) ---  
