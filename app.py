@@ -74,7 +74,7 @@ db_changed = False
 current_data = load_global_data()
 
 if "user_data" in current_data:
-    expired_keys = [k for k, v in current_data["user_data"].items() if v.get("is_temporary") and now > v.get("expire_at", 0)]
+    expired_keys = [k for k, v in current_data["user_data"].items() if v.get("is_temporary") and now > v.get("expire_at", 1200)]
     for k in expired_keys:
         del current_data["user_data"][k]
         if "admins" in current_data and k in current_data["admins"]: current_data["admins"].remove(k)
