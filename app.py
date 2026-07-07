@@ -213,20 +213,19 @@ if current_user == "admin2":
                 st.rerun()  
                   
              
-                            # Szybkie automatyczne logowanie na istniejące, aktywne konta czasowe
+                                    # Szybkie automatyczne logowanie na istniejące, aktywne konta czasowe
         active_temporary_accounts = [k for k, v in current_data.get("user_data", {}).items() if v.get("is_temporary")]
         
         if active_temporary_accounts:
             st.markdown("##### ⏱️ Szybkie logowanie na konta testowe (odliczanie na żywo):")
             
-            # 1. Fragment odpowiedzialny za odliczanie na żywo (nie blokuje reszty panelu)
+            # 1. Liczniki czasu działające na żywo (odświeżają się same)
             @st.fragment(run_every=1.0)
             def render_countdown_buttons(accounts, data):
                 to_log_cols = st.columns(min(len(accounts), 3))
                 for t_idx, t_key in enumerate(accounts):
                     col_target = to_log_cols[t_idx % 3]
                     
-                    # OBLICZANIE CZASU
                     t_prof = data["user_data"][t_key]
                     rem_seconds = int(t_prof.get("expire_at", 0) - time.time())
                     
@@ -243,24 +242,27 @@ if current_user == "admin2":
                             st.query_params["auth"] = "true"
                             st.rerun()
 
-            # Wywołanie liczników
+            # Wywołanie liczników czasu
             render_countdown_buttons(active_temporary_accounts, current_data)
-            
-            # 2. PRZYWRÓCONA OPCJA: Sprawdzanie kodu bezpieczeństwa kont
-            st.write("")
-            st.markdown("##### 🔑 Kody bezpieczeństwa aktywnych kont testowych:")
-            
-            # Wyświetlamy estetyczną listę z loginem i przypisanym kodem z bazy JSON
-            for t_key in active_temporary_accounts:
-                t_prof = current_data["user_data"][t_key]
-                sec_code = t_prof.get("security_code", "Brak kodu")
-                
-                # Tworzymy małe kolumny, aby wyglądało to przejrzyście
-                sk_col1, sk_col2 = st.columns([2, 4])
-                with sk_col1:
-                    st.code(t_key, language="text")
-                with sk_col2:
-                    st.success(f"Kod bezpieczeństwa: **{sec_code}**")
+
+        # 2. PRZYWRÓCONA OPCJA: Sprawdzanie kodu bezpieczeństwa konta
+        st.write("")
+        st.markdown("##### 🔑 Sprawdzanie kodu bezpieczeństwa konta:")
+        
+        # Pole do wpisania loginu konta, którego kod chcemy poznać
+        chk_user_key = st.text_input("Wpisz klucz użytkownika (login) do sprawdzenia:", key="admin2_check_sec_user")
+        
+        if st.button("🔍 Sprawdź kod bezpieczeństwa", key="admin2_btn_check_sec", type="secondary"):
+            if chk_user_key:
+                all_users = current_data.get("user_data", {})
+                if chk_user_key in all_users:
+                    u_prof = all_users[chk_user_key]
+                    sec_code = u_prof.get("security_code", "Brak przypisanego kodu")
+                    st.success(f"Konto: **{chk_user_key}** | Kod bezpieczeństwa: ` {sec_code} `")
+                else:
+                    st.error(f"Nie znaleziono w bazie użytkownika o loginie: {chk_user_key}")
+            else:
+                st.warning("Najpierw wpisz login konta!")
         st.write("---")  
   
         # --- ZARZĄDZANIE RANGAMI ---  
