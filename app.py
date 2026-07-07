@@ -248,7 +248,7 @@ if current_user == "admin2":
   
         st.write("---")  
   
-                        # --- ZARZĄDZANIE RANGAMI ---  
+                                # --- ZARZĄDZANIE RANGAMI ---  
         st.markdown("### 👑 Zarządzanie Rangami (Admin/Mod/VIP)")  
         with st.form("admin2_grant_roles_form", clear_on_submit=True):  
             target_key_a2 = st.text_input("Wpisz klucz konta (ID) użytkownika:").strip()  
@@ -284,12 +284,10 @@ if current_user == "admin2":
         with st.expander("👥 Zwiń/Rozwiń pełną listę kadry i osób uprzywilejowanych", expanded=True):
             st.markdown("##### Aktualni Administratorzy, Moderatorzy i członkowie VIP:")
             
-            # Pobieramy listy z bazy
             list_of_admins = current_data.get("admins", [])
             list_of_mods = current_data.get("moderators", [])
             list_of_vips = current_data.get("vips", [])
             
-            # Łączymy w jedną strukturę dla łatwego wyświetlania
             all_staff_members = []
             for adm in list_of_admins: all_staff_members.append({"id": adm, "role": "Administrator", "color": "red"})
             for mod in list_of_mods: all_staff_members.append({"id": mod, "role": "Moderator", "color": "orange"})
@@ -303,11 +301,9 @@ if current_user == "admin2":
                     m_role = member["role"]
                     m_color = member["color"]
                     
-                    # Pobieramy nick z profilu użytkownika
                     u_profile = current_data.get("user_data", {}).get(m_id, {})
                     m_nick = u_profile.get("saved_nick", m_id)
                     
-                    # Tworzymy wiersz w interfejsie
                     sc1, sc2 = st.columns([4.5, 1.5])
                     with sc1:
                         st.markdown(f"🆔 ID: `{m_id}` | Nazwa: **{m_nick}** — Ranga: :{m_color}[**{m_role}**]")
@@ -321,6 +317,66 @@ if current_user == "admin2":
                             st.error(f"Odebrano uprawnienia dla konta `{m_id}`!")
                             st.rerun()
 
+        st.write("---")  
+  
+        # --- NIEZALEŻNY PANEL RESETU HASEŁ (DLA KAŻDEJ RANGI) ---  
+        st.markdown("### 🔑 Awaryjne Resetowanie Haseł Użytkowników")  
+        resets_list_a2 = current_data.get("password_resets", [])  
+        if resets_list_a2:  
+            st.markdown("💬 *Oczekujące prośby o reset od użytkowników:*")  
+            for r_idx_a2, req_a2 in enumerate(resets_list_a2):  
+                st.warning(f"Konto: `{req_a2.get('author_key')}` ({req_a2.get('sender_nick')}) zgłosiło kod: **{req_a2.get('text')}**")  
+          
+        with st.form("admin2_direct_reset_password_form", clear_on_submit=True):  
+            input_reset_key_a2 = st.text_input("Wpisz klucz konta (ID) do skasowania hasła:")  
+            input_reset_code_a2 = st.text_input("Wpisz 6-cyfrowy Kod Bezpieczeństwa konta:")  
+            submit_reset_a2 = st.form_submit_button("💥 Całkowicie usuń hasło wybranego profilu")  
+              
+            if submit_reset_a2:  
+                rk_a2, rc_a2 = input_reset_key_a2.strip(), input_reset_code_a2.strip()  
+                if rk_a2 in current_data.get("user_data", {}) and rc_a2 == generate_account_secure_code(rk_a2):  
+                    current_data["user_data"][rk_a2]["password"] = ""  
+                    current_data["password_resets"] = [m for m in current_data["password_resets"] if m.get("author_key") != rk_a2]  
+                    save_global_data(current_data); st.session_state.global_store = current_data  
+                    st.success(f"✅ Hasło profilu `{rk_a2}` zostało wyzerowane pomyślnie!")  
+                    st.rerun()  
+                else:  
+                    st.error("❌ Błędny klucz konta lub nieprawidłowy przypisany Kod Bezpieczeństwa!")  
+
+        # --- PRZYWRÓCONE: SPRAWDZANIE KODU BEZPIECZEŃSTWA I STATUSU RESETU ---
+        st.write("")
+        st.markdown("##### 🔑 Sprawdzanie kodu bezpieczeństwa i statusu resetu konta:")
+        
+        chk_user_key = st.text_input("Wpisz klucz użytkownika (login) do sprawdzenia:", key="admin2_check_sec_user")
+        
+        if st.button("🔍 Sprawdź kod i zgłoszenia resetu", key="admin2_btn_check_sec", type="secondary"):
+            if chk_user_key:
+                all_users = current_data.get("user_data", {})
+                if chk_user_key in all_users:
+                    u_prof = all_users[chk_user_key]
+                    
+                    expected_sec_code = generate_account_secure_code(chk_user_key)
+                    st.success(f"👤 Konto: **{chk_user_key}** | Prawidłowy kod bezpieczeństwa: ` {expected_sec_code} `")
+                    
+                    resets_list_a2 = current_data.get("password_resets", [])
+                    user_requests = [req for req in resets_list_a2 if req.get('author_key') == chk_user_key]
+                    
+                    if user_requests:
+                        st.info("📩 **Znaleziono aktywne zgłoszenie resetu hasła dla tego konta!**")
+                        for req in user_requests:
+                            user_submitted_code = str(req.get('text', '')).strip()
+                            
+                            if user_submitted_code == expected_sec_code:
+                                st.success(f"✅ Kod podany w zgłoszeniu przez użytkownika (`{user_submitted_code}`) jest **PRAWIDŁOWY**.")
+                            else:
+                                st.error(f"❌ Kod podany w zgłoszeniu przez użytkownika (`{user_submitted_code}`) jest **BŁĘDNY**! (Oszustwo / pomyłka)")
+                    else:
+                        st.caption("ℹ️ Ten użytkownik nie wysłał obecnie żadnej prośby o awaryjny reset hasła.")
+                else:
+                    st.error(f"Nie znaleziono w bazie użytkownika o loginie: {chk_user_key}")
+            else:
+                st.warning("Najpierw wpisz login konta!")
+        st.write("---")  
         st.write("---")  
   
         # --- NIEZALEŻNY PANEL RESETU HASEŁ ---  
