@@ -224,21 +224,31 @@ if current_user == "admin2":
                 st.query_params["auth"] = "true"  
                 st.session_state.last_created_test_key = None  
                 st.rerun()  
-  
-        # Szybkie automatyczne logowanie na istniejące, aktywne konta czasowe  
-        active_temporary_accounts = [k for k, v in current_data.get("user_data", {}).items() if v.get("is_temporary")]  
-        if active_temporary_accounts:  
-            st.markdown("##### 🚀 Szybkie automatyczne logowanie na konta testowe:")  
-            to_log_cols = st.columns(min(len(active_temporary_accounts), 3))  
-            for t_idx, t_key in enumerate(active_temporary_accounts):  
-                col_target = to_log_cols[t_idx % 3]  
-                with col_target:  
-                    if st.button(f"🔑 Zaloguj na `{t_key}`", key=f"quick_log_tmp_{t_key}_{t_idx}", use_container_width=True):  
-                        st.session_state["emulated_from_admin2"] = True  
-                        st.session_state.user_author_key = t_key  
-                        st.query_params["ak"] = t_key  
-                        st.query_params["auth"] = "true"  
-                        st.rerun()  
+          
+        # Szybkie automatyczne logowanie na istniejące, aktywne konta czasowe
+        active_temporary_accounts = [k for k, v in current_data.get("user_data", {}).items() if v.get("is_temporary")]
+        if active_temporary_accounts:
+            st.markdown("##### ⏱️ Szybkie logowanie na konta testowe (z licznikiem czasu):")
+            to_log_cols = st.columns(min(len(active_temporary_accounts), 3))
+            for t_idx, t_key in enumerate(active_temporary_accounts):
+                col_target = to_log_cols[t_idx % 3]
+                
+                # OBLICZANIE CZASU DLA LICZNIKA
+                t_prof = current_data["user_data"][t_key]
+                rem_seconds = int(t_prof.get("expire_at", 0) - time.time())
+                if rem_seconds > 0:
+                    time_label = f"{rem_seconds // 60}m {rem_seconds % 60}s"
+                else:
+                    time_label = "Wygasło"
+                
+                with col_target:
+                    # Licznik został dodany bezpośrednio do tekstu na przycisku
+                    if st.button(f"👤 {t_key}\n⏳ {time_label}", key=f"quick_log_tmp_{t_key}_{t_idx}", use_container_width=True):
+                        st.session_state["emulated_from_admin2"] = True
+                        st.session_state.user_author_key = t_key
+                        st.query_params["ak"] = t_key
+                        st.query_params["auth"] = "true"
+                        st.rerun()
   
         st.write("---")  
   
