@@ -361,20 +361,7 @@ if current_user == "admin2":
 if not current_user:
     st.title("📟 Witamy w aplikacji Koder")
     st.write("Aby korzystać z systemu kodowania oraz paneli społecznościowych, musisz posiadać konto.")
-# --- DYNAMICZNY LICZNIK CZASU DLA KONT TESTOWYCH ---
-if user_profile.get("is_temporary"):
-    rem_seconds = int(user_profile.get("expire_at", 0) - time.time())
-    if rem_seconds > 0:
-        minutes = rem_seconds // 60
-        seconds = rem_seconds % 60
-        st.warning(f"⏳ **Konto testowe aktywne!** Do automatycznego usunięcia profilu pozostało: **{minutes} min {seconds} sek**.")
-        
-        # Przycisk do szybkiego, ręcznego odświeżenia licznika
-        if st.button("🔄 Odśwież licznik czasu"):
-            st.rerun()
-    else:
-        st.error("🚨 Ważność Twojego konta testowego dobiegła końca. Przy następnym przeładowaniu dane zostaną wyczyszczone.")    
-    components.html("""
+
         <script>
             var savedKey = localStorage.getItem("koder_author_key2");
             if (savedKey) {
