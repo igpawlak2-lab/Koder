@@ -213,20 +213,19 @@ if current_user == "admin2":
                 st.rerun()  
                   
              
-                    # Szybkie automatyczne logowanie na istniejące, aktywne konta czasowe
+                                    # Szybkie automatyczne logowanie na istniejące, aktywne konta czasowe
         active_temporary_accounts = [k for k, v in current_data.get("user_data", {}).items() if v.get("is_temporary")]
         
         if active_temporary_accounts:
             st.markdown("##### ⏱️ Szybkie logowanie na konta testowe (odliczanie na żywo):")
             
-            # Tworzymy izolowany fragment, który odświeża tylko przyciski czasowe
+            # 1. Liczniki czasu działające na żywo (odświeżają się same)
             @st.fragment(run_every=1.0)
             def render_countdown_buttons(accounts, data):
                 to_log_cols = st.columns(min(len(accounts), 3))
                 for t_idx, t_key in enumerate(accounts):
                     col_target = to_log_cols[t_idx % 3]
                     
-                    # OBLICZANIE CZASU
                     t_prof = data["user_data"][t_key]
                     rem_seconds = int(t_prof.get("expire_at", 0) - time.time())
                     
@@ -243,9 +242,27 @@ if current_user == "admin2":
                             st.query_params["auth"] = "true"
                             st.rerun()
 
-            # Wywołanie fragmentu
+            # Wywołanie liczników czasu
             render_countdown_buttons(active_temporary_accounts, current_data)
-  
+
+        # 2. PRZYWRÓCONA OPCJA: Sprawdzanie kodu bezpieczeństwa konta
+        st.write("")
+        st.markdown("##### 🔑 Sprawdzanie kodu bezpieczeństwa konta:")
+        
+        # Pole do wpisania loginu konta, którego kod chcemy poznać
+        chk_user_key = st.text_input("Wpisz klucz użytkownika (login) do sprawdzenia:", key="admin2_check_sec_user")
+        
+        if st.button("🔍 Sprawdź kod bezpieczeństwa", key="admin2_btn_check_sec", type="secondary"):
+            if chk_user_key:
+                all_users = current_data.get("user_data", {})
+                if chk_user_key in all_users:
+                    u_prof = all_users[chk_user_key]
+                    sec_code = u_prof.get("security_code", "Brak przypisanego kodu")
+                    st.success(f"Konto: **{chk_user_key}** | Kod bezpieczeństwa: ` {sec_code} `")
+                else:
+                    st.error(f"Nie znaleziono w bazie użytkownika o loginie: {chk_user_key}")
+            else:
+                st.warning("Najpierw wpisz login konta!")
         st.write("---")  
   
         # --- ZARZĄDZANIE RANGAMI ---  
@@ -278,20 +295,7 @@ if current_user == "admin2":
                     st.error("❌ Podane konto nie istnieje w bazie danych profilu.")  
   
         st.write("---")  
-
-                #--- NIEZALEŻNY PANEL RESETU HASEŁ DLA ADMIN2
-        st.markdown("### Awaryjne Resetowanie Haseł Użytkowników")
-
-        resets_list_a2 = current_data.get("password_resets", [])
-        if resets_list_a2:
-            st.markdown("*Oczekujące prośby o reset od użytkowników:*")
-            for r_idx_a2, req_a2 in enumerate(resets_list_a2):
-                st.warning(f"Konto: {req_a2.get('author_key')} ({req_a2.get('sender_nick')}) zgłosiło kod: **{req_a2.get('text')}**")
-
-        with st.form("admin2_direct_reset_password_form", clear_on_submit=True):
-            input_reset_key_a2 = st.text_input("Wpisz klucz konta (ID) do skasowania hasła:")
-            input_reset_code_a2 = st.text_input("Wpisz 6-cyfrowy Kod Bezpieczeństwa konta:")
-            submit_reset_a2 = st.form_submit_button(" Całkowicie usuń hasło wybranego profilu")
+  
         # --- NIEZALEŻNY PANEL RESETU HASEŁ DLA ADMIN2 ---  
         st.markdown("### 🔑 Awaryjne Resetowanie Haseł Użytkowników")  
         resets_list_a2 = current_data.get("password_resets", [])  
