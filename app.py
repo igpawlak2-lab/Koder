@@ -53,41 +53,7 @@ def load_global_data():
                 if "announcement_font" not in data: data["announcement_font"] = "sans-serif"
                 if "announcement_size" not in data: data["announcement_size"] = 16
                 if "announcement_bg_color" not in data: data["announcement_bg_color"] = "#e7f3fe"
-                if "default_theme_color" not in data: data["default_theme_color"] = "#1E90FF"
-                if "default_bg_color" not in data: data["default_bg_color"] = "#FFFFFF"
-                if "default_clear_btn_color" not in data: data["default_clear_btn_color"] = "#5cb85c"
-                return data
-        except:
-            return default_data
-    return default_data
-
-def save_global_data(data):
-    try:
-        with open(DATA_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=4)
-          def wyzwol_powiadomienie_systemowe(autor, tresc, nazwa_czatu):
-    """Generuje powiadomienie Streamlit oraz systemowe powiadomienie push w przeglądarce"""
-    st.toast(f"🔔 {nazwa_czatu}: {autor} - {tresc}", icon="📟")
-    components.html(f"""
-        <script>
-        function pokaz() {{
-            if (!("Notification" in window)) return;
-            if (Notification.permission === "granted") {{
-                new Notification("{nazwa_czatu}", {{ body: "{autor}: {tresc}", icon: "📟" }});
-            }} else if (Notification.permission !== "denied") {{
-                Notification.requestPermission().then(permission => {{
-                    if (permission === "granted") {{
-                        new Notification("{nazwa_czatu}", {{ body: "{autor}: {tresc}" }});
-                    }}
-                }});
-            }}
-        }}
-        pokaz();
-        </script>
-    """, height=0, width=0)
-
-    except:
-        pass
+                if "default_theme_color" not in data:
 
 # --- AUTOMATYCZNE CZYSZCZENIE KONT TESTOWYCH PO 1 GODZINIE ---
 now = time.time()
