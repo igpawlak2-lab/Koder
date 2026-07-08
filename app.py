@@ -68,7 +68,7 @@ def save_global_data(data):
     except:
         pass
 
-# --- FUNKCJA POWIADOMIEŃ (Zaczyna się od samej lewej krawędzi) ---
+# --- FUNKCJA POWIADOMIEŃ ---
 def wyzwol_powiadomienie_systemowe(autor, tresc, nazwa_czatu):
     """Generuje powiadomienie Streamlit oraz systemowe powiadomienie push w przeglądarce"""
     st.toast(f"🔔 {nazwa_czatu}: {autor} - {tresc}", icon="📟")
@@ -90,7 +90,7 @@ def wyzwol_powiadomienie_systemowe(autor, tresc, nazwa_czatu):
         </script>
     """, height=0, width=0)
 
-# --- AUTOMATYCZNE CZYSZCZENIE KONT TESTOWYCH PO 1 GODZINIE ---
+# --- AUTOMATYCZNE CZYSZCZENIE KONT TESTOWYCH (20 MINUT) ---
 now = time.time()
 db_changed = False
 current_data = load_global_data()
@@ -106,24 +106,8 @@ if "user_data" in current_data:
 
 if db_changed:
     save_global_data(current_data)
-    st.session_state.global_store = current_data
-
-# Obsługa powrotu do konta admin2 z emulacji administratora
-if "emulated_from_admin2" in st.session_state and st.sidebar.button("⬅️ Powrót do panelu Admin2", type="primary"):
-    del st.session_state["emulated_from_admin2"]
-    if "emulated_role" in st.session_state: del st.session_state["emulated_role"]
-    st.session_state.user_author_key = "admin2"
-    st.query_params["ak"] = "admin2"
-    st.query_params["auth"] = "true"
-    st.rerun()
-
-current_user = st.session_state.user_author_key
-
-# Funkcja generująca bezpieczny kod weryfikacyjny konta
-def generate_account_secure_code(account_key):
-    salt = "KoderSecureSystemSalt2026"
-    hashed = hashlib.sha256((account_key + salt).encode('utf-8')).hexdigest()
-    return str(int(hashed[:8], 16))[-6:].zfill(6)
+    if "global_store" in st.session_state:
+        st.session_state.global_store = current_data
 
 
 # --- PANEL AWARYJNEGO KONTA WŁAŚCICIELA (admin2) ---  
