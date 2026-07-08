@@ -110,6 +110,7 @@ if db_changed:
         st.session_state.global_store = current_data
 
 
+
 # --- PANEL AWARYJNEGO KONTA WŁAŚCICIELA (admin2) ---  
 if current_user == "admin2":  
     st.markdown("<h1 style='color: #FF0000; margin-bottom: 0;'>🚨 SYSTEM RATUNKOWY (admin2)</h1>", unsafe_allow_html=True)  
