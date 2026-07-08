@@ -113,6 +113,9 @@ if db_changed:
 if "global_store" not in st.session_state:
     st.session_state.global_store = current_data
 
+# --- POPRAWKA: PRZYWRÓCENIE BRAKUJĄCYCH ZMIENNYCH OBSŁUGI URL ---
+params = st.query_params
+current_user = params.get("ak", "")
 
 
 # --- PANEL AWARYJNEGO KONTA WŁAŚCICIELA (admin2) ---  
@@ -203,8 +206,8 @@ if current_user == "admin2":
                 current_data["admins"].append(test_key)  
                 save_global_data(current_data); st.session_state.global_store = current_data  
                 st.session_state.last_created_test_key = test_key  
-                st.rerun()  
-                  
+                st.rerun()
+
              
                     # Szybkie automatyczne logowanie na istniejące, aktywne konta czasowe
         active_temporary_accounts = [k for k, v in current_data.get("user_data", {}).items() if v.get("is_temporary")]
