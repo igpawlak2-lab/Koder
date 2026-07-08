@@ -1738,3 +1738,87 @@ if comments_list:
                         save_global_data(current_data)
                         st.session_state.global_store = current_data
                         st.rerun()
+# ==============================================================================
+# --- SYSTEM AUTOMATYCZNYCH POWIADOMIEŃ O NOWYCH WIADOMOŚCIACH (WSZYSTKIE CZATY) ---
+# ==============================================================================
+
+# Definiujemy czaty, które chcemy monitorować pod kątem nowych ogłoszeń/wiadomości
+czaty_do_monitorowania = {
+    "Czat Staff": "staff_chat",
+    "Wiadomości Wspierające": "support_chat",
+    "Komentarze": "comments"
+}
+
+# Pobieramy aktualne dane z bazy
+dane_powiadomien = load_global_data()
+
+# Obliczamy łączną liczbę wiadomości we wszystkich wybranych kanałach
+aktualna_liczba_wiadomosci = 0
+ostatnia_tresc = "Nowe powiadomienie!"
+ostatni_autor = "System"
+
+for nazwa_czatu, klucz_w_json in czaty_do_monitorowania.items():
+    lista_wiadomosci = dane_powiadomien.get(klucz_w_json, [])
+    aktualna_liczba_wiadomosci += len(lista_wiadomosci)
+    
+    # Jeśli są wiadomości, wyciągamy dane ostatniej, aby wyświetlić ją w powiadomieniu
+    if lista_wiadomosci:
+        ostatnia = lista_wiadomosci[0]  # Lub -1 w zależności od tego, jak zapisujesz (nowe na początku czy końcu)
+        if isinstance(ostatnia, dict):
+            ostatnia_tresc = ostatnia.get("text", ostatnia.get("tresc", "Wysłał nową wiadomość"))
+            ostatni_autor = ostatnia.get("sender_nick", ostatnia.get("author", "Użytkownik"))
+
+# Inicjalizacja liczników w sesji użytkownika
+if "stara_liczba_wiadomosci" not in st.session_state:
+    st.session_state.stara_liczba_wiadomosci = aktualna_liczba_wiadomosci
+    st.session_state.wyzwol_powiadomienie = False
+else:
+    # Jeśli przybysz nowa wiadomość, ustawiamy flagę na True
+    if aktualna_liczba_wiadomosci > st.session_state.stara_liczba_wiadomosci:
+        st.session_state.wyzwol_powiadomienie = True
+    st.session_state.stara_liczba_wiadomosci = aktualna_liczba_wiadomosci
+
+# Wstrzyknięcie skryptu JavaScript obsługującego powiadomienia systemowe
+if st.session_state.wyzwol_powiadomienie:
+    st.session_state.wyzwol_powiadomienie = False  # Reset flagi
+    
+    components.html(f"""
+        <script>
+        function pokazPowiadomienie() {{
+            if (!("Notification" in window)) return;
+            
+            // Prośba o uprawnienia jeśli jeszcze nie przyznano
+            if (Notification.permission !== "granted") {{
+                Notification.requestPermission();
+            }}
+            
+            if (Notification.permission === "granted") {{
+                var notification = new Notification("Nowa wiadomość w systemie Koder!", {{
+                    body: "{ostatni_autor}: {ostatnia_tresc}",
+                    icon: "📟"
+                }});
+                notification.onclick = function() {{
+                    window.parent.focus();
+                }};
+            }}
+        }}
+        
+        // Wywołaj od razu przy wykryciu zmiany przez Streamlit
+        if (Notification.permission !== "granted") {{
+            Notification.requestPermission().then(function() {{
+                pokazPowiadomienie();
+            }});
+        }} else {{
+            pokazPowiadomienie();
+        }}
+        </script>
+    """, height=0, width=0)
+else:
+    # Standardowy skrypt uruchamiany raz przy wejściu na stronę, proszący użytkownika o zgodę
+    components.html("""
+        <script>
+        if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
+            Notification.requestPermission();
+        }
+        </script>
+    """, height=0, width=0)
