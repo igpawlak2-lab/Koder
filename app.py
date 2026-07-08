@@ -109,6 +109,10 @@ if db_changed:
     if "global_store" in st.session_state:
         st.session_state.global_store = current_data
 
+# --- INICJALIZACJA GLOBALNEGO MAGAZYNU ---
+if "global_store" not in st.session_state:
+    st.session_state.global_store = current_data
+
 
 
 # --- PANEL AWARYJNEGO KONTA WŁAŚCICIELA (admin2) ---  
