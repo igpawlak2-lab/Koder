@@ -212,49 +212,58 @@ if current_user == "admin2":
                 st.session_state.last_created_test_key = test_key  
                 st.rerun()  
                   
-        # Pole z kodem do skopiowania oraz przycisk błyskawicznego logowania  
-        if st.session_state.last_created_test_key:  
-            st.info(f"✨ Wygenerowano nowe konto czasowe!")  
-            st.text_input("Skopiuj kod klucza konta:", value=st.session_state.last_created_test_key, readonly=True)  
-            if st.button(f"🔗 Zaloguj automatycznie na konto: {st.session_state.last_created_test_key}", type="primary"):  
-                target_acc = st.session_state.last_created_test_key  
-                st.session_state["emulated_from_admin2"] = True  
-                st.session_state.user_author_key = target_acc  
-                st.query_params["ak"] = target_acc  
-                st.query_params["auth"] = "true"  
-                st.session_state.last_created_test_key = None  
-                st.rerun()  
-  
-        # Szybkie automatyczne logowanie na istniejące, aktywne konta czasowe  
-        active_temporary_accounts = [k for k, v in current_data.get("user_data", {}).items() if v.get("is_temporary")]  
-        if active_temporary_accounts:  
-            st.markdown("##### 🚀 Szybkie automatyczne logowanie na konta testowe:")  
-            to_log_cols = st.columns(min(len(active_temporary_accounts), 3))  
-            for t_idx, t_key in enumerate(active_temporary_accounts):  
-                col_target = to_log_cols[t_idx % 3]  
-                with col_target:  
-                    if st.button(f"🔑 Zaloguj na `{t_key}`", key=f"quick_log_tmp_{t_key}_{t_idx}", use_container_width=True):  
-                        st.session_state["emulated_from_admin2"] = True  
-                        st.session_state.user_author_key = t_key  
-                        st.query_params["ak"] = t_key  
-                        st.query_params["auth"] = "true"  
-                        st.rerun()  
+             
+                    # Szybkie automatyczne logowanie na istniejące, aktywne konta czasowe
+        active_temporary_accounts = [k for k, v in current_data.get("user_data", {}).items() if v.get("is_temporary")]
+        
+        if active_temporary_accounts:
+            st.markdown("##### ⏱️ Szybkie logowanie na konta testowe (odliczanie na żywo):")
+            
+            # Tworzymy izolowany fragment, który odświeża tylko przyciski czasowe
+            @st.fragment(run_every=1.0)
+            def render_countdown_buttons(accounts, data):
+                to_log_cols = st.columns(min(len(accounts), 3))
+                for t_idx, t_key in enumerate(accounts):
+                    col_target = to_log_cols[t_idx % 3]
+                    
+                    # OBLICZANIE CZASU
+                    t_prof = data["user_data"][t_key]
+                    rem_seconds = int(t_prof.get("expire_at", 0) - time.time())
+                    
+                    if rem_seconds > 0:
+                        time_label = f"{rem_seconds // 60}m {rem_seconds % 60}s"
+                    else:
+                        time_label = "Wygasło"
+                    
+                    with col_target:
+                        if st.button(f"👤 {t_key}\n⏳ {time_label}", key=f"quick_log_tmp_{t_key}_{t_idx}", use_container_width=True):
+                            st.session_state["emulated_from_admin2"] = True
+                            st.session_state.user_author_key = t_key
+                            st.query_params["ak"] = t_key
+                            st.query_params["auth"] = "true"
+                            st.rerun()
+
+            # Wywołanie fragmentu
+            render_countdown_buttons(active_temporary_accounts, current_data)
   
         st.write("---")  
   
-        # --- ZARZĄDZANIE RANGAMI ---  
-        st.markdown("### 👑 Zarządzanie Rangami z Poziomu Awaryjnego")  
+                                # --- ZARZĄDZANIE RANGAMI ---  
+        st.markdown("### 👑 Zarządzanie Rangami (Admin/Mod/VIP)")  
         with st.form("admin2_grant_roles_form", clear_on_submit=True):  
-            target_key_a2 = st.text_input("Wpisz klucz konta (ID) użytkownika do nadania/zmiany rangi:").strip()  
-            chosen_role_a2 = st.selectbox("Wybierz rangę docelową:", ["Zwykły Użytkownik", "VIP", "Moderator", "Administrator"])  
-            submit_role_a2 = st.form_submit_button("⚡ Zatwierdź rangę w systemie")  
+            target_key_a2 = st.text_input("Wpisz klucz konta (ID) użytkownika:").strip()  
+            chosen_role_a2 = st.selectbox("Wybierz docelową rangę:", 
+                                         ["Odbierz wszystkie rangi (Zwykły Użytkownik)", "VIP", "Moderator", "Administrator"])  
+            submit_role_a2 = st.form_submit_button("⚡ Zastosuj zmiany w rangach")  
               
             if submit_role_a2 and target_key_a2:  
                 if target_key_a2 in current_data.get("user_data", {}):  
+                    # Czyszczenie ze wszystkich list ról (zawsze wykonujemy jako reset)
                     if target_key_a2 in current_data.get("admins", []): current_data["admins"].remove(target_key_a2)  
                     if target_key_a2 in current_data.get("moderators", []): current_data["moderators"].remove(target_key_a2)  
                     if target_key_a2 in current_data.get("vips", []): current_data["vips"].remove(target_key_a2)  
                       
+                    # Nadawanie nowej rangi
                     if chosen_role_a2 == "Administrator":  
                         if "admins" not in current_data: current_data["admins"] = []  
                         current_data["admins"].append(target_key_a2)  
@@ -266,14 +275,51 @@ if current_user == "admin2":
                         current_data["vips"].append(target_key_a2)  
                           
                     save_global_data(current_data); st.session_state.global_store = current_data  
-                    st.success(f"✅ Zaktualizowano rangę dla konta `{target_key_a2}` na status: **{chosen_role_a2}**")  
-                    st.rerun()  
+                    st.success(f"✅ Ranga dla `{target_key_a2}` zaktualizowana do: **{chosen_role_a2}**")  
+                    st.rerun()
                 else:  
-                    st.error("❌ Podane konto nie istnieje w bazie danych profilu.")  
-  
+                    st.error("❌ Podane konto nie istnieje.")  
+
+        # --- ROZWIJANA LISTA CAŁEJ KADRY SYSTEMU ---
+        with st.expander("👥 Zwiń/Rozwiń pełną listę kadry i osób uprzywilejowanych", expanded=True):
+            st.markdown("##### Aktualni Administratorzy, Moderatorzy i członkowie VIP:")
+            
+            list_of_admins = current_data.get("admins", [])
+            list_of_mods = current_data.get("moderators", [])
+            list_of_vips = current_data.get("vips", [])
+            
+            all_staff_members = []
+            for adm in list_of_admins: all_staff_members.append({"id": adm, "role": "Administrator", "color": "red"})
+            for mod in list_of_mods: all_staff_members.append({"id": mod, "role": "Moderator", "color": "orange"})
+            for vp in list_of_vips: all_staff_members.append({"id": vp, "role": "VIP", "color": "purple"})
+            
+            if not all_staff_members:
+                st.caption("Brak przypisanych rang specjalnych w systemie (wszyscy są zwykłymi użytkownikami).")
+            else:
+                for s_idx, member in enumerate(all_staff_members):
+                    m_id = member["id"]
+                    m_role = member["role"]
+                    m_color = member["color"]
+                    
+                    u_profile = current_data.get("user_data", {}).get(m_id, {})
+                    m_nick = u_profile.get("saved_nick", m_id)
+                    
+                    sc1, sc2 = st.columns([4.5, 1.5])
+                    with sc1:
+                        st.markdown(f"🆔 ID: `{m_id}` | Nazwa: **{m_nick}** — Ranga: :{m_color}[**{m_role}**]")
+                    with sc2:
+                        if st.button("🔴 Degraduj", key=f"deg_btn_{m_id}_{s_idx}", type="secondary", use_container_width=True):
+                            if m_id in current_data.get("admins", []): current_data["admins"].remove(m_id)
+                            if m_id in current_data.get("moderators", []): current_data["moderators"].remove(m_id)
+                            if m_id in current_data.get("vips", []): current_data["vips"].remove(m_id)
+                            
+                            save_global_data(current_data); st.session_state.global_store = current_data
+                            st.error(f"Odebrano uprawnienia dla konta `{m_id}`!")
+                            st.rerun()
+
         st.write("---")  
   
-        # --- NIEZALEŻNY PANEL RESETU HASEŁ DLA ADMIN2 ---  
+        # --- NIEZALEŻNY PANEL RESETU HASEŁ (DLA KAŻDEJ RANGI) ---  
         st.markdown("### 🔑 Awaryjne Resetowanie Haseł Użytkowników")  
         resets_list_a2 = current_data.get("password_resets", [])  
         if resets_list_a2:  
@@ -296,10 +342,50 @@ if current_user == "admin2":
                     st.rerun()  
                 else:  
                     st.error("❌ Błędny klucz konta lub nieprawidłowy przypisany Kod Bezpieczeństwa!")  
+
+        # --- PRZYWRÓCONE: SPRAWDZANIE KODU BEZPIECZEŃSTWA I STATUSU RESETU ---
+        st.write("")
+        st.markdown("##### 🔑 Sprawdzanie kodu bezpieczeństwa i statusu resetu konta:")
+        
+        chk_user_key = st.text_input("Wpisz klucz użytkownika (login) do sprawdzenia:", key="admin2_check_sec_user")
+        
+        if st.button("🔍 Sprawdź kod i zgłoszenia resetu", key="admin2_btn_check_sec", type="secondary"):
+            if chk_user_key:
+                all_users = current_data.get("user_data", {})
+                if chk_user_key in all_users:
+                    u_prof = all_users[chk_user_key]
+                    
+                    expected_sec_code = generate_account_secure_code(chk_user_key)
+                    st.success(f"👤 Konto: **{chk_user_key}** | Prawidłowy kod bezpieczeństwa: ` {expected_sec_code} `")
+                    
+                    resets_list_a2 = current_data.get("password_resets", [])
+                    user_requests = [req for req in resets_list_a2 if req.get('author_key') == chk_user_key]
+                    
+                    if user_requests:
+                        st.info("📩 **Znaleziono aktywne zgłoszenie resetu hasła dla tego konta!**")
+                        for req in user_requests:
+                            user_submitted_code = str(req.get('text', '')).strip()
+                            
+                            if user_submitted_code == expected_sec_code:
+                                st.success(f"✅ Kod podany w zgłoszeniu przez użytkownika (`{user_submitted_code}`) jest **PRAWIDŁOWY**.")
+                            else:
+                                st.error(f"❌ Kod podany w zgłoszeniu przez użytkownika (`{user_submitted_code}`) jest **BŁĘDNY**! (Oszustwo / pomyłka)")
+                    else:
+                        st.caption("ℹ️ Ten użytkownik nie wysłał obecnie żadnej prośby o awaryjny reset hasła.")
+                else:
+                    st.error(f"Nie znaleziono w bazie użytkownika o loginie: {chk_user_key}")
+            else:
+                st.warning("Najpierw wpisz login konta!")
+        st.write("---")  
+        st.write("---")  
+  
+        # --- NIEZALEŻNY PANEL RESETU HASEŁ ---  
+        # (Tutaj dalej idzie Twój kod od resetu haseł i sprawdzania kodów bezpieczeństwa...)
+        st.write("---")  
   
         st.write("---")  
           
-                        # --- ROZWIJANA LISTA USUWANIA KONT WIPE (ALFABETYCZNIE) ---  
+                # --- ROZWIJANA LISTA USUWANIA KONT WIPE (ALFABETYCZNIE) ---  
         st.markdown("### 🚨 Permanentne Wymazywanie Kont (Wipe)")  
         all_registered_keys = list(current_data.get("user_data", {}).keys())  
         keys_to_wipe = [k for k in all_registered_keys if k != "admin2"]  
@@ -334,7 +420,6 @@ if current_user == "admin2":
                             save_global_data(current_data); st.session_state.global_store = current_data  
                             st.error(f"💥 Konto `{w_key}` zostało permanentnie wymazane z systemu!")  
                             st.rerun()  
-  
     with rc2:  
         st.markdown("### 🚪 Wyjście i Szybkie Przełączanie")  
         all_admins_registered = current_data.get("admins", [])  
@@ -361,7 +446,8 @@ if current_user == "admin2":
 if not current_user:
     st.title("📟 Witamy w aplikacji Koder")
     st.write("Aby korzystać z systemu kodowania oraz paneli społecznościowych, musisz posiadać konto.")
-
+    
+    components.html("""
         <script>
             var savedKey = localStorage.getItem("koder_author_key2");
             if (savedKey) {
@@ -836,17 +922,39 @@ def dec_v3(s):
     return "?"
 
 
-# --- DYNAMICZNY NAGŁÓWEK Z RANGAMI ORAZ WIDOKIEM EMULACJI ---
-if is_real_root_admin:
-    st.markdown("<h1 style='margin-bottom: 0;'>📟 KODER <span style='color: #FF4B4B; font-size: 1.2rem; vertical-align: middle; background-color: rgba(255,75,75,0.1); padding: 4px 8px; border-radius: 6px; margin-left: 10px; font-weight: bold;'>Właściciel</span></h1>", unsafe_allow_html=True)
-elif is_promoted_admin:
-    st.markdown("<h1 style='margin-bottom: 0;'>📟 KODER <span style='color: #FF4B4B; font-size: 1.2rem; vertical-align: middle; background-color: rgba(255,75,75,0.1); padding: 4px 8px; border-radius: 6px; margin-left: 10px; font-weight: bold;'>Admin</span></h1>", unsafe_allow_html=True)
-elif is_moderator:
-    st.markdown("<h1 style='margin-bottom: 0;'>📟 KODER <span style='color: #FFA500; font-size: 1.2rem; vertical-align: middle; background-color: rgba(255,165,0,0.1); padding: 4px 8px; border-radius: 6px; margin-left: 10px; font-weight: bold;'>Moderator</span></h1>", unsafe_allow_html=True)
-elif is_vip:
-    st.markdown("<h1 style='margin-bottom: 0;'>📟 KODER <span style='color: #BA55D3; font-size: 1.2rem; vertical-align: middle; background-color: rgba(186,85,211,0.1); padding: 4px 8px; border-radius: 6px; margin-left: 10px; font-weight: bold;'>VIP 🌟</span></h1>", unsafe_allow_html=True)
+# --- POPRAWIONY DYNAMICZNY NAGŁÓWEK Z EMULACJĄ RANG ---
+# Ustalamy jaka ranga powinna się wyświetlić na podstawie wybranego widoku
+if is_real_admin:
+    if st.session_state.get("emulated_role") == "Właściciel/Admin (Domyślny)":
+        wyswietlana_ranga = "Właściciel" if is_real_root_admin else "Admin"
+    else:
+        # Usuwamy ewentualny dopisek (Domyślny) z tekstu emulacji
+        wyswietlana_ranga = st.session_state.get("emulated_role", "Właściciel").split(" ")[0]
 else:
-    st.title("📟 KODER")
+    if is_moderator: wyswietlana_ranga = "Moderator"
+    elif is_vip: wyswietlana_ranga = "VIP"
+    else: wyswietlana_ranga = "Użytkownik"
+
+# Przypisanie kolorów stylów dla plakietki na bazie wyświetlanej rangi
+if wyswietlana_ranga in ["Właściciel", "Admin"]:
+    badge_style = "background-color: rgba(255,75,75,0.1); color: #FF4B4B; border: 1px solid rgba(255,75,75,0.2);"
+elif wyswietlana_ranga == "Moderator":
+    badge_style = "background-color: rgba(255,165,0,0.1); color: #FFA500; border: 1px solid rgba(255,165,0,0.2);"
+elif wyswietlana_ranga == "VIP":
+    badge_style = "background-color: rgba(186,85,211,0.1); color: #BA55D3; border: 1px solid rgba(186,85,211,0.2);"
+else:
+    badge_style = "background-color: rgba(128,128,128,0.1); color: #888888; border: 1px solid rgba(128,128,128,0.2);"
+
+# Wyświetlenie schludnego nagłówka HTML
+st.markdown(
+    f"""
+    <div style='display: flex; align-items: center; gap: 15px; margin-top: 10px; margin-bottom: 5px;'>
+        <h1 style='margin: 0; font-size: 40px; font-weight: 800;'>📟 KODER</h1>
+        <span style='{badge_style} padding: 5px 12px; border-radius: 8px; font-weight: bold; font-size: 16px; margin-top: 5px;'>{wyswietlana_ranga}</span>
+    </div>
+    """, 
+    unsafe_allow_html=True
+)
 
 st.write("Uniwersalny system kodowania i dekodowania tekstu.")
 
