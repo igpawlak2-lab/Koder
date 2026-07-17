@@ -1,0 +1,110 @@
+/* Stylowanie aplikacji Koder */
+
+/* Responsive design dla guzików w chacie */
+@media (max-width: 768px) {
+    [data-testid="stHorizontalBlock"] {
+        flex-direction: column !important;
+    }
+    
+    [data-testid="stHorizontalBlock"] > div {
+        width: 100% !important;
+        margin-bottom: 12px !important;
+    }
+    
+    /* Guziki stack vertically na mobilnych */
+    .chat-buttons {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        width: 100%;
+    }
+    
+    .chat-buttons button {
+        width: 100% !important;
+    }
+}
+
+/* Sidebar notification badge */
+.notification-badge {
+    display: inline-block;
+    background-color: #FF4B4B;
+    color: white;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 12px;
+    margin-left: 8px;
+}
+
+/* Notification list */
+.notification-item {
+    padding: 12px;
+    margin: 8px 0;
+    border-radius: 8px;
+    border-left: 4px solid #1E90FF;
+    background-color: rgba(30, 144, 255, 0.05);
+    transition: all 0.3s ease;
+}
+
+.notification-item:hover {
+    background-color: rgba(30, 144, 255, 0.1);
+    transform: translateX(4px);
+}
+
+.notification-item.unread {
+    background-color: rgba(30, 144, 255, 0.1);
+    font-weight: bold;
+}
+
+/* Chat container */
+.chat-box-container {
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    background-color: #fcfcfc;
+    margin-top: 10px;
+    padding: 12px;
+}
+
+/* Radio button styling */
+div[data-testid="stRadio"] [data-testid="stWidgetLabel"] + div {
+    display: flex;
+    gap: 10px;
+    margin-top: 5px;
+    width: 100%;
+    flex-wrap: wrap;
+}
+
+/* Button styling */
+div.stButton > button {
+    transition: all 0.2s ease-in-out !important;
+    font-weight: bold !important;
+}
+
+div.stButton > button:hover {
+    transform: scale(1.02);
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* Success/Error messages */
+.stSuccess {
+    animation: slideIn 0.3s ease;
+}
+
+.stError {
+    animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
