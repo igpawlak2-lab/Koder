@@ -68,13 +68,26 @@ def save_global_data(data):
     except:
         pass
 
-# --- AUTOMATYCZNE CZYSZCZENIE KONT TESTOWYCH PO 1 GODZINIE ---
+# --- 1. INICJALIZACJA STANOWISKA SESJI (NAJPIERW) ---
+if "global_store" not in st.session_state:
+    st.session_state.global_store = load_global_data()
+
+# --- 2. AUTOMATYCZNE CZYSZCZENIE KONT TESTOWYCH PO 1 GODZINIE ---
 now = time.time()
 db_changed = False
-current_data = load_global_data()
+current_data = st.session_state.global_store
 
 if "user_data" in current_data:
-    expired_keys = [k for k, v in current_data["user_data"].items() if v.get("is_temporary") and now > v.get("expire_at", 0)]
+    expired_keys = []
+    for k, v in current_data["user_data"].items():
+        # Bezpieczna weryfikacja flag i czasu
+        is_temp = v.get("is_temporary", False)
+        expire_time = v.get("expire_at", 0)
+        
+        if is_temp and expire_time > 0 and now > expire_time:
+            expired_keys.append(k)
+
+    # Usuwanie tylko wygasłych kont tymczasowych
     for k in expired_keys:
         del current_data["user_data"][k]
         if "admins" in current_data and k in current_data["admins"]: current_data["admins"].remove(k)
@@ -82,9 +95,16 @@ if "user_data" in current_data:
         if "vips" in current_data and k in current_data["vips"]: current_data["vips"].remove(k)
         db_changed = True
 
+# Zapisujemy zmiany na dysku i w pamięci aplikacji
 if db_changed:
     save_global_data(current_data)
     st.session_state.global_store = current_data
+
+# --- 3. PRZYPISANIE ZMIENNYCH Z AKTUALNEGO STANU ---
+def_theme = st.session_state.global_store.get("default_theme_color", "#1E90FF")
+def_bg = st.session_state.global_store.get("default_bg_color", "#FFFFFF")
+def_clear = st.session_state.global_store.get("default_clear_btn_color", "#5cb85c")
+
 
 # Inicjalizacja głównego magazynu w stanu sesji
 if "global_store" not in st.session_state:
