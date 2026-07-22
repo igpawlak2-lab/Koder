@@ -72,33 +72,47 @@ def save_global_data(data):
 if "global_store" not in st.session_state:
     st.session_state.global_store = load_global_data()
 
-# --- 2. AUTOMATYCZNE CZYSZCZENIE KONT TESTOWYCH PO 1 GODZINIE ---
+#--- 2. AUTOMATYCZNE CZYSZCZENIE KONT TESTOWYCH PO 1 GODZINIE ---
 now = time.time()
 db_changed = False
 current_data = st.session_state.global_store
 
 if "user_data" in current_data:
     expired_keys = []
+    
+    # 1. Filtrujemy I WYŁĄCZNIE konta z flagą is_temporary = True oraz wygasłym czasem
     for k, v in current_data["user_data"].items():
-        # Bezpieczna weryfikacja flag i czasu
-        is_temp = v.get("is_temporary", False)
-        expire_time = v.get("expire_at", 0)
-        
-        if is_temp and expire_time > 0 and now > expire_time:
-            expired_keys.append(k)
+        if isinstance(v, dict):
+            is_temp = v.get("is_temporary", False)
+            expire_time = v.get("expire_at", 0)
+            
+            # Kluczowa zmiana: sprawdzamy wyłącznie konta, które są flagowane jako tymczasowe
+            if is_temp is True and expire_time > 0 and now > expire_time:
+                expired_keys.append(k)
 
-    # Usuwanie tylko wygasłych kont tymczasowych
+    # 2. Usuwamy TYLKO zweryfikowane konta testowe
     for k in expired_keys:
-        del current_data["user_data"][k]
-        if "admins" in current_data and k in current_data["admins"]: current_data["admins"].remove(k)
-        if "moderators" in current_data and k in current_data["moderators"]: current_data["moderators"].remove(k)
-        if "vips" in current_data and k in current_data["vips"]: current_data["vips"].remove(k)
-        db_changed = True
+        if k in current_data["user_data"]:
+            del current_data["user_data"][k]
+            db_changed = True
+            
+        if "admins" in current_data and k in current_data["admins"]:
+            current_data["admins"].remove(k)
+            db_changed = True
+            
+        if "moderators" in current_data and k in current_data["moderators"]:
+            current_data["moderators"].remove(k)
+            db_changed = True
+            
+        if "vips" in current_data and k in current_data["vips"]:
+            current_data["vips"].remove(k)
+            db_changed = True
 
-# Zapisujemy zmiany na dysku i w pamięci aplikacji
-if db_changed:
-    save_global_data(current_data)
-    st.session_state.global_store = current_data
+    # Zapisujemy zmiany na dysku i w pamięci sesji tylko gdy realnie usunięto konto testowe
+    if db_changed:
+        save_global_data(current_data)
+        st.session_state.global_store = current_data
+
 
 # --- 3. PRZYPISANIE ZMIENNYCH Z AKTUALNEGO STANU ---
 def_theme = st.session_state.global_store.get("default_theme_color", "#1E90FF")
