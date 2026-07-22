@@ -30,9 +30,7 @@ def load_global_data():
         "announcement_font": "sans-serif",
         "announcement_size": 16,
         "announcement_bg_color": "#e7f3fe",     
-        "default_theme_color": "#1E90FF",      
-        "default_bg_color": "#FFFFFF",         
-        "default_clear_btn_color": "#5cb85c"   
+        
     }
     if os.path.exists(DATA_FILE):
         try:
