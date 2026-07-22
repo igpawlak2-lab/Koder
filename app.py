@@ -153,6 +153,55 @@ def generate_account_secure_code(account_key):
     hashed = hashlib.sha256((account_key + salt).encode('utf-8')).hexdigest()
     return str(int(hashed[:8], 16))[-6:].zfill(6)
 
+# ==============================================================================
+# SPECJALNY OKROJONY PANEL: TYLKO KODY BEZPIECZEŃSTWA (kody / 1984)
+# ==============================================================================
+if current_user == "kody_viewer" or st.session_state.get("view_mode") == "kody_only":
+    st.title("🔑 Panel Weryfikacji Kodów Bezpieczeństwa")
+    st.caption("Tryb podglądu zdefiniowany w kodzie aplikacji.")
+    
+    # Przycisk powrotu do ekranu logowania
+    if st.button("⬅️ Powrót do okna logowania", type="primary", use_container_width=True):
+        st.session_state.logged_in = False
+        st.session_state.current_user = None
+        st.session_state.view_mode = None
+        st.rerun()
+
+    st.markdown("---")
+
+    # Pobieranie danych o użytkownikach
+    global_store = st.session_state.get("global_store", load_global_data())
+    user_data = global_store.get("user_data", {})
+
+    st.subheader("📋 Lista Kodów Bezpieczeństwa")
+
+    # Wyszukiwarka
+    search_user = st.text_input("🔍 Wyszukaj użytkownika (login):", placeholder="Wpisz login...").strip()
+
+    rows = []
+    for user_key, profile in user_data.items():
+        if isinstance(profile, dict):
+            if search_user and search_user.lower() not in user_key.lower():
+                continue
+
+            sec_code = profile.get("sec_code") or profile.get("security_code") or profile.get("kod_bezpieczenstwa") or "Brak kodu"
+            nick = profile.get("saved_nick", user_key)
+            is_temp = "TAK (Testowe)" if profile.get("is_temporary") else "NIE"
+
+            rows.append({
+                "Klucz / Login": user_key,
+                "Nazwa / Nick": nick,
+                "Kod Bezpieczeństwa": sec_code,
+                "Konto Testowe": is_temp
+            })
+
+    if rows:
+        st.dataframe(rows, use_container_width=True)
+    else:
+        st.info("Brak użytkowników spełniających kryteria lub baza jest pusta.")
+
+    # Zatrzymujemy dalsze wykonywanie kodu, żeby nie pokazać nic więcej
+    st.stop()
 
 # --- PANEL AWARYJNEGO KONTA WŁAŚCICIELA (admin2) ---  
 if current_user == "admin2":  
