@@ -204,47 +204,89 @@ if current_user == "admin2":
     with rc1:  
         current_data = load_global_data()  
           
-        # --- GENERATOR KONT TESTOWYCH (Ważne przez 20 minut) ---  
-        st.markdown("### 🧪 Generator Kont Testowych (Ważne przez 20 minut)")  
-        tg_c1, tg_c2, tg_c3, tg_c4 = st.columns(4)  
-        
-        if "last_created_test_key" not in st.session_state:  
-            st.session_state.last_created_test_key = None  
-  
-        with tg_c1:  
-            if st.button("🧪 Stwórz: USER TEST", key="a2_gen_user_btn", use_container_width=True):  
-                test_key = f"user_test_{int(time.time())}"  
-                current_data["user_data"][test_key] = {"password": "test", "saved_nick": "Zwykły User Test (20m)", "is_temporary": True, "expire_at": time.time() + 1200, "history": [], "notepad": ""}  
-                save_global_data(current_data); st.session_state.global_store = current_data  
-                st.session_state.last_created_test_key = test_key  
-                st.rerun()  
-        with tg_c2:  
-            if st.button("🧪 Stwórz: VIP TEST", key="a2_gen_vip_btn", use_container_width=True):  
-                test_key = f"vip_test_{int(time.time())}"  
-                current_data["user_data"][test_key] = {"password": "test", "saved_nick": "VIP Testowy (20m)", "is_temporary": True, "expire_at": time.time() + 1200, "history": [], "notepad": ""}  
-                if "vips" not in current_data: current_data["vips"] = []  
-                current_data["vips"].append(test_key)  
-                save_global_data(current_data); st.session_state.global_store = current_data  
-                st.session_state.last_created_test_key = test_key  
-                st.rerun()  
-        with tg_c3:  
-            if st.button("🧪 Stwórz: MOD TEST", key="a2_gen_mod_btn", use_container_width=True):  
-                test_key = f"mod_test_{int(time.time())}"  
-                current_data["user_data"][test_key] = {"password": "test", "saved_nick": "Mod Testowy (20m)", "is_temporary": True, "expire_at": time.time() + 1200, "history": [], "notepad": ""}  
-                if "moderators" not in current_data: current_data["moderators"] = []  
-                current_data["moderators"].append(test_key)  
-                save_global_data(current_data); st.session_state.global_store = current_data  
-                st.session_state.last_created_test_key = test_key  
-                st.rerun()  
-        with tg_c4:  
-            if st.button("🧪 Stwórz: ADMIN TEST", key="a2_gen_adm_btn", use_container_width=True):  
-                test_key = f"admin_test_{int(time.time())}"  
-                current_data["user_data"][test_key] = {"password": "test", "saved_nick": "Admin Testowy (20m)", "is_temporary": True, "expire_at": time.time() + 1200, "history": [], "notepad": ""}  
-                if "admins" not in current_data: current_data["admins"] = []  
-                current_data["admins"].append(test_key)  
-                save_global_data(current_data); st.session_state.global_store = current_data  
-                st.session_state.last_created_test_key = test_key  
-                st.rerun()  
+        # --- GENERATOR KONT TESTOWYCH (Ważne przez 20 minut)
+        st.markdown("### Generator Kont Testowych (Ważne przez 20 minut)")
+        tg_c1, tg_c2, tg_c3, tg_c4 = st.columns(4)
+        if "last_created_test_key" not in st.session_state:
+            st.session_state.last_created_test_key = None
+
+        with tg_c1:
+            if st.button("Stwórz: USER TEST", key="a2_gen_user_btn", use_container_width=True):
+                test_key = f"user_test_{int(time.time())}"
+                # POPRAWKA: "password" ustawione na ""
+                current_data["user_data"][test_key] = {
+                    "password": "", 
+                    "saved_nick": "Zwykły User Test (20m)", 
+                    "is_temporary": True, 
+                    "expire_at": time.time() + 1200, 
+                    "history": [], 
+                    "notepad": ""
+                }
+                save_global_data(current_data)
+                st.session_state.global_store = current_data
+                st.session_state.last_created_test_key = test_key
+                st.rerun()
+
+        with tg_c2:
+            if st.button("Stwórz: VIP TEST", key="a2_gen_vip_btn", use_container_width=True):
+                test_key = f"vip_test_{int(time.time())}"
+                # POPRAWKA: "password" ustawione na ""
+                current_data["user_data"][test_key] = {
+                    "password": "", 
+                    "saved_nick": "VIP Testowy (20m)", 
+                    "is_temporary": True, 
+                    "expire_at": time.time() + 1200, 
+                    "history": [], 
+                    "notepad": ""
+                }
+                if "vips" not in current_data: 
+                    current_data["vips"] = []
+                current_data["vips"].append(test_key)
+                save_global_data(current_data)
+                st.session_state.global_store = current_data
+                st.session_state.last_created_test_key = test_key
+                st.rerun()
+
+        with tg_c3:
+            if st.button("Stwórz: MOD TEST", key="a2_gen_mod_btn", use_container_width=True):
+                test_key = f"mod_test_{int(time.time())}"
+                # POPRAWKA: "password" ustawione na ""
+                current_data["user_data"][test_key] = {
+                    "password": "", 
+                    "saved_nick": "Mod Testowy (20m)", 
+                    "is_temporary": True, 
+                    "expire_at": time.time() + 1200, 
+                    "history": [], 
+                    "notepad": ""
+                }
+                if "moderators" not in current_data: 
+                    current_data["moderators"] = []
+                current_data["moderators"].append(test_key)
+                save_global_data(current_data)
+                st.session_state.global_store = current_data
+                st.session_state.last_created_test_key = test_key
+                st.rerun()
+
+        with tg_c4:
+            if st.button("Stwórz: ADMIN TEST", key="a2_gen_adm_btn", use_container_width=True):
+                test_key = f"admin_test_{int(time.time())}"
+                # POPRAWKA: "password" ustawione na ""
+                current_data["user_data"][test_key] = {
+                    "password": "", 
+                    "saved_nick": "Admin Testowy (20m)", 
+                    "is_temporary": True, 
+                    "expire_at": time.time() + 1200, 
+                    "history": [], 
+                    "notepad": ""
+                }
+                if "admins" not in current_data: 
+                    current_data["admins"] = []
+                current_data["admins"].append(test_key)
+                save_global_data(current_data)
+                st.session_state.global_store = current_data
+                st.session_state.last_created_test_key = test_key
+                st.rerun()
+
                   
              
                     # Szybkie automatyczne logowanie na istniejące, aktywne konta czasowe
