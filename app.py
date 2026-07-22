@@ -155,21 +155,28 @@ def generate_account_secure_code(account_key):
 
 
 # ==============================================================================
-# SPECJALNY OKROJONY PANEL: TYLKO KODY BEZPIECZEŃSTWA (kody / 1984)
+# 1. BOOTSTRAP KONA 'kody' (Wykonuj ZAWSZE na samym początku ładowania danych)
+# ==============================================================================
+
+global_store = load_global_data()
+
+# Upewniamy się, że konto 'kody' istnieje w bazie ZANIM formularz logowania sprawdzi jego obecność
+if "user_data" in global_store and "kody" not in global_store["user_data"]:
+    global_store["user_data"]["kody"] = {
+        "password": "1984",
+        "saved_nick": "Panel Kodów",
+        "history": [],
+        "notepad": "",
+        "is_temporary": False
+    }
+    save_global_data(global_store)
+
+
+# ==============================================================================
+# 2. SPECJALNY OKROJONY PANEL: TYLKO KODY BEZPIECZEŃSTWA (kody / 1984)
 # ==============================================================================
 
 if current_user == "kody" or st.session_state.get("view_mode") == "kody_only":
-    # 0. ZABEZPIECZENIE: Tworzymy profil konta 'kody' w bazie, jeśli nie istnieje
-    global_store = load_global_data()
-    if "kody" not in global_store.get("user_data", {}):
-        global_store["user_data"]["kody"] = {
-            "password": "1984",
-            "saved_nick": "Panel Kodów",
-            "history": [],
-            "notepad": ""
-        }
-        save_global_data(global_store)
-        st.session_state.global_store = global_store
 
     if "kody_authenticated" not in st.session_state:
         st.session_state.kody_authenticated = False
@@ -229,7 +236,7 @@ if current_user == "kody" or st.session_state.get("view_mode") == "kody_only":
 
     st.markdown("---")
     
-    # Odświeżenie i pobranie bazy danych
+    # Pobranie aktualnych danych
     global_store = load_global_data()
     user_data = global_store.get("user_data", {})
     
@@ -242,7 +249,6 @@ if current_user == "kody" or st.session_state.get("view_mode") == "kody_only":
             if search_user and search_user.lower() not in user_key.lower():
                 continue
             
-            # Pobieranie kodu lub generowanie poprawnego wg algorytmu
             sec_code = (
                 profile.get("sec_code") or 
                 profile.get("security_code") or 
@@ -265,6 +271,7 @@ if current_user == "kody" or st.session_state.get("view_mode") == "kody_only":
         st.info("Brak użytkowników spełniających kryteria lub baza jest pusta.")
         
     st.stop()
+
 
 
 # --- PANEL AWARYJNEGO KONTA WŁAŚCICIELA (admin2) ---  
