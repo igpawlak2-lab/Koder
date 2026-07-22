@@ -154,22 +154,6 @@ def generate_account_secure_code(account_key):
     return str(int(hashed[:8], 16))[-6:].zfill(6)
 
 
-# ==============================================================================
-# 1. BOOTSTRAP KONA 'kody' (Wykonuj ZAWSZE na samym początku ładowania danych)
-# ==============================================================================
-
-global_store = load_global_data()
-
-# Upewniamy się, że konto 'kody' istnieje w bazie ZANIM formularz logowania sprawdzi jego obecność
-if "user_data" in global_store and "kody" not in global_store["user_data"]:
-    global_store["user_data"]["kody"] = {
-        "password": "1984",
-        "saved_nick": "Panel Kodów",
-        "history": [],
-        "notepad": "",
-        "is_temporary": False
-    }
-    save_global_data(global_store)
 
 
 # ==============================================================================
