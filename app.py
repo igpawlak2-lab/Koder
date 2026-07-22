@@ -157,66 +157,101 @@ def generate_account_secure_code(account_key):
 # ==============================================================================
 # SPECJALNY OKROJONY PANEL: TYLKO KODY BEZPIECZEŃSTWA (kody / 1984)
 # ==============================================================================
+
 if current_user == "kody" or st.session_state.get("view_mode") == "kody_only":
+    # 0. ZABEZPIECZENIE: Tworzymy profil konta 'kody' w bazie, jeśli nie istnieje
+    global_store = load_global_data()
+    if "kody" not in global_store.get("user_data", {}):
+        global_store["user_data"]["kody"] = {
+            "password": "1984",
+            "saved_nick": "Panel Kodów",
+            "history": [],
+            "notepad": ""
+        }
+        save_global_data(global_store)
+        st.session_state.global_store = global_store
+
     if "kody_authenticated" not in st.session_state:
         st.session_state.kody_authenticated = False
 
+    # --- EKRAN LOGOWANIA DO PANELU KODÓW (Hasło: 1984) ---
     if not st.session_state.kody_authenticated:
         st.title("🔑 Panel Weryfikacji Kodów Bezpieczeństwa")
         st.subheader("🔒 Weryfikacja tożsamości")
         
         with st.form("kody_login_form"):
-            input_pass_kody = st.text_input("Podaj hasło do panelu kodów:", type="password", placeholder="Wpisz hasło...")
+            input_pass_kody = st.text_input(
+                "Podaj hasło do panelu kodów:", 
+                type="password", 
+                placeholder="Wpisz hasło..."
+            )
             submit_kody = st.form_submit_button("🔓 Zaloguj do panelu kodów")
-
+            
             if submit_kody:
-                if input_pass_kody == "1984":
+                if input_pass_kody.strip() == "1984":
                     st.session_state.kody_authenticated = True
                     st.rerun()
                 else:
                     st.error("❌ Niepoprawne hasło!")
-
+        
         st.write("---")
         with st.form("kody_exit_form"):
             exit_key = st.text_input("Wróć do standardowego konta (wklej klucz):")
-            if st.form_submit_button("Opuść panel kodów") and exit_key.strip():
+            if st.form_submit_button("🚪 Opuść panel kodów") and exit_key.strip():
                 ek = exit_key.strip()
                 st.session_state.user_author_key = ek
                 st.query_params["ak"] = ek
-                if "kody_authenticated" in st.session_state: del st.session_state.kody_authenticated
-                components.html(f"<script>localStorage.setItem('koder_author_key2', '{ek}'); window.parent.location.href = window.parent.location.pathname + '?ak={ek}';</script>", height=0, width=0)
+                if "kody_authenticated" in st.session_state: 
+                    del st.session_state.kody_authenticated
+                components.html(
+                    f"<script>localStorage.setItem('koder_author_key2', '{ek}');"
+                    f"window.parent.location.href = window.parent.location.pathname + '?ak={ek}';</script>", 
+                    height=0, 
+                    width=0
+                )
                 st.rerun()
         st.stop()
 
-    # WYŚWIETLANIE KODÓW PO POPRAWNYM HASLE 1984
+    # --- WIDOK PANELU PO POPRAWNYM ZALOGOWANIU HASŁEM 1984 ---
     st.title("🔑 Panel Weryfikacji Kodów Bezpieczeństwa")
     st.caption("Tryb podglądu zdefiniowany bezpośrednio w kodzie aplikacji.")
 
-    if st.button("⬅️ Powrót / Wyloguj z panelu kodów", type="primary", use_container_width=True):
+    if st.button("🚪 Powrót / Wyloguj z panelu kodów", type="primary", use_container_width=True):
         st.session_state.kody_authenticated = False
         st.session_state.user_author_key = ""
         st.query_params["ak"] = ""
-        components.html("<script>window.parent.location.href = window.parent.location.pathname;</script>", height=0, width=0)
+        components.html(
+            "<script>window.parent.location.href = window.parent.location.pathname;</script>", 
+            height=0, 
+            width=0
+        )
         st.rerun()
 
     st.markdown("---")
-
+    
+    # Odświeżenie i pobranie bazy danych
     global_store = load_global_data()
     user_data = global_store.get("user_data", {})
-
+    
     st.subheader("📋 Lista Kodów Bezpieczeństwa")
     search_user = st.text_input("🔍 Wyszukaj użytkownika (login):", placeholder="Wpisz login...").strip()
-
+    
     rows = []
     for user_key, profile in user_data.items():
         if isinstance(profile, dict):
             if search_user and search_user.lower() not in user_key.lower():
                 continue
-
-            sec_code = profile.get("sec_code") or profile.get("security_code") or profile.get("kod_bezpieczenstwa") or "Brak kodu"
+            
+            # Pobieranie kodu lub generowanie poprawnego wg algorytmu
+            sec_code = (
+                profile.get("sec_code") or 
+                profile.get("security_code") or 
+                profile.get("kod_bezpieczenstwa") or 
+                generate_account_secure_code(user_key)
+            )
             nick = profile.get("saved_nick", user_key)
             is_temp = "TAK (Testowe)" if profile.get("is_temporary") else "NIE"
-
+            
             rows.append({
                 "Klucz / Login": user_key,
                 "Nazwa / Nick": nick,
@@ -228,7 +263,7 @@ if current_user == "kody" or st.session_state.get("view_mode") == "kody_only":
         st.dataframe(rows, use_container_width=True)
     else:
         st.info("Brak użytkowników spełniających kryteria lub baza jest pusta.")
-
+        
     st.stop()
 
 
