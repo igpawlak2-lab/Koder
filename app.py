@@ -70,43 +70,53 @@ def save_global_data(data):
 if "global_store" not in st.session_state:
     st.session_state.global_store = load_global_data()
 
-#--- 2. AUTOMATYCZNE CZYSZCZENIE KONT TESTOWYCH PO 1 GODZINIE ---
-now = time.time()
+# --- 2. AUTOMATYCZNE BEZPIECZNE CZYSZCZENIE KONT TESTOWYCH ---
+teraz = time.time()
 db_changed = False
 current_data = st.session_state.global_store
 
 if "user_data" in current_data:
     expired_keys = []
-    
-    # 1. Filtrujemy I WYŁĄCZNIE konta z flagą is_temporary = True oraz wygasłym czasem
-    for k, v in current_data["user_data"].items():
+
+    # Iteracja po wszystkich kontach w bazie
+    for k, v in list(current_data["user_data"].items()):
         if isinstance(v, dict):
+            # OCHRONA KONT STAŁYCH: Pobieramy flagę (domyślnie False)
             is_temp = v.get("is_temporary", False)
-            expire_time = v.get("expire_at", 0)
-            
-            # Kluczowa zmiana: sprawdzamy wyłącznie konta, które są flagowane jako tymczasowe
-            if is_temp is True and expire_time > 0 and now > expire_time:
+            expire_time = v.get("expire_at", None)
+
+            # WARUNEK ABSOLUTNY:
+            # 1. Konto MUSI posiadać dokladną flagę is_temporary == True
+            # 2. Czas wygaśnięcia expire_at MUSI istnieć (nie może być None ani 0)
+            # 3. Aktualny czas MUSI być większy niż expire_at
+            if (
+                is_temp is True
+                and expire_time is not None
+                and expire_time > 0
+                and teraz > expire_time
+            ):
                 expired_keys.append(k)
 
-    # 2. Usuwamy TYLKO zweryfikowane konta testowe
-    for k in expired_keys:
-        if k in current_data["user_data"]:
-            del current_data["user_data"][k]
-            db_changed = True
-            
-        if "admins" in current_data and k in current_data["admins"]:
-            current_data["admins"].remove(k)
-            db_changed = True
-            
-        if "moderators" in current_data and k in current_data["moderators"]:
-            current_data["moderators"].remove(k)
-            db_changed = True
-            
-        if "vips" in current_data and k in current_data["vips"]:
-            current_data["vips"].remove(k)
-            db_changed = True
+    # Usunięcie TYLKO potwierdzonych tymczasowych kont
+    if expired_keys:
+        for k in expired_keys:
+            if k in current_data["user_data"]:
+                del current_data["user_data"][k]
+                db_changed = True
 
-    # Zapisujemy zmiany na dysku i w pamięci sesji tylko gdy realnie usunięto konto testowe
+            if "admins" in current_data and k in current_data["admins"]:
+                current_data["admins"].remove(k)
+                db_changed = True
+
+            if "moderators" in current_data and k in current_data["moderators"]:
+                current_data["moderators"].remove(k)
+                db_changed = True
+
+            if "vips" in current_data and k in current_data["vips"]:
+                current_data["vips"].remove(k)
+                db_changed = True
+
+    # Zapisujemy plik JSON tylko wtedy, gdy realnie skasowano konto testowe
     if db_changed:
         save_global_data(current_data)
         st.session_state.global_store = current_data
