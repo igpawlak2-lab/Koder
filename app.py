@@ -1,63 +1,87 @@
-import re
 import datetime
-import os
-import json
-import uuid
 import hashlib
-import time  # POPRAWKA: Dodano brakujący import modułu time
+import json
+import os
+import re
+import time
+import uuid
+
 import streamlit as st
 import streamlit.components.v1 as components
 
 # Czysty interfejs aplikacji
 st.set_page_config(page_title="Koder", page_icon="📟", layout="wide")
 
+# --- STAŁE CZASOWE (W SEKUNDACH) ---
+CZAS_KONTA_TESTOWEGO = 20 * 60  # 20 minut = 1200 sekund
+BEZPIECZNY_CZAS_ZWYKLEGO = 2_000_000_000  # 2 miliardy sekund (~63,4 roku)
+
 # --- GLOBALNY PLIK JSON (STRUKTURA DANYCH DLA WSZYSTKICH KONT) ---
 DATA_FILE = "dane_aplikacji.json"
 
+
 def load_global_data():
     default_data = {
-        "likes": 0, 
-        "comments": [], 
-        "user_data": {}, 
-        "moderators": [],                       
-        "admins": [],                       
-        "vips": [],                       
-        "staff_chat": [],    
+        "likes": 0,
+        "comments": [],
+        "user_data": {},
+        "moderators": [],
+        "admins": [],
+        "vips": [],
+        "staff_chat": [],
         "staff_dms": [],
-        "support_chat": [], 
-        "password_resets": [],                       
+        "support_chat": [],
+        "password_resets": [],
         "announcement": "Brak aktualnych ogłoszeń.",
         "announcement_font": "sans-serif",
         "announcement_size": 16,
-        "announcement_bg_color": "#e7f3fe",     
-        
+        "announcement_bg_color": "#e7f3fe",
     }
     if os.path.exists(DATA_FILE):
         try:
             with open(DATA_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                if not isinstance(data, dict): return default_data
-                if "likes" not in data: data["likes"] = 0
-                if "comments" not in data: data["comments"] = []
-                if "user_data" not in data: data["user_data"] = {}
-                if "moderators" not in data: data["moderators"] = []
-                if "admins" not in data: data["admins"] = []
-                if "vips" not in data: data["vips"] = []
-                if "staff_chat" not in data: data["staff_chat"] = [] 
-                if "staff_dms" not in data: data["staff_dms"] = []
-                if "support_chat" not in data: data["support_chat"] = [] 
-                if "password_resets" not in data: data["password_resets"] = []
-                if "announcement" not in data: data["announcement"] = "Brak aktualnych ogłoszeń."
-                if "announcement_font" not in data: data["announcement_font"] = "sans-serif"
-                if "announcement_size" not in data: data["announcement_size"] = 16
-                if "announcement_bg_color" not in data: data["announcement_bg_color"] = "#e7f3fe"
-                if "default_theme_color" not in data: data["default_theme_color"] = "#1E90FF"
-                if "default_bg_color" not in data: data["default_bg_color"] = "#FFFFFF"
-                if "default_clear_btn_color" not in data: data["default_clear_btn_color"] = "#5cb85c"
+                if not isinstance(data, dict):
+                    return default_data
+                if "likes" not in data:
+                    data["likes"] = 0
+                if "comments" not in data:
+                    data["comments"] = []
+                if "user_data" not in data:
+                    data["user_data"] = {}
+                if "moderators" not in data:
+                    data["moderators"] = []
+                if "admins" not in data:
+                    data["admins"] = []
+                if "vips" not in data:
+                    data["vips"] = []
+                if "staff_chat" not in data:
+                    data["staff_chat"] = []
+                if "staff_dms" not in data:
+                    data["staff_dms"] = []
+                if "support_chat" not in data:
+                    data["support_chat"] = []
+                if "password_resets" not in data:
+                    data["password_resets"] = []
+                if "announcement" not in data:
+                    data["announcement"] = "Brak aktualnych ogłoszeń."
+                if "announcement_font" not in data:
+                    data["announcement_font"] = "sans-serif"
+                if "announcement_size" not in data:
+                    data["announcement_size"] = 16
+                if "announcement_bg_color" not in data:
+                    data["announcement_bg_color"] = "#e7f3fe"
+                if "default_theme_color" not in data:
+                    data["default_theme_color"] = "#1E90FF"
+                if "default_bg_color" not in data:
+                    data["default_bg_color"] = "#FFFFFF"
+                if "default_clear_btn_color" not in data:
+                    data["default_clear_btn_color"] = "#5cb85c"
                 return data
         except:
             return default_data
     return default_data
+
 
 def save_global_data(data):
     try:
@@ -66,11 +90,38 @@ def save_global_data(data):
     except:
         pass
 
+
+# --- FUNKCJA POMOCNICZA: TWORZENIE NOWEGO KONTA ---
+def create_user_account(account_key, is_temporary=False):
+    """Tworzy lub aktualizuje konto użytkownika z odpowiednim licznikiem wygaśnięcia."""
+    teraz_ts = time.time()
+    current_data = st.session_state.global_store
+
+    if "user_data" not in current_data:
+        current_data["user_data"] = {}
+
+    if is_temporary:
+        expire_at = teraz_ts + CZAS_KONTA_TESTOWEGO  # Wygasa po 20 min
+    else:
+        expire_at = (
+            teraz_ts + BEZPIECZNY_CZAS_ZWYKLEGO
+        )  # Ukryty licznik na 2 mld sekund (~63 lata)
+
+    current_data["user_data"][account_key] = {
+        "created_at": teraz_ts,
+        "is_temporary": is_temporary,
+        "expire_at": expire_at,
+    }
+
+    save_global_data(current_data)
+    st.session_state.global_store = current_data
+
+
 # --- 1. INICJALIZACJA STANOWISKA SESJI (NAJPIERW) ---
 if "global_store" not in st.session_state:
     st.session_state.global_store = load_global_data()
 
-# --- 2. AUTOMATYCZNE BEZPIECZNE CZYSZCZENIE KONT TESTOWYCH ---
+# --- 2. AUTOMATYCZNE CZYSZCZENIE KONT (TYLKO PO PRZEKROCZENIU LICZNIKA) ---
 teraz = time.time()
 db_changed = False
 current_data = st.session_state.global_store
@@ -81,23 +132,15 @@ if "user_data" in current_data:
     # Iteracja po wszystkich kontach w bazie
     for k, v in list(current_data["user_data"].items()):
         if isinstance(v, dict):
-            # OCHRONA KONT STAŁYCH: Pobieramy flagę (domyślnie False)
-            is_temp = v.get("is_temporary", False)
             expire_time = v.get("expire_at", None)
 
-            # WARUNEK ABSOLUTNY:
-            # 1. Konto MUSI posiadać dokladną flagę is_temporary == True
-            # 2. Czas wygaśnięcia expire_at MUSI istnieć (nie może być None ani 0)
-            # 3. Aktualny czas MUSI być większy niż expire_at
-            if (
-                is_temp is True
-                and expire_time is not None
-                and expire_time > 0
-                and teraz > expire_time
-            ):
+            # USUWANIE: Jeśli czas wygaśnięcia został przekroczony.
+            # Zwykłe konta mają tu +2_000_000_000s, więc nie zostaną naruszone.
+            # Konta testowe mają +1200s (20 min), więc po tym czasie zostaną wykryte.
+            if expire_time is not None and teraz > expire_time:
                 expired_keys.append(k)
 
-    # Usunięcie TYLKO potwierdzonych tymczasowych kont
+    # Usunięcie przeterminowanych kont
     if expired_keys:
         for k in expired_keys:
             if k in current_data["user_data"]:
@@ -116,22 +159,13 @@ if "user_data" in current_data:
                 current_data["vips"].remove(k)
                 db_changed = True
 
-    # Zapisujemy plik JSON tylko wtedy, gdy realnie skasowano konto testowe
+    # Zapisujemy plik JSON tylko w przypadku dokonania zmian
     if db_changed:
         save_global_data(current_data)
         st.session_state.global_store = current_data
 
 
 # --- 3. PRZYPISANIE ZMIENNYCH Z AKTUALNEGO STANU ---
-def_theme = st.session_state.global_store.get("default_theme_color", "#1E90FF")
-def_bg = st.session_state.global_store.get("default_bg_color", "#FFFFFF")
-def_clear = st.session_state.global_store.get("default_clear_btn_color", "#5cb85c")
-
-
-# Inicjalizacja głównego magazynu w stanu sesji
-if "global_store" not in st.session_state:
-    st.session_state.global_store = load_global_data()
-
 def_theme = st.session_state.global_store.get("default_theme_color", "#1E90FF")
 def_bg = st.session_state.global_store.get("default_bg_color", "#FFFFFF")
 def_clear = st.session_state.global_store.get("default_clear_btn_color", "#5cb85c")
@@ -147,9 +181,12 @@ if "user_author_key" not in st.session_state:
         st.session_state.user_author_key = ""
 
 # Obsługa powrotu do konta admin2 z emulacji administratora
-if "emulated_from_admin2" in st.session_state and st.sidebar.button("⬅️ Powrót do panelu Admin2", type="primary"):
+if "emulated_from_admin2" in st.session_state and st.sidebar.button(
+    "⬅️ Powrót do panelu Admin2", type="primary"
+):
     del st.session_state["emulated_from_admin2"]
-    if "emulated_role" in st.session_state: del st.session_state["emulated_role"]
+    if "emulated_role" in st.session_state:
+        del st.session_state["emulated_role"]
     st.session_state.user_author_key = "admin2"
     st.query_params["ak"] = "admin2"
     st.query_params["auth"] = "true"
@@ -157,12 +194,12 @@ if "emulated_from_admin2" in st.session_state and st.sidebar.button("⬅️ Powr
 
 current_user = st.session_state.user_author_key
 
+
 # Funkcja generująca bezpieczny kod weryfikacyjny konta
 def generate_account_secure_code(account_key):
     salt = "KoderSecureSystemSalt2026"
-    hashed = hashlib.sha256((account_key + salt).encode('utf-8')).hexdigest()
+    hashed = hashlib.sha256((account_key + salt).encode("utf-8")).hexdigest()
     return str(int(hashed[:8], 16))[-6:].zfill(6)
-
 
 
 
