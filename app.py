@@ -91,9 +91,16 @@ def save_global_data(data):
         pass
 
 
+# Funkcja generująca bezpieczny kod weryfikacyjny konta
+def generate_account_secure_code(account_key):
+    salt = "KoderSecureSystemSalt2026"
+    hashed = hashlib.sha256((account_key + salt).encode("utf-8")).hexdigest()
+    return str(int(hashed[:8], 16))[-6:].zfill(6)
+
+
 # --- FUNKCJA POMOCNICZA: TWORZENIE NOWEGO KONTA ---
-def create_user_account(account_key, is_temporary=False):
-    """Tworzy lub aktualizuje konto użytkownika z odpowiednim licznikiem wygaśnięcia."""
+def create_user_account(account_key, password=None, is_temporary=False):
+    """Tworzy lub aktualizuje konto użytkownika z zachowaniem hasła i licznika wygaśnięcia."""
     teraz_ts = time.time()
     current_data = st.session_state.global_store
 
@@ -103,15 +110,26 @@ def create_user_account(account_key, is_temporary=False):
     if is_temporary:
         expire_at = teraz_ts + CZAS_KONTA_TESTOWEGO  # Wygasa po 20 min
     else:
-        expire_at = (
-            teraz_ts + BEZPIECZNY_CZAS_ZWYKLEGO
-        )  # Ukryty licznik na 2 mld sekund (~63 lata)
+        expire_at = teraz_ts + BEZPIECZNY_CZAS_ZWYKLEGO  # Licznik na ~63 lata
 
-    current_data["user_data"][account_key] = {
-        "created_at": teraz_ts,
+    # Zachowujemy istniejące dane, jeśli konto już istnieje
+    existing_user = current_data["user_data"].get(account_key, {})
+    
+    # Przechowywanie danych konta wraz z zabezpieczonym / przekazanym hasłem
+    user_info = {
+        "created_at": existing_user.get("created_at", teraz_ts),
         "is_temporary": is_temporary,
         "expire_at": expire_at,
+        "sec_code": existing_user.get("sec_code") or generate_account_secure_code(account_key)
     }
+
+    # Jeżeli przekazano nowe hasło – zapisz je (lub zachowaj dotychczasowe)
+    if password:
+        user_info["password"] = password
+    elif "password" in existing_user:
+        user_info["password"] = existing_user["password"]
+
+    current_data["user_data"][account_key] = user_info
 
     save_global_data(current_data)
     st.session_state.global_store = current_data
@@ -134,9 +152,7 @@ if "user_data" in current_data:
         if isinstance(v, dict):
             expire_time = v.get("expire_at", None)
 
-            # USUWANIE: Jeśli czas wygaśnięcia został przekroczony.
-            # Zwykłe konta mają tu +2_000_000_000s, więc nie zostaną naruszone.
-            # Konta testowe mają +1200s (20 min), więc po tym czasie zostaną wykryte.
+            # USUWANIE: Tylko jeśli czas wygaśnięcia faktycznie minął.
             if expire_time is not None and teraz > expire_time:
                 expired_keys.append(k)
 
@@ -195,14 +211,6 @@ if "emulated_from_admin2" in st.session_state and st.sidebar.button(
 current_user = st.session_state.user_author_key
 
 
-# Funkcja generująca bezpieczny kod weryfikacyjny konta
-def generate_account_secure_code(account_key):
-    salt = "KoderSecureSystemSalt2026"
-    hashed = hashlib.sha256((account_key + salt).encode("utf-8")).hexdigest()
-    return str(int(hashed[:8], 16))[-6:].zfill(6)
-
-
-
 # ==============================================================================
 # 2. SPECJALNY OKROJONY PANEL: TYLKO KODY BEZPIECZEŃSTWA (kody / 1984)
 # ==============================================================================
@@ -235,18 +243,20 @@ if current_user == "kody" or st.session_state.get("view_mode") == "kody_only":
         st.write("---")
         with st.form("kody_exit_form"):
             exit_key = st.text_input("Wróć do standardowego konta (wklej klucz):")
-            if st.form_submit_button("🚪 Opuść panel kodów") and exit_key.strip():
+            submit_exit = st.form_submit_button("🚪 Opuść panel kodów")
+            
+            if submit_exit and exit_key.strip():
                 ek = exit_key.strip()
+                
+                # Zapisujemy/utrwalamy konto użytkownika, zanim przejdziemy dalej
+                create_user_account(ek, is_temporary=False)
+                
                 st.session_state.user_author_key = ek
                 st.query_params["ak"] = ek
                 if "kody_authenticated" in st.session_state: 
                     del st.session_state.kody_authenticated
-                components.html(
-                    f"<script>localStorage.setItem('koder_author_key2', '{ek}');"
-                    f"window.parent.location.href = window.parent.location.pathname + '?ak={ek}';</script>", 
-                    height=0, 
-                    width=0
-                )
+                
+                # Używamy st.rerun zamiast natychmiastowego przeładowania JS
                 st.rerun()
         st.stop()
 
@@ -257,12 +267,7 @@ if current_user == "kody" or st.session_state.get("view_mode") == "kody_only":
     if st.button("🚪 Powrót / Wyloguj z panelu kodów", type="primary", use_container_width=True):
         st.session_state.kody_authenticated = False
         st.session_state.user_author_key = ""
-        st.query_params["ak"] = ""
-        components.html(
-            "<script>window.parent.location.href = window.parent.location.pathname;</script>", 
-            height=0, 
-            width=0
-        )
+        st.query_params.clear()
         st.rerun()
 
     st.markdown("---")
@@ -302,7 +307,6 @@ if current_user == "kody" or st.session_state.get("view_mode") == "kody_only":
         st.info("Brak użytkowników spełniających kryteria lub baza jest pusta.")
         
     st.stop()
-
 
 
 # --- PANEL AWARYJNEGO KONTA WŁAŚCICIELA (admin2) ---  
