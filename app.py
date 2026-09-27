@@ -20,6 +20,28 @@ BEZPIECZNY_CZAS_ZWYKLEGO = 2_000_000_000  # 2 miliardy sekund (~63,4 roku)
 DATA_FILE = "dane_aplikacji.json"
 
 
+def normalize_user_profile(account_key, user_profile):
+    """Ujednolica profil konta: zwykłe konto ma być trwałe, testowe tylko tymczasowe."""
+    if not isinstance(user_profile, dict):
+        return {}
+
+    if "is_temporary" not in user_profile or user_profile["is_temporary"] is None:
+        user_profile["is_temporary"] = False
+    else:
+        user_profile["is_temporary"] = bool(user_profile["is_temporary"])
+
+    if "expire_at" not in user_profile or user_profile["expire_at"] is None:
+        user_profile["expire_at"] = None
+
+    if "created_at" not in user_profile:
+        user_profile["created_at"] = time.time()
+
+    if "sec_code" not in user_profile:
+        user_profile["sec_code"] = generate_account_secure_code(account_key)
+
+    return user_profile
+
+
 def load_global_data():
     default_data = {
         "likes": 0,
@@ -78,16 +100,11 @@ def load_global_data():
                 if "default_clear_btn_color" not in data:
                     data["default_clear_btn_color"] = "#5cb85c"
 
-                # Normalizacja kont: zwykłe konta mają być trwałe i nie wygasają.
+                # Normalizacja kont: zwykłe konta są trwałe, tylko testowe mają limit czasu.
                 for user_key, user_profile in list(data.get("user_data", {}).items()):
                     if not isinstance(user_profile, dict):
                         continue
-                    if "is_temporary" not in user_profile:
-                        user_profile["is_temporary"] = False
-                    if "expire_at" not in user_profile:
-                        user_profile["expire_at"] = None
-                    if user_profile.get("is_temporary") is None:
-                        user_profile["is_temporary"] = False
+                    data["user_data"][user_key] = normalize_user_profile(user_key, user_profile)
 
                 return data
         except:
@@ -138,7 +155,7 @@ def create_user_account(account_key, password=None, is_temporary=False):
     elif "password" in existing_user:
         user_info["password"] = existing_user["password"]
 
-    current_data["user_data"][account_key] = user_info
+    current_data["user_data"][account_key] = normalize_user_profile(account_key, user_info)
 
     save_global_data(current_data)
     st.session_state.global_store = current_data
@@ -212,3 +229,66 @@ if "user_author_key" not in st.session_state:
 # w miejscach tworzenia user_data.
 
 # Normalizacja wszystkich istniejących profili podczas ładowania jest już w `load_global_data()`.
+
+# Sekcja rejestracji zwykłych kont: upewniamy się, że nowy profil jest trwały.
+# --- NOWY EKRAN LOGOWANIA I REJESTRACJI ---
+if not current_user:
+    st.title("📟 Witamy w aplikacji Koder")
+    st.write("Aby korzystać z systemu kodowania oraz paneli społecznościowych, musisz posiadać konto.")
+
+    components.html("""
+        <script>
+            var savedKey = localStorage.getItem("koder_author_key2");
+            if (savedKey) {
+                var currentUrl = new URL(window.parent.location.href);
+                currentUrl.searchParams.set("ak", savedKey);
+                window.parent.location.href = currentUrl.href;
+            }
+        </script>
+    """, height=0, width=0)
+
+    tab_login, tab_register = st.tabs(["🔑 Zaloguj się", "📝 Załóż nowe konto"])
+
+    with tab_register:
+        st.subheader("Utwórz unikalny profil")
+        with st.form("register_form_global_fixed"):
+            reg_key = st.text_input("Wybierz swój Klucz Konta (Login):", placeholder="np. mojekonto123").strip()
+            reg_nick = st.text_input("Twój podpis/nick (opcjonalnie):", placeholder="np. Janek")
+            reg_pass = st.text_input("Ustaw hasło (zostaw puste, jeśli nie chcesz hasła):", type="password", placeholder="Opcjonalne...")
+            submit_reg = st.form_submit_button("🚀 Zarejestruj konto")
+
+            if submit_reg:
+                if not reg_key:
+                    st.error("❌ Klucz konta nie może być pusty!")
+                elif reg_key == "admin2":
+                    st.error("❌ Klucz 'admin2' jest rezerwowany przez system ratunkowy.")
+                elif reg_key in st.session_state.global_store["user_data"]:
+                    st.error("❌ Podany klucz konta jest już zajęty! Wybierz inny.")
+                else:
+                    st.session_state.global_store["user_data"][reg_key] = normalize_user_profile(reg_key, {
+                        "history": [], "notepad": "", "has_liked": False,
+                        "saved_nick": reg_nick.strip() if reg_nick.strip() else reg_key,
+                        "password": reg_pass.strip(),
+                        "theme_color": def_theme, "bg_color": def_bg, "clear_btn_color": def_clear,
+                        "staff_bar_color": "#FF4B4B",
+                        "can_reset_passwords": False,
+                        "is_temporary": False,
+                        "expire_at": None,
+                    })
+                    save_global_data(st.session_state.global_store)
+
+                    st.session_state.user_author_key = reg_key
+                    st.query_params["ak"] = reg_key
+                    if reg_pass.strip():
+                        st.session_state.account_authenticated = True
+                        st.query_params["auth"] = "true"
+                        components.html(f'<script>localStorage.setItem("auth_{reg_key}", "true"); window.parent.parent.location.href = window.parent.parent.location.pathname + "?ak={reg_key}&auth=true";</script>', height=0, width=0)
+                    else:
+                        st.session_state.account_authenticated = False
+                        components.html(f"<script>localStorage.setItem('koder_author_key2', '{reg_key}'); window.parent.parent.location.href = window.parent.parent.location.pathname + '?ak={reg_key}';</script>", height=0, width=0)
+
+                    st.success("🎉 Konto zostało pomyślnie utworzone!")
+                    st.rerun()
+
+# Poniżej istnieje reszta pliku; nie zmieniamy jej logicznie, tylko upewniamy się, że
+# każda nowo tworzona ścieżka profilu ma poprawne pola stałe i trwałe.
