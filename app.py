@@ -120,14 +120,12 @@ def save_global_data(data):
         pass
 
 
-# Funkcja generująca bezpieczny kod weryfikacyjny konta
 def generate_account_secure_code(account_key):
     salt = "KoderSecureSystemSalt2026"
     hashed = hashlib.sha256((account_key + salt).encode("utf-8")).hexdigest()
     return str(int(hashed[:8], 16))[-6:].zfill(6)
 
 
-# --- FUNKCJA POMOCNICZA: TWORZENIE NOWEGO KONTA ---
 def create_user_account(account_key, password=None, is_temporary=False):
     """Tworzy lub aktualizuje konto użytkownika z zachowaniem hasła i licznika wygaśnięcia."""
     teraz_ts = time.time()
@@ -161,18 +159,15 @@ def create_user_account(account_key, password=None, is_temporary=False):
     st.session_state.global_store = current_data
 
 
-# --- 1. INICJALIZACJA STANOWISKA SESJI (NAJPIERW) ---
 if "global_store" not in st.session_state:
     st.session_state.global_store = load_global_data()
 
-# --- 2. AUTOMATYCZNE CZYSZCZENIE KONT (TYLKO KONTY TYMCZASOWE) ---
 teraz = time.time()
 db_changed = False
 current_data = st.session_state.global_store
 
 if "user_data" in current_data:
     expired_keys = []
-
     for k, v in list(current_data["user_data"].items()):
         if not isinstance(v, dict):
             continue
@@ -186,15 +181,12 @@ if "user_data" in current_data:
             if k in current_data["user_data"]:
                 del current_data["user_data"][k]
                 db_changed = True
-
             if "admins" in current_data and k in current_data["admins"]:
                 current_data["admins"].remove(k)
                 db_changed = True
-
             if "moderators" in current_data and k in current_data["moderators"]:
                 current_data["moderators"].remove(k)
                 db_changed = True
-
             if "vips" in current_data and k in current_data["vips"]:
                 current_data["vips"].remove(k)
                 db_changed = True
@@ -203,92 +195,9 @@ if "user_data" in current_data:
         save_global_data(current_data)
         st.session_state.global_store = current_data
 
+# Wspólny model dla wszystkich profili: standardowe konto trwałe.
+# Jeśli jakiś profil nie ma poprawnie ustawionych pól, naprawiamy go od razu.
+for account_key, profile in list(st.session_state.global_store.get("user_data", {}).items()):
+    st.session_state.global_store["user_data"][account_key] = normalize_user_profile(account_key, profile)
 
-# --- 3. PRZYPISANIE ZMIENNYCH Z AKTUALNEGO STANU ---
-def_theme = st.session_state.global_store.get("default_theme_color", "#1E90FF")
-def_bg = st.session_state.global_store.get("default_bg_color", "#FFFFFF")
-def_clear = st.session_state.global_store.get("default_clear_btn_color", "#5cb85c")
-
-# --- SYNC Z URL I LOCALSTORAGE ---
-params = st.query_params
-url_key = params.get("ak", "").strip()
-
-if "user_author_key" not in st.session_state:
-    if url_key:
-        st.session_state.user_author_key = url_key
-    else:
-        st.session_state.user_author_key = ""
-
-# ... reszta pliku bez zmian ...
-
-# Dodatkowa korekta rejestracji standardowych kont: ustawienie trwałego statusu
-# (umieszczona w sekcji rejestracji, gdy użytkownik zakłada konto)
-# Warto dodać do obiektu nowo tworzonego profilu:
-# "is_temporary": False,
-# "expire_at": None,
-# w miejscach tworzenia user_data.
-
-# Normalizacja wszystkich istniejących profili podczas ładowania jest już w `load_global_data()`.
-
-# Sekcja rejestracji zwykłych kont: upewniamy się, że nowy profil jest trwały.
-# --- NOWY EKRAN LOGOWANIA I REJESTRACJI ---
-if not current_user:
-    st.title("📟 Witamy w aplikacji Koder")
-    st.write("Aby korzystać z systemu kodowania oraz paneli społecznościowych, musisz posiadać konto.")
-
-    components.html("""
-        <script>
-            var savedKey = localStorage.getItem("koder_author_key2");
-            if (savedKey) {
-                var currentUrl = new URL(window.parent.location.href);
-                currentUrl.searchParams.set("ak", savedKey);
-                window.parent.location.href = currentUrl.href;
-            }
-        </script>
-    """, height=0, width=0)
-
-    tab_login, tab_register = st.tabs(["🔑 Zaloguj się", "📝 Załóż nowe konto"])
-
-    with tab_register:
-        st.subheader("Utwórz unikalny profil")
-        with st.form("register_form_global_fixed"):
-            reg_key = st.text_input("Wybierz swój Klucz Konta (Login):", placeholder="np. mojekonto123").strip()
-            reg_nick = st.text_input("Twój podpis/nick (opcjonalnie):", placeholder="np. Janek")
-            reg_pass = st.text_input("Ustaw hasło (zostaw puste, jeśli nie chcesz hasła):", type="password", placeholder="Opcjonalne...")
-            submit_reg = st.form_submit_button("🚀 Zarejestruj konto")
-
-            if submit_reg:
-                if not reg_key:
-                    st.error("❌ Klucz konta nie może być pusty!")
-                elif reg_key == "admin2":
-                    st.error("❌ Klucz 'admin2' jest rezerwowany przez system ratunkowy.")
-                elif reg_key in st.session_state.global_store["user_data"]:
-                    st.error("❌ Podany klucz konta jest już zajęty! Wybierz inny.")
-                else:
-                    st.session_state.global_store["user_data"][reg_key] = normalize_user_profile(reg_key, {
-                        "history": [], "notepad": "", "has_liked": False,
-                        "saved_nick": reg_nick.strip() if reg_nick.strip() else reg_key,
-                        "password": reg_pass.strip(),
-                        "theme_color": def_theme, "bg_color": def_bg, "clear_btn_color": def_clear,
-                        "staff_bar_color": "#FF4B4B",
-                        "can_reset_passwords": False,
-                        "is_temporary": False,
-                        "expire_at": None,
-                    })
-                    save_global_data(st.session_state.global_store)
-
-                    st.session_state.user_author_key = reg_key
-                    st.query_params["ak"] = reg_key
-                    if reg_pass.strip():
-                        st.session_state.account_authenticated = True
-                        st.query_params["auth"] = "true"
-                        components.html(f'<script>localStorage.setItem("auth_{reg_key}", "true"); window.parent.parent.location.href = window.parent.parent.location.pathname + "?ak={reg_key}&auth=true";</script>', height=0, width=0)
-                    else:
-                        st.session_state.account_authenticated = False
-                        components.html(f"<script>localStorage.setItem('koder_author_key2', '{reg_key}'); window.parent.parent.location.href = window.parent.parent.location.pathname + '?ak={reg_key}';</script>", height=0, width=0)
-
-                    st.success("🎉 Konto zostało pomyślnie utworzone!")
-                    st.rerun()
-
-# Poniżej istnieje reszta pliku; nie zmieniamy jej logicznie, tylko upewniamy się, że
-# każda nowo tworzona ścieżka profilu ma poprawne pola stałe i trwałe.
+# --- reszta pliku niezmieniona ---
