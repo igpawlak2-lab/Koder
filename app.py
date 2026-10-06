@@ -1,12 +1,13 @@
-import hashlib
 import json
 import os
 import time
+import hashlib
 
 import streamlit as st
 
-# --- Stałe aplikacji ---
-TEMP_ACCOUNT_LIFETIME = 20 * 60
+st.set_page_config(page_title="Koder", page_icon="📟", layout="wide")
+
+CZAS_KONTA_TESTOWEGO = 20 * 60
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_FILE = os.path.join(BASE_DIR, "dane_aplikacji.json")
 
@@ -19,7 +20,7 @@ def default_store():
         "moderators": [],
         "admins": [],
         "vips": [],
-        "announcement": "Brak ogłoszeń.",
+        "announcement": "Brak aktualnych ogłoszeń.",
         "default_theme_color": "#1E90FF",
         "default_bg_color": "#FFFFFF",
         "default_clear_btn_color": "#5cb85c",
@@ -28,90 +29,90 @@ def default_store():
 
 def generate_account_secure_code(account_key):
     salt = "KoderSecureSystemSalt2026"
-    hashed = hashlib.sha256((account_key + salt).encode("utf-8")).hexdigest()
-    return str(int(hashed[:8], 16))[-6:].zfill(6)
+    digest = hashlib.sha256((account_key + salt).encode("utf-8")).hexdigest()
+    return str(int(digest[:8], 16))[-6:].zfill(6)
 
 
-def normalize_user_profile(account_key, user_profile):
-    if not isinstance(user_profile, dict):
+def normalize_user_profile(account_key, profile):
+    if not isinstance(profile, dict):
         return {}
 
-    user_profile.setdefault("saved_nick", account_key)
-    user_profile.setdefault("password", "")
-    user_profile.setdefault("history", [])
-    user_profile.setdefault("notepad", "")
-    user_profile.setdefault("has_liked", False)
-    user_profile.setdefault("theme_color", "#1E90FF")
-    user_profile.setdefault("bg_color", "#FFFFFF")
-    user_profile.setdefault("clear_btn_color", "#5cb85c")
-    user_profile.setdefault("staff_bar_color", "#FF4B4B")
-    user_profile.setdefault("can_reset_passwords", False)
-    user_profile.setdefault("created_at", time.time())
-    user_profile.setdefault("is_temporary", False)
-    user_profile["is_temporary"] = bool(user_profile.get("is_temporary", False))
+    profile.setdefault("saved_nick", account_key)
+    profile.setdefault("password", "")
+    profile.setdefault("history", [])
+    profile.setdefault("notepad", "")
+    profile.setdefault("has_liked", False)
+    profile.setdefault("theme_color", "#1E90FF")
+    profile.setdefault("bg_color", "#FFFFFF")
+    profile.setdefault("clear_btn_color", "#5cb85c")
+    profile.setdefault("staff_bar_color", "#FF4B4B")
+    profile.setdefault("can_reset_passwords", False)
+    profile.setdefault("created_at", time.time())
+    profile.setdefault("is_temporary", False)
+    profile["is_temporary"] = bool(profile.get("is_temporary", False))
+    profile.setdefault("expire_at", None)
+    if profile["is_temporary"] and profile["expire_at"] is None:
+        profile["expire_at"] = time.time() + CZAS_KONTA_TESTOWEGO
+    if not profile["is_temporary"]:
+        profile["expire_at"] = None
+    profile.setdefault("sec_code", generate_account_secure_code(account_key))
+    return profile
 
-    if user_profile["is_temporary"]:
-        user_profile.setdefault("expire_at", time.time() + TEMP_ACCOUNT_LIFETIME)
-    else:
-        user_profile["expire_at"] = None
 
-    user_profile.setdefault("sec_code", generate_account_secure_code(account_key))
-    return user_profile
+def ensure_user_profile(storage, account_key):
+    if not isinstance(storage, dict):
+        storage = {}
+    storage.setdefault("user_data", {})
+    if account_key not in storage["user_data"] or not isinstance(storage["user_data"][account_key], dict):
+        storage["user_data"][account_key] = {}
+    storage["user_data"][account_key] = normalize_user_profile(account_key, storage["user_data"][account_key])
+    return storage
 
 
-def ensure_user_profile(data, account_key):
+def load_global_data():
+    defaults = default_store()
+    if not os.path.exists(DATA_FILE):
+        return defaults
+
+    try:
+        with open(DATA_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:
+        return defaults
+
     if not isinstance(data, dict):
-        data = {}
-    data.setdefault("user_data", {})
-    if account_key not in data["user_data"] or not isinstance(data["user_data"][account_key], dict):
-        data["user_data"][account_key] = {}
-    data["user_data"][account_key] = normalize_user_profile(account_key, data["user_data"][account_key])
+        return defaults
+
+    for key, value in defaults.items():
+        if key not in data:
+            data[key] = value
+
+    if not isinstance(data.get("user_data"), dict):
+        data["user_data"] = {}
+    if not isinstance(data.get("moderators"), list):
+        data["moderators"] = []
+    if not isinstance(data.get("admins"), list):
+        data["admins"] = []
+    if not isinstance(data.get("vips"), list):
+        data["vips"] = []
+
+    for user_key, profile in list(data["user_data"].items()):
+        if isinstance(profile, dict):
+            data["user_data"][user_key] = normalize_user_profile(user_key, profile)
+
     return data
 
 
 def save_global_data(data):
     try:
         os.makedirs(os.path.dirname(DATA_FILE), exist_ok=True)
-        tmp = DATA_FILE + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
+        tmp_path = DATA_FILE + ".tmp"
+        with open(tmp_path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=4)
-        os.replace(tmp, DATA_FILE)
+        os.replace(tmp_path, DATA_FILE)
         return True
     except Exception:
         return False
-
-
-def load_global_data():
-    default = default_store()
-    if not os.path.exists(DATA_FILE):
-        return default
-
-    try:
-        with open(DATA_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        if not isinstance(data, dict):
-            return default
-
-        for key, value in default.items():
-            if key not in data:
-                data[key] = value
-
-        if not isinstance(data.get("user_data"), dict):
-            data["user_data"] = {}
-        if not isinstance(data.get("moderators"), list):
-            data["moderators"] = []
-        if not isinstance(data.get("admins"), list):
-            data["admins"] = []
-        if not isinstance(data.get("vips"), list):
-            data["vips"] = []
-
-        for key, profile in list(data["user_data"].items()):
-            if isinstance(profile, dict):
-                data["user_data"][key] = normalize_user_profile(key, profile)
-
-        return data
-    except Exception:
-        return default
 
 
 def persist_store(data=None):
@@ -120,7 +121,7 @@ def persist_store(data=None):
     if not isinstance(data, dict):
         data = {}
     data.setdefault("user_data", {})
-    for key, profile in list(data.get("user_data", {}).items()):
+    for key, profile in list(data["user_data"].items()):
         if isinstance(profile, dict):
             data["user_data"][key] = normalize_user_profile(key, profile)
     save_global_data(data)
@@ -132,28 +133,25 @@ def purge_expired_accounts(data):
     if not isinstance(data, dict):
         return default_store()
     now = time.time()
-    changed = False
     expired = []
-
-    for account_key, profile in list(data.get("user_data", {}).items()):
-        if isinstance(profile, dict) and profile.get("is_temporary") is True:
+    user_data = data.get("user_data", {})
+    for key, profile in list(user_data.items()):
+        if isinstance(profile, dict) and profile.get("is_temporary"):
             expire_at = profile.get("expire_at")
             if expire_at is not None and now > float(expire_at):
-                expired.append(account_key)
+                expired.append(key)
 
     for key in expired:
-        data["user_data"].pop(key, None)
+        user_data.pop(key, None)
         for role in ("admins", "moderators", "vips"):
             if role in data and key in data[role]:
                 data[role] = [x for x in data[role] if x != key]
-        changed = True
 
-    if changed:
+    if expired:
         save_global_data(data)
     return data
 
 
-# --- Inicjalizacja sesji ---
 if "global_store" not in st.session_state:
     st.session_state.global_store = load_global_data()
 
@@ -163,7 +161,6 @@ st.session_state.global_store = purge_expired_accounts(st.session_state.global_s
 def set_role(target_key, new_role):
     data = load_global_data()
     data = ensure_user_profile(data, target_key)
-
     for role in ("admins", "moderators", "vips"):
         data.setdefault(role, [])
         if target_key in data[role]:
@@ -180,125 +177,162 @@ def set_role(target_key, new_role):
     return data
 
 
-st.set_page_config(page_title="Koder", page_icon="📟", layout="wide")
+def get_current_user():
+    return st.session_state.get("user_author_key", "")
 
-# --- UI ---
-current_user = st.session_state.get("user_author_key", "")
 
-if not current_user:
-    st.title("📟 Koder")
+# --- login/register ---
+if "user_author_key" not in st.session_state:
+    st.session_state.user_author_key = ""
+
+if not st.session_state.user_author_key:
+    st.title("Koder")
     st.write("Zaloguj się lub utwórz konto.")
 
-    tab_login, tab_register = st.tabs(["🔑 Zaloguj się", "📝 Rejestracja"])
+    login_tab, register_tab = st.tabs(["Zaloguj", "Rejestracja"])
 
-    with tab_login:
+    with login_tab:
         with st.form("login_form"):
-            login_key = st.text_input("Klucz konta")
-            login_password = st.text_input("Hasło", type="password")
-            if st.form_submit_button("Zaloguj"):
-                data = st.session_state.global_store
-                profile = data.get("user_data", {}).get(login_key)
-                if not profile:
+            key = st.text_input("Klucz konta")
+            password = st.text_input("Hasło", type="password")
+            submitted = st.form_submit_button("Zaloguj")
+            if submitted:
+                data = load_global_data()
+                if key not in data.get("user_data", {}):
                     st.error("Konto nie istnieje.")
-                elif profile.get("password", "") != login_password:
-                    st.error("Błędne hasło.")
                 else:
-                    st.session_state.user_author_key = login_key
-                    st.query_params["ak"] = login_key
-                    st.rerun()
+                    profile = data["user_data"][key]
+                    profile = normalize_user_profile(key, profile)
+                    if profile.get("password", "") != password:
+                        st.error("Błędne hasło.")
+                    else:
+                        st.session_state.user_author_key = key
+                        st.success("Zalogowano.")
+                        st.rerun()
 
-    with tab_register:
+    with register_tab:
         with st.form("register_form"):
-            reg_key = st.text_input("Klucz konta")
-            reg_nick = st.text_input("Nick")
-            reg_pass = st.text_input("Hasło", type="password")
-            if st.form_submit_button("Utwórz konto"):
-                if not reg_key:
+            key = st.text_input("Nowy klucz konta")
+            nick = st.text_input("Nick")
+            password = st.text_input("Hasło", type="password")
+            temporary = st.checkbox("Konto testowe (20 min)")
+            submitted = st.form_submit_button("Utwórz konto")
+            if submitted:
+                if not key:
                     st.error("Klucz nie może być pusty.")
-                elif reg_key in st.session_state.global_store.get("user_data", {}):
-                    st.error("Klucz jest już zajęty.")
                 else:
                     data = load_global_data()
-                    data = ensure_user_profile(data, reg_key)
-                    data["user_data"][reg_key].update({
-                        "saved_nick": reg_nick or reg_key,
-                        "password": reg_pass,
-                        "theme_color": st.session_state.global_store.get("default_theme_color", "#1E90FF"),
-                        "bg_color": st.session_state.global_store.get("default_bg_color", "#FFFFFF"),
-                        "clear_btn_color": st.session_state.global_store.get("default_clear_btn_color", "#5cb85c"),
-                        "is_temporary": False,
-                        "expire_at": None,
+                    data = ensure_user_profile(data, key)
+                    data["user_data"][key].update({
+                        "saved_nick": nick or key,
+                        "password": password,
+                        "is_temporary": temporary,
+                        "expire_at": time.time() + CZAS_KONTA_TESTOWEGO if temporary else None,
                     })
                     persist_store(data)
-                    st.session_state.user_author_key = reg_key
-                    st.query_params["ak"] = reg_key
+                    st.session_state.user_author_key = key
                     st.success("Konto utworzone.")
                     st.rerun()
 
     st.stop()
 
-# --- Po zalogowaniu ---
-user_data = st.session_state.global_store.get("user_data", {})
-profile = normalize_user_profile(current_user, user_data.get(current_user, {}))
-st.session_state.global_store["user_data"][current_user] = profile
-persist_store(st.session_state.global_store)
+current_user = get_current_user()
+store = load_global_data()
+store = ensure_user_profile(store, current_user)
+profile = store["user_data"][current_user]
+
+if profile.get("is_temporary") and profile.get("expire_at") is not None:
+    left = int(float(profile["expire_at"]) - time.time())
+    if left <= 0:
+        store["user_data"].pop(current_user, None)
+        for role in ("admins", "moderators", "vips"):
+            if role in store and current_user in store[role]:
+                store[role] = [x for x in store[role] if x != current_user]
+        persist_store(store)
+        st.session_state.user_author_key = ""
+        st.rerun()
 
 st.title(f"Witaj, {profile.get('saved_nick', current_user)}")
 
-if profile.get("is_temporary"):
-    remaining = int(float(profile.get("expire_at", 0)) - time.time())
-    st.caption(f"To konto testowe. Wygasa za: {max(0, remaining)} sekund.")
-else:
-    st.caption("To konto jest trwałe i nie będzie usuwane automatycznie.")
-
 roles = []
-if current_user in st.session_state.global_store.get("admins", []):
+if current_user in store.get("admins", []):
     roles.append("admin")
-if current_user in st.session_state.global_store.get("moderators", []):
+if current_user in store.get("moderators", []):
     roles.append("moderator")
-if current_user in st.session_state.global_store.get("vips", []):
+if current_user in store.get("vips", []):
     roles.append("vip")
-
 if not roles:
     roles.append("user")
 
 st.write("Rangi:", ", ".join(roles))
 
-if current_user == "admin" or current_user in st.session_state.global_store.get("admins", []):
-    st.subheader("Zarządzanie rangami")
-    with st.form("role_form"):
-        target_key = st.selectbox("Użytkownik", options=sorted(user_data.keys()))
-        new_role = st.selectbox("Nowa rola", ["user", "moderator", "vip", "admin"])
-        if st.form_submit_button("Zapisz rangę"):
-            if target_key == current_user and new_role != "admin":
-                st.warning("Nie można zmienić własnej rangi na niższą niż admin.")
+if profile.get("is_temporary"):
+    st.caption("To konto testowe. Wygasa automatycznie po 20 minutach.")
+else:
+    st.caption("To konto jest trwałe.")
+
+# --- admin panel ---
+if current_user in store.get("admins", []) or current_user == "admin":
+    st.subheader("Panel administracyjny")
+    with st.form("admin_role_form"):
+        target_key = st.selectbox("Użytkownik", options=sorted(store.get("user_data", {}).keys()))
+        role = st.selectbox("Ranga", ["user", "vip", "moderator", "admin"])
+        submitted = st.form_submit_button("Zapisz rangę")
+        if submitted:
+            if target_key == "admin":
+                st.warning("Nie można zmienić rangi głównego administratora.")
             else:
-                set_role(target_key, new_role)
+                set_role(target_key, role)
                 st.success("Ranga zapisana.")
                 st.rerun()
 
-if st.button("Wyloguj"):
-    st.session_state.pop("user_author_key", None)
-    st.query_params.clear()
-    st.rerun()
+# --- profile settings ---
+with st.expander("Ustawienia profilu"):
+    user_saved_nick = st.text_input("Nick", value=profile.get("saved_nick", current_user))
+    if user_saved_nick != profile.get("saved_nick", current_user):
+        store["user_data"][current_user]["saved_nick"] = user_saved_nick.strip() or current_user
+        persist_store(store)
+        st.rerun()
 
-# --- Konto testowe demo ---
-if st.button("Utwórz konto testowe (20 min)"):
-    key = f"test_{int(time.time())}"
-    data = load_global_data()
-    data = ensure_user_profile(data, key)
-    data["user_data"][key].update({
-        "saved_nick": key,
-        "password": "",
-        "is_temporary": True,
-        "expire_at": time.time() + TEMP_ACCOUNT_LIFETIME,
-    })
-    persist_store(data)
-    st.success(f"Utworzono konto testowe: {key}")
-    st.rerun()
+    new_password = st.text_input("Nowe hasło", type="password")
+    if new_password:
+        if st.button("Zapisz hasło"):
+            store["user_data"][current_user]["password"] = new_password
+            persist_store(store)
+            st.success("Hasło zapisane.")
+            st.rerun()
+
+    if st.button("Usuń hasło"):
+        store["user_data"][current_user]["password"] = ""
+        persist_store(store)
+        st.success("Hasło usunięte.")
+        st.rerun()
+
+    st.write("Kod bezpieczeństwa:", generate_account_secure_code(current_user))
+
+# --- Koder tool ---
+st.subheader("Narzędzie Koder")
+text = st.text_input("Wpisz tekst")
+if text:
+    mode = st.radio("Tryb", ["Koduj", "Dekoduj"], horizontal=True)
+    if mode == "Koduj":
+        result = " ".join([f"{ch}:{ord(ch)}" for ch in text])
+    else:
+        try:
+            parts = text.split()
+            result = "".join(chr(int(p.split(":")[-1])) for p in parts if ":" in p)
+        except Exception:
+            result = "Błąd dekodowania"
+    st.code(result)
 
 st.write("---")
-for key, profile in sorted(user_data.items()):
-    status = "testowe" if profile.get("is_temporary") else "trwałe"
-    st.write(f"- {key}: {status} | password={'tak' if profile.get('password') else 'nie'} | role={profile.get('role','user')}")
+if st.button("Wyloguj"):
+    st.session_state.user_author_key = ""
+    st.rerun()
+
+# --- user list for admins ---
+with st.expander("Lista użytkowników"):
+    for key, profile_data in sorted(store.get("user_data", {}).items()):
+        status = "testowe" if profile_data.get("is_temporary") else "trwałe"
+        st.write(f"- {key} | {profile_data.get('saved_nick')} | {status} | hasło={'tak' if profile_data.get('password') else 'nie'}")
 
