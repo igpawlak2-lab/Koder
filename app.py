@@ -7,16 +7,8 @@ import streamlit as st
 
 st.set_page_config(page_title="Koder", page_icon="📟", layout="wide")
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-CSS_PATH = os.path.join(BASE_DIR, "styles.css")
-if os.path.exists(CSS_PATH):
-    try:
-        with open(CSS_PATH, "r", encoding="utf-8") as f:
-            st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
-    except Exception:
-        pass
-
 CZA_S_KONTA_TESTOWEGO = 20 * 60
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_FILE = os.path.join(BASE_DIR, "dane_aplikacji.json")
 
 
