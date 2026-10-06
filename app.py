@@ -7,7 +7,6 @@ import streamlit as st
 
 st.set_page_config(page_title="Koder", page_icon="📟", layout="wide")
 
-# Wczytanie stylów z pliku CSS (zachowuje dotychczasową logikę aplikacji)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CSS_PATH = os.path.join(BASE_DIR, "styles.css")
 if os.path.exists(CSS_PATH):
@@ -17,8 +16,7 @@ if os.path.exists(CSS_PATH):
     except Exception:
         pass
 
-Czas_konta_testowego = 20 * 60
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CZA_S_KONTA_TESTOWEGO = 20 * 60
 DATA_FILE = os.path.join(BASE_DIR, "dane_aplikacji.json")
 
 
@@ -62,7 +60,7 @@ def normalize_user_profile(account_key, profile):
     profile["is_temporary"] = bool(profile.get("is_temporary", False))
     profile.setdefault("expire_at", None)
     if profile["is_temporary"] and profile["expire_at"] is None:
-        profile["expire_at"] = time.time() + CZAS_KONTA_TESTOWEGO
+        profile["expire_at"] = time.time() + CZA_S_KONTA_TESTOWEGO
     if not profile["is_temporary"]:
         profile["expire_at"] = None
     profile.setdefault("sec_code", generate_account_secure_code(account_key))
@@ -237,7 +235,7 @@ if not st.session_state.user_author_key:
                         "saved_nick": nick or key,
                         "password": password,
                         "is_temporary": temporary,
-                        "expire_at": time.time() + CZAS_KONTA_TESTOWEGO if temporary else None,
+                        "expire_at": time.time() + CZA_S_KONTA_TESTOWEGO if temporary else None,
                     })
                     persist_store(data)
                     st.session_state.user_author_key = key
