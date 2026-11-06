@@ -3,6 +3,7 @@ import hashlib
 import json
 import os
 import re
+import random
 import time
 import uuid
 
@@ -1030,13 +1031,43 @@ def clean_txt(t):
     return re.sub(r'[^A-Z ]', '', t)
 
 # --- SYSTEMY KODOWANIA V1 ORAZ V2 ---
-def enc_v1(l):
-    for i, (g, o, s) in DATA_MAP.items():
-        if s == l: return f"{i}"
-    for i, (g, o, s) in DATA_MAP.items():
-        if s[0] == l and len(s) > 1: return f"{i}.1"
-        if len(s) > 1 and s[1] == l.lower(): return f"{i}.2"
-    return "?"
+def enc_v1(letter):
+    candidates = []
+    for element_id, (_, _, symbol) in DATA_MAP.items():
+        if symbol == letter:
+            candidates.append(str(element_id))
+        elif len(symbol) > 1:
+            if symbol[0] == letter:
+                candidates.append(f"{element_id}.1")
+            if symbol[1].upper() == letter:
+                candidates.append(f"{element_id}.2")
+    return random.choice(candidates) if candidates else "?"
+
+
+def enc_v2(letter):
+    candidates = []
+    for _, (group, period, symbol) in DATA_MAP.items():
+        if symbol == letter:
+            candidates.append(f"{group}.{period}")
+        elif len(symbol) > 1:
+            if symbol[0] == letter:
+                candidates.append(f"{group}.{period}1")
+            if symbol[1].upper() == letter:
+                candidates.append(f"{group}.{period}2")
+    return random.choice(candidates) if candidates else "?"
+
+
+def enc_v3(letter):
+    candidates = []
+    for _, (group, period, symbol) in DATA_MAP.items():
+        if symbol == letter:
+            candidates.append(f"{period}.{group}.0")
+        elif len(symbol) > 1:
+            if symbol[0] == letter:
+                candidates.append(f"{period}.{group}.1")
+            if symbol[1].upper() == letter:
+                candidates.append(f"{period}.{group}.2")
+    return random.choice(candidates) if candidates else "?"
 
 def format_v1_unicode(code_str):
     if "." in code_str:
@@ -1064,13 +1095,6 @@ def dec_v1(s):
     except ValueError: pass
     return "?"
 
-def enc_v2(l):
-    for i, (g, o, s) in DATA_MAP.items():
-        if s == l: return f"{g}.{o}"
-    for i, (g, o, s) in DATA_MAP.items():
-        if s[0] == l and len(s) > 1: return f"{g}.{o}1"
-        if len(s) > 1 and s[1] == l.lower(): return f"{g}.{o}2"
-    return "?"
 
 def format_v2_unicode(code_str):
     if "." in code_str:
@@ -1108,13 +1132,7 @@ def dec_v2(s):
     return "?"
 
 # --- UNIKALNY ALGORYTM: KOD 3 ---
-def enc_v3(l):
-    for i, (g, o, s) in DATA_MAP.items():
-        if s == l: return f"{o}.{g}.0"
-    for i, (g, o, s) in DATA_MAP.items():
-        if s[0] == l and len(s) > 1: return f"{o}.{g}.1"
-        if len(s) > 1 and s[1] == l.lower(): return f"{o}.{g}.2"
-    return "?"
+
 
 def format_v3_unicode(code_str):
     if "." in code_str:
