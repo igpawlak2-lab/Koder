@@ -1237,32 +1237,59 @@ with c1:
                 st.error("❌ Brak uprawnień! Kod 3 jest dostępny wyłącznie dla użytkowników z rangą VIP lub wyższą.")
             else:
                 res_display = ""
+
                 if mode == "Koduj":
-                    words = clean_txt(txt).split(' ')
-                    if "Kod 1" in proto:
-                        raw_words = [[enc_v1(l) for l in w] for w in words]
-                        res_display = "   ".join([" ".join([format_v1_unicode(l) for l in w]) for w in raw_words])
-                    elif "Kod 2" in proto:
-                        raw_words = [[enc_v2(l) for l in w] for w in words]
-                        res_display = "   ".join([" ".join([format_v2_unicode(l) for l in w]) for w in raw_words])
-                    elif "Kod 3" in proto:
-                        raw_words = [[enc_v3(l) for l in w] for w in words]
-                        res_display = "   ".join([" ".join([format_v3_unicode(l) for l in w]) for w in raw_words])
+                    cache_key = (current_user, proto, txt)
+
+                    if st.session_state.get("_random_encoding_cache_key") == cache_key:
+                        res_display = st.session_state["_random_encoding_cache_value"]
+                    else:
+                        words = clean_txt(txt).split(" ")
+
+                        if "Kod 1" in proto:
+                            raw_words = [[enc_v1(letter) for letter in word] for word in words]
+                            res_display = "   ".join(
+                                [" ".join(format_v1_unicode(code) for code in word) for word in raw_words]
+                            )
+                        elif "Kod 2" in proto:
+                            raw_words = [[enc_v2(letter) for letter in word] for word in words]
+                            res_display = "   ".join(
+                                [" ".join(format_v2_unicode(code) for code in word) for word in raw_words]
+                            )
+                        elif "Kod 3" in proto:
+                            raw_words = [[enc_v3(letter) for letter in word] for word in words]
+                            res_display = "   ".join(
+                                [" ".join(format_v3_unicode(code) for code in word) for word in raw_words]
+                            )
+
+                        st.session_state["_random_encoding_cache_key"] = cache_key
+                        st.session_state["_random_encoding_cache_value"] = res_display
+
                 else:
                     decoded_words = []
-                    for w in txt.split("   "):
+                    for word in txt.split("   "):
                         word_chars = []
-                        for s in w.strip().split(" "):
-                            if s: 
-                                if "Kod 1" in proto: word_chars.append(dec_v1(s))
-                                elif "Kod 2" in proto: word_chars.append(dec_v2(s))
-                                elif "Kod 3" in proto: word_chars.append(dec_v3(s))
+                        for code in word.strip().split(" "):
+                            if code:
+                                if "Kod 1" in proto:
+                                    word_chars.append(dec_v1(code))
+                                elif "Kod 2" in proto:
+                                    word_chars.append(dec_v2(code))
+                                elif "Kod 3" in proto:
+                                    word_chars.append(dec_v3(code))
                         decoded_words.append("".join(word_chars))
+
                     res_display = " ".join(decoded_words)
 
-                st.markdown(f"**Wynik:** <div style='font-size:1.4rem; font-weight:bold; background-color:#F0F2F6; color:#1E1E1E; padding:12px; border-radius:8px; margin-bottom:10px;'>{res_display}</div>", unsafe_allow_html=True)
+                st.markdown(
+                    f"**Wynik:** <div style='font-size:1.4rem; font-weight:bold; "
+                    f"background-color:#F0F2F6; color:#1E1E1E; padding:12px; "
+                    f"border-radius:8px; margin-bottom:10px;'>{res_display}</div>",
+                    unsafe_allow_html=True,
+                )
+
                 if mode == "Koduj":
-                    st.caption("📋 Kliknij ikonę po prawej stronie bloku, aby skopiować kod wraz z indeksami:")
+                    st.caption("📋 Kliknij ikonę kopiowania, aby skopiować kod:")
                     st.code(res_display, language="text")
                 
                 h_time = datetime.datetime.now().strftime('%H:%M:%S')
