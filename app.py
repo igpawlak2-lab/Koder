@@ -1239,7 +1239,13 @@ with c1:
         mode = st.session_state.mode_selection
         
         st.write(" ")
-        txt = st.text_input("Wprowadź dane i zatwierdź Enterem:", placeholder="Wpisz dane tutaj...", key="main_encoder_input_field")
+                with st.form("encoder_form"):
+            txt = st.text_input(
+                "Wprowadź dane i zatwierdź Enterem:",
+                placeholder="Wpisz dane tutaj...",
+                key="main_encoder_input_field",
+            )
+            submit_encoder = st.form_submit_button("⚙️ Wykonaj")
         
         if txt:
             if "Kod 3" in proto and not has_kod3_access:
