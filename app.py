@@ -1262,13 +1262,7 @@ with c1:
 
                 st.markdown(f"**Wynik:** <div style='font-size:1.4rem; font-weight:bold; background-color:#F0F2F6; color:#1E1E1E; padding:12px; border-radius:8px; margin-bottom:10px;'>{res_display}</div>", unsafe_allow_html=True)
                 if mode == "Koduj":
-                  cache_key = (current_user, proto, txt)
-if st.session_state.get("_random_encoding_cache_key") == cache_key:
-    res_display = st.session_state["_random_encoding_cache_value"]
-else:
-    st.session_state["_random_encoding_cache_key"] = cache_key
-    st.session_state["_random_encoding_cache_value"] = res_display
-                      st.caption("📋 Kliknij ikonę po prawej stronie bloku, aby skopiować kod wraz z indeksami:")
+                    st.caption("📋 Kliknij ikonę po prawej stronie bloku, aby skopiować kod wraz z indeksami:")
                     st.code(res_display, language="text")
                 
                 h_time = datetime.datetime.now().strftime('%H:%M:%S')
