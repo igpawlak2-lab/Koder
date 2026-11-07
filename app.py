@@ -18,8 +18,8 @@ CZAS_KONTA_TESTOWEGO = 20 * 60  # 20 minut = 1200 sekund
 BEZPIECZNY_CZAS_ZWYKLEGO = 2_000_000_000  # 2 miliardy sekund (~63,4 roku)
 
 # --- GLOBALNY PLIK JSON (STRUKTURA DANYCH DLA WSZYSTKICH KONT) ---
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_FILE = os.path.join(BASE_DIR, "dane_aplikacji.json")
+DATA_FILE = "dane_aplikacji.json"
+
 
 def load_global_data():
     default_data = {
@@ -85,20 +85,11 @@ def load_global_data():
 
 
 def save_global_data(data):
-    tmp_path = DATA_FILE + ".tmp"
     try:
-        with open(tmp_path, "w", encoding="utf-8") as f:
+        with open(DATA_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=4)
-            f.flush()
-            os.fsync(f.fileno())
-
-        os.replace(tmp_path, DATA_FILE)
-        return True
-    except OSError as exc:
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
-        st.error(f"Nie udało się zapisać danych konta: {exc}")
-        return False
+    except:
+        pass
 
 
 # Funkcja generująca bezpieczny kod weryfikacyjny konta
@@ -1239,13 +1230,7 @@ with c1:
         mode = st.session_state.mode_selection
         
         st.write(" ")
-                with st.form("encoder_form"):
-            txt = st.text_input(
-                "Wprowadź dane i zatwierdź Enterem:",
-                placeholder="Wpisz dane tutaj...",
-                key="main_encoder_input_field",
-            )
-            submit_encoder = st.form_submit_button("⚙️ Wykonaj")
+        txt = st.text_input("Wprowadź dane i zatwierdź Enterem:", placeholder="Wpisz dane tutaj...", key="main_encoder_input_field")
         
         if txt:
             if "Kod 3" in proto and not has_kod3_access:
