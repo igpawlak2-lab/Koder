@@ -1254,7 +1254,7 @@ if st.session_state.get("_random_encoding_cache_key") == cache_key:
 else:
     st.session_state["_random_encoding_cache_key"] = cache_key
     st.session_state["_random_encoding_cache_value"] = res_display
-                else:
+            else:
                     decoded_words = []
                     for w in txt.split("   "):
                         word_chars = []
