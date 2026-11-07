@@ -85,11 +85,20 @@ def load_global_data():
 
 
 def save_global_data(data):
+    tmp_path = DATA_FILE + ".tmp"
     try:
-        with open(DATA_FILE, "w", encoding="utf-8") as f:
+        with open(tmp_path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=4)
-    except:
-        pass
+            f.flush()
+            os.fsync(f.fileno())
+
+        os.replace(tmp_path, DATA_FILE)
+        return True
+    except OSError as exc:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+        st.error(f"Nie udało się zapisać danych konta: {exc}")
+        return False
 
 
 # Funkcja generująca bezpieczny kod weryfikacyjny konta
