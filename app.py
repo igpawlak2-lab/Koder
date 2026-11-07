@@ -18,8 +18,8 @@ CZAS_KONTA_TESTOWEGO = 20 * 60  # 20 minut = 1200 sekund
 BEZPIECZNY_CZAS_ZWYKLEGO = 2_000_000_000  # 2 miliardy sekund (~63,4 roku)
 
 # --- GLOBALNY PLIK JSON (STRUKTURA DANYCH DLA WSZYSTKICH KONT) ---
-DATA_FILE = "dane_aplikacji.json"
-
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_FILE = os.path.join(BASE_DIR, "dane_aplikacji.json")
 
 def load_global_data():
     default_data = {
