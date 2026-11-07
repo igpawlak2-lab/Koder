@@ -1247,7 +1247,7 @@ with c1:
             )
             submit_encoder = st.form_submit_button("⚙️ Wykonaj")
         
-                if submit_encoder and txt:
+        if txt:
             if "Kod 3" in proto and not has_kod3_access:
                 st.error("❌ Brak uprawnień! Kod 3 jest dostępny wyłącznie dla użytkowników z rangą VIP lub wyższą.")
             else:
