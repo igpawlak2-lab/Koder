@@ -1248,6 +1248,12 @@ with c1:
                     elif "Kod 3" in proto:
                         raw_words = [[enc_v3(l) for l in w] for w in words]
                         res_display = "   ".join([" ".join([format_v3_unicode(l) for l in w]) for w in raw_words])
+                cache_key = (current_user, proto, txt)
+if st.session_state.get("_random_encoding_cache_key") == cache_key:
+    res_display = st.session_state["_random_encoding_cache_value"]
+else:
+    st.session_state["_random_encoding_cache_key"] = cache_key
+    st.session_state["_random_encoding_cache_value"] = res_display
                 else:
                     decoded_words = []
                     for w in txt.split("   "):
