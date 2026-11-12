@@ -1155,28 +1155,61 @@ def format_v3_unicode(code_str):
 
 def dec_v3(s):
     s = s.strip()
-    if not s: return "?"
-    try:
-        o_part, g_str, pos_str = "", "", ""
-        in_sub, in_sup = False, False
+    if not s:
+        return "?"
+
+    # Zapis kropkowy: okres.grupa.pozycja, np. 5.4.1
+    if "." in s:
+        parts = s.split(".")
+        if len(parts) != 3:
+            return "?"
+        try:
+            period = int(parts[0])
+            group = int(parts[1])
+            position = int(parts[2])
+        except ValueError:
+            return "?"
+    else:
+        # Zapis z indeksami, np. 5₄¹
+        period_part = ""
+        group_part = ""
+        position_part = ""
+        section = "period"
+
         for char in s:
-            if char in REV_SUB: 
-                g_str += REV_SUB[char]
-                in_sub = True
-            elif char in REV_SUP: 
-                pos_str += REV_SUP[char]
-                in_sup = True
+            if char in REV_SUB:
+                group_part += REV_SUB[char]
+                section = "group"
+            elif char in REV_SUP:
+                position_part += REV_SUP[char]
+                section = "position"
+            elif char.isdigit():
+                if section == "period":
+                    period_part += char
+                else:
+                    return "?"
             else:
-                if not in_sub and not in_sup:
-                    o_part += char
-        o = int(o_part)
-        g = int(g_str)
-        pos = pos_str if pos_str in ["1", "2"] else "0"
-        
-        for i, (vg, vo, vs) in DATA_MAP.items():
-            if vo == o and vg == g:
-                return vs[1].upper() if pos == "2" and len(vs) > 1 else vs[0].upper()
-    except: pass
+                return "?"
+
+        if not period_part or not group_part:
+            return "?"
+
+        try:
+            period = int(period_part)
+            group = int(group_part)
+            position = int(position_part) if position_part else 0
+        except ValueError:
+            return "?"
+
+    if position not in (0, 1, 2):
+        return "?"
+
+    for _, (element_group, element_period, symbol) in DATA_MAP.items():
+        if element_period == period and element_group == group:
+            if position == 2:
+                return symbol[1].upper() if len(symbol) > 1 else "?"
+            return symbol[0].upper()
+
     return "?"
 
 
